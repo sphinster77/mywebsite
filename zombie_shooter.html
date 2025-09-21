@@ -65,7 +65,7 @@
     <div class="game-container">
         <div class="game-info">
             <div>Score: <span id="score">0</span></div>
-            <div>Lives: <span id="lives">3</span></div>
+            <div>Health: <span id="health">100</span></div>
             <div>Level: <span id="level">1</span></div>
         </div>
         
@@ -90,14 +90,17 @@
     <script>
         // Game variables
         let score = 0;
-        let lives = 3;
-        let level = 1;
+        let level = 1; // we'll display current wave here
+        let maxHealth = 100;
+        let playerHealth = maxHealth;
+        let lastHitTime = 0;
+        const hitCooldownMs = 800;
         let gameRunning = false;
         let gamePaused = false;
         
         // DOM elements
         const scoreElement = document.getElementById('score');
-        const livesElement = document.getElementById('lives');
+        const healthElement = document.getElementById('health');
         const levelElement = document.getElementById('level');
         const startBtn = document.getElementById('startBtn');
         const pauseBtn = document.getElementById('pauseBtn');
@@ -122,6 +125,15 @@
         
         let zombies = [];
         let bullets = [];
+
+        // Wave system
+        let wave = 1;
+        let waveActive = false;
+        let enemiesRemainingThisWave = 0;
+        let spawnIntervalMs = 1000;
+        let lastSpawnAt = 0;
+        let nextWaveAt = 0; // timestamp for next wave start
+        const timeBetweenWavesMs = 3000;
         
         // Event listeners
         startBtn.addEventListener('click', startGame);
@@ -140,10 +152,12 @@
                 gameRunning = true;
                 gamePaused = false;
                 resetGame();
+                startWave();
                 gameLoop();
                 startBtn.textContent = 'Restart';
             } else {
                 resetGame();
+                startWave();
             }
         }
         
@@ -160,10 +174,14 @@
         
         function resetGame() {
             score = 0;
-            lives = 3;
             level = 1;
+            wave = 1;
+            playerHealth = maxHealth;
             zombies = [];
             bullets = [];
+            waveActive = false;
+            enemiesRemainingThisWave = 0;
+            nextWaveAt = performance.now();
             updateUI();
         }
         
@@ -246,95 +264,128 @@
                 z.x += Math.cos(angle) * z.speed;
                 z.y += Math.sin(angle) * z.speed;
 
-                // If zombie hits player
-                if (rectsOverlap(
-                    { x: player.x - player.width / 2, y: player.y - player.height / 2, w: player.width, h: player.height },
-                    { x: z.x - z.width / 2, y: z.y - z.height / 2, w: z.width, h: z.height }
-                )) {
-                    zombies.splice(i, 1);
-                    lives--;
-                    updateUI();
-                    if (lives <= 0) {
+            // If zombie hits player
+            if (rectsOverlap(
+                { x: player.x - player.width / 2, y: player.y - player.height / 2, w: player.width, h: player.height },
+                { x: z.x - z.width / 2, y: z.y - z.height / 2, w: z.width, h: z.height }
+            )) {
+                const now = performance.now();
+                if (now - lastHitTime > hitCooldownMs) {
+                    lastHitTime = now;
+                    playerHealth -= z.damage;
+                    if (playerHealth <= 0) {
+                        playerHealth = 0;
+                        updateUI();
                         gameOver();
                         return;
                     }
+                    updateUI();
                 }
-            }
-            
-            // Spawn new zombies
-            if (Math.random() < Math.min(0.01 + level * 0.005, 0.05)) {
-                spawnZombie();
+                // Remove zombie after hit to avoid stacking hits
+                zombies.splice(i, 1);
             }
         }
         
-        function draw() {
-            // Clear canvas
-            ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-            
-            // Draw player
-            ctx.fillStyle = player.color;
-            ctx.fillRect(
-                player.x - player.width / 2,
-                player.y - player.height / 2,
-                player.width,
-                player.height
-            );
-            
-            // Draw bullets
-            ctx.fillStyle = '#f1c40f';
-            for (const bullet of bullets) {
-                ctx.beginPath();
-                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Draw zombies (simple rectangles)
-            for (const zombie of zombies) {
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(
-                    zombie.x - zombie.width / 2,
-                    zombie.y - zombie.height / 2,
-                    zombie.width,
-                    zombie.height
-                );
-                // Health bar
-                const hpRatio = zombie.hp / zombie.maxHp;
-                ctx.fillStyle = '#8e44ad';
-                ctx.fillRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width * hpRatio, 4);
-                ctx.strokeStyle = '#111';
-                ctx.strokeRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width, 4);
-                ctx.fillStyle = '#2ecc71';
-            }
-
-            // Draw crosshair at mouse position
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.5;
+        // Wave spawning control
+        const now = performance.now();
+        if (!waveActive && zombies.length === 0 && now >= nextWaveAt) {
+            startWave();
+        }
+        if (waveActive && enemiesRemainingThisWave > 0 && now - lastSpawnAt >= spawnIntervalMs) {
+            spawnZombie();
+            enemiesRemainingThisWave--;
+            lastSpawnAt = now;
+        }
+        if (waveActive && enemiesRemainingThisWave === 0 && zombies.length === 0) {
+            waveActive = false;
+            wave++;
+            level = wave; // show wave number in Level UI
+            nextWaveAt = now + timeBetweenWavesMs;
+            updateUI();
+        }
+    }
+    
+    function draw() {
+        // Clear canvas
+        ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+        
+        // Draw player
+        ctx.fillStyle = player.color;
+        ctx.fillRect(
+            player.x - player.width / 2,
+            player.y - player.height / 2,
+            player.width,
+            player.height
+        );
+        
+        // Draw bullets
+        ctx.fillStyle = '#f1c40f';
+        for (const bullet of bullets) {
             ctx.beginPath();
-            ctx.moveTo(mousePos.x - 10, mousePos.y);
-            ctx.lineTo(mousePos.x + 10, mousePos.y);
-            ctx.moveTo(mousePos.x, mousePos.y - 10);
-            ctx.lineTo(mousePos.x, mousePos.y + 10);
-            ctx.stroke();
-            
-            // Draw game over message
-            if (!gameRunning) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw zombies (simple rectangles)
+        for (const zombie of zombies) {
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(
+                zombie.x - zombie.width / 2,
+                zombie.y - zombie.height / 2,
+                zombie.width,
+                zombie.height
+            );
+            // Health bar
+            const hpRatio = zombie.hp / zombie.maxHp;
+            ctx.fillStyle = '#8e44ad';
+            ctx.fillRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width * hpRatio, 4);
+            ctx.strokeStyle = '#111';
+            ctx.strokeRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width, 4);
+        }
+
+        // Draw crosshair at mouse position
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(mousePos.x - 10, mousePos.y);
+        ctx.lineTo(mousePos.x + 10, mousePos.y);
+        ctx.moveTo(mousePos.x, mousePos.y - 10);
+        ctx.lineTo(mousePos.x, mousePos.y + 10);
+        ctx.stroke();
+
+        // Wave countdown message
+        if (!waveActive && zombies.length === 0) {
+            const now = performance.now();
+            const secs = Math.max(0, Math.ceil((nextWaveAt - now) / 1000));
+            if (secs > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                 ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-                
                 ctx.fillStyle = 'white';
-                ctx.font = '48px Arial';
+                ctx.font = '28px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText('Game Over', gameCanvas.width / 2, gameCanvas.height / 2);
-                
-                ctx.font = '24px Arial';
-                ctx.fillText(`Final Score: ${score}`, gameCanvas.width / 2, gameCanvas.height / 2 + 50);
-                
-                ctx.font = '20px Arial';
-                ctx.fillText('Click Start to play again', gameCanvas.width / 2, gameCanvas.height / 2 + 100);
+                ctx.fillText(`Wave ${wave} starting in ${secs}...`, gameCanvas.width / 2, gameCanvas.height / 2);
             }
         }
-        
-        function spawnZombie() {
+
+        // Draw game over message
+        if (!gameRunning) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over', gameCanvas.width / 2, gameCanvas.height / 2);
+            
+            ctx.font = '24px Arial';
+            ctx.fillText(`Final Score: ${score}`, gameCanvas.width / 2, gameCanvas.height / 2 + 50);
+            
+            ctx.font = '20px Arial';
+            ctx.fillText('Click Start to play again', gameCanvas.width / 2, gameCanvas.height / 2 + 100);
+        }
+    }
+    
+    function spawnZombie() {
             // Spawn at a random edge
             const edge = Math.floor(Math.random() * 4); // 0 top, 1 right, 2 bottom, 3 left
             let x, y;
@@ -348,16 +399,19 @@
                 x = -20; y = Math.random() * gameCanvas.height;
             }
 
-            const maxHp = 1 + Math.floor(level / 2);
-            const zombie = {
-                x,
-                y,
-                width: 30,
-                height: 40,
-                speed: 0.6 + Math.random() * (0.4 + level * 0.15),
-                hp: maxHp,
-                maxHp
-            };
+            // Zombie types: normal, fast, tank
+            const r = Math.random();
+            let type;
+            if (r < 0.6) type = 'normal';
+            else if (r < 0.85) type = 'fast';
+            else type = 'tank';
+
+            const base = 1 + Math.floor(wave / 2);
+            let width = 30, height = 40, speed = 0.8 + wave * 0.05, hp = base, damage = 10;
+            if (type === 'fast') { speed = 1.2 + wave * 0.08; hp = Math.max(1, base - 1); damage = 8; width = 26; height = 34; }
+            if (type === 'tank') { speed = 0.6 + wave * 0.03; hp = base + 2; damage = 20; width = 36; height = 48; }
+
+            const zombie = { x, y, width, height, speed, hp, maxHp: hp, damage, type };
             zombies.push(zombie);
         }
         
@@ -416,13 +470,22 @@
         
         function updateUI() {
             scoreElement.textContent = score;
-            livesElement.textContent = lives;
-            levelElement.textContent = level;
+            healthElement.textContent = playerHealth;
+            levelElement.textContent = level; // shows wave number
         }
         
         function gameOver() {
             gameRunning = false;
             draw();
+        }
+
+        function startWave() {
+            waveActive = true;
+            enemiesRemainingThisWave = 5 + wave * 2;
+            spawnIntervalMs = Math.max(300, 1000 - wave * 50);
+            lastSpawnAt = performance.now();
+            level = wave;
+            updateUI();
         }
 
         function onKeyDown(e) {
