@@ -31,6 +31,7 @@
             background-color: #222;
             margin: 20px 0;
             border: 2px solid #333;
+            cursor: none; /* We'll draw a custom crosshair */
         }
         .controls {
             margin: 20px 0;
@@ -103,6 +104,11 @@
         const resetBtn = document.getElementById('resetBtn');
         const gameCanvas = document.getElementById('gameCanvas');
         const ctx = gameCanvas.getContext('2d');
+        const keysPressed = {};
+        let mousePos = { x: 0, y: 0 };
+        let mouseDown = false;
+        let lastShotTime = 0;
+        const shotCooldownMs = 200; // 5 shots per second
         
         // Game objects
         let player = {
@@ -121,7 +127,12 @@
         startBtn.addEventListener('click', startGame);
         pauseBtn.addEventListener('click', togglePause);
         resetBtn.addEventListener('click', resetGame);
-        gameCanvas.addEventListener('click', shoot);
+        gameCanvas.addEventListener('mousedown', (e) => { mouseDown = true; tryShoot(e); });
+        window.addEventListener('mouseup', () => { mouseDown = false; });
+        gameCanvas.addEventListener('mouseleave', () => { mouseDown = false; });
+        gameCanvas.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
         
         // Game functions
         function startGame() {
@@ -166,6 +177,26 @@
         }
         
         function update() {
+            // Auto fire when mouse is held down
+            if (mouseDown) {
+                tryShoot();
+            }
+            // Player movement
+            let vx = 0, vy = 0;
+            if (keysPressed['w'] || keysPressed['ArrowUp']) vy -= 1;
+            if (keysPressed['s'] || keysPressed['ArrowDown']) vy += 1;
+            if (keysPressed['a'] || keysPressed['ArrowLeft']) vx -= 1;
+            if (keysPressed['d'] || keysPressed['ArrowRight']) vx += 1;
+
+            if (vx !== 0 || vy !== 0) {
+                const len = Math.hypot(vx, vy) || 1;
+                player.x += (vx / len) * player.speed;
+                player.y += (vy / len) * player.speed;
+                // Clamp to canvas bounds
+                player.x = Math.max(player.width / 2, Math.min(gameCanvas.width - player.width / 2, player.x));
+                player.y = Math.max(player.height / 2, Math.min(gameCanvas.height - player.height / 2, player.y));
+            }
+
             // Update bullets
             for (let i = bullets.length - 1; i >= 0; i--) {
                 // Move bullet using its velocity
@@ -185,44 +216,53 @@
                 
                 // Check for bullet-zombie collisions
                 for (let j = zombies.length - 1; j >= 0; j--) {
-                    if (checkCollision(bullets[i], zombies[j])) {
-                        // Remove bullet and zombie
+                    const z = zombies[j];
+                    if (checkCollision(bullets[i], z)) {
+                        // Damage zombie
+                        z.hp -= bullets[i].damage || 1;
+                        // Remove bullet
                         bullets.splice(i, 1);
-                        zombies.splice(j, 1);
                         
-                        // Increase score
-                        score += 10;
-                        updateUI();
-                        
-                        // Check for level up
-                        if (score % 100 === 0) {
-                            level++;
+                        // If zombie dies, remove and score
+                        if (z.hp <= 0) {
+                            zombies.splice(j, 1);
+                            score += 10;
+                            
+                            // Level up every 100 points
+                            if (score > 0 && score % 100 === 0) {
+                                level++;
+                            }
                             updateUI();
                         }
-                        
                         break;
                     }
                 }
             }
             
-            // Update zombies
+            // Update zombies (chase the player)
             for (let i = zombies.length - 1; i >= 0; i--) {
-                zombies[i].y += zombies[i].speed;
-                
-                // Check if zombie reached the bottom
-                if (zombies[i].y > gameCanvas.height) {
+                const z = zombies[i];
+                const angle = Math.atan2(player.y - z.y, player.x - z.x);
+                z.x += Math.cos(angle) * z.speed;
+                z.y += Math.sin(angle) * z.speed;
+
+                // If zombie hits player
+                if (rectsOverlap(
+                    { x: player.x - player.width / 2, y: player.y - player.height / 2, w: player.width, h: player.height },
+                    { x: z.x - z.width / 2, y: z.y - z.height / 2, w: z.width, h: z.height }
+                )) {
                     zombies.splice(i, 1);
                     lives--;
                     updateUI();
-                    
                     if (lives <= 0) {
                         gameOver();
+                        return;
                     }
                 }
             }
             
             // Spawn new zombies
-            if (Math.random() < 0.02) {
+            if (Math.random() < Math.min(0.01 + level * 0.005, 0.05)) {
                 spawnZombie();
             }
         }
@@ -257,7 +297,24 @@
                     zombie.width,
                     zombie.height
                 );
+                // Health bar
+                const hpRatio = zombie.hp / zombie.maxHp;
+                ctx.fillStyle = '#8e44ad';
+                ctx.fillRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width * hpRatio, 4);
+                ctx.strokeStyle = '#111';
+                ctx.strokeRect(zombie.x - zombie.width / 2, zombie.y - zombie.height / 2 - 8, zombie.width, 4);
+                ctx.fillStyle = '#2ecc71';
             }
+
+            // Draw crosshair at mouse position
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(mousePos.x - 10, mousePos.y);
+            ctx.lineTo(mousePos.x + 10, mousePos.y);
+            ctx.moveTo(mousePos.x, mousePos.y - 10);
+            ctx.lineTo(mousePos.x, mousePos.y + 10);
+            ctx.stroke();
             
             // Draw game over message
             if (!gameRunning) {
@@ -278,45 +335,82 @@
         }
         
         function spawnZombie() {
+            // Spawn at a random edge
+            const edge = Math.floor(Math.random() * 4); // 0 top, 1 right, 2 bottom, 3 left
+            let x, y;
+            if (edge === 0) { // top
+                x = Math.random() * gameCanvas.width; y = -20;
+            } else if (edge === 1) { // right
+                x = gameCanvas.width + 20; y = Math.random() * gameCanvas.height;
+            } else if (edge === 2) { // bottom
+                x = Math.random() * gameCanvas.width; y = gameCanvas.height + 20;
+            } else { // left
+                x = -20; y = Math.random() * gameCanvas.height;
+            }
+
+            const maxHp = 1 + Math.floor(level / 2);
             const zombie = {
-                x: Math.random() * (gameCanvas.width - 30) + 15,
-                y: -20,
+                x,
+                y,
                 width: 30,
                 height: 40,
-                speed: 1 + Math.random() * level * 0.2
+                speed: 0.6 + Math.random() * (0.4 + level * 0.15),
+                hp: maxHp,
+                maxHp
             };
             zombies.push(zombie);
         }
         
-        function shoot(e) {
+        function tryShoot(e) {
             if (!gameRunning || gamePaused) return;
-            
+
+            const now = performance.now();
+            if (now - lastShotTime < shotCooldownMs) return;
+            lastShotTime = now;
+
             const rect = gameCanvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            
+            const mx = (e?.clientX ?? (rect.left + mousePos.x)) - rect.left;
+            const my = (e?.clientY ?? (rect.top + mousePos.y)) - rect.top;
+
             // Calculate direction from player to mouse
-            const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
-            
+            const angle = Math.atan2(my - player.y, mx - player.x);
+
             // Create bullet
             const bullet = {
                 x: player.x,
                 y: player.y,
-                radius: 5,
-                speed: 10,
-                dx: Math.cos(angle) * 10,
-                dy: Math.sin(angle) * 10
+                radius: 4,
+                speed: 12,
+                dx: Math.cos(angle) * 12,
+                dy: Math.sin(angle) * 12,
+                damage: 1
             };
-            
+
             bullets.push(bullet);
         }
         
-        function checkCollision(obj1, obj2) {
+        function checkCollision(circle, rect) {
+            // circle: {x,y,radius}, rect center-based {x,y,width,height}
+            const rx = rect.x - rect.width / 2;
+            const ry = rect.y - rect.height / 2;
+            const rw = rect.width;
+            const rh = rect.height;
+            const cx = circle.x;
+            const cy = circle.y;
+
+            const closestX = Math.max(rx, Math.min(cx, rx + rw));
+            const closestY = Math.max(ry, Math.min(cy, ry + rh));
+            const dx = cx - closestX;
+            const dy = cy - closestY;
+            return (dx * dx + dy * dy) <= (circle.radius * circle.radius);
+        }
+
+        function rectsOverlap(a, b) {
             return (
-                obj1.x < obj2.x + obj2.width / 2 &&
-                obj1.x > obj2.x - obj2.width / 2 &&
-                obj1.y < obj2.y + obj2.height / 2 &&
-                obj1.y > obj2.y - obj2.height / 2
+                a.x < b.x + b.w &&
+                a.x + a.w > b.x &&
+                a.y < b.y + b.h &&
+                a.y + a.h > b.y
             );
         }
         
@@ -329,6 +423,20 @@
         function gameOver() {
             gameRunning = false;
             draw();
+        }
+
+        function onKeyDown(e) {
+            keysPressed[e.key] = true;
+        }
+
+        function onKeyUp(e) {
+            keysPressed[e.key] = false;
+        }
+
+        function onMouseMove(e) {
+            const rect = gameCanvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
         }
         
         // Initialize canvas size
