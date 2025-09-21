@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Shooter Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        header {
+            background-color: #dca50c;
+            color: white;
+            text-align: center;
+            padding: 1rem 0;
+        }
+        .game-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .game-canvas {
+            width: 100%;
+            height: 400px;
+            background-color: #222;
+            margin: 20px 0;
+            border: 2px solid #333;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            background-color: #172ab3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0e1a7a;
+        }
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Zombie Shooter Game</h1>
+    </header>
+    
+    <div class="game-container">
+        <div class="game-info">
+            <div>Score: <span id="score">0</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+            <div>Level: <span id="level">1</span></div>
+        </div>
+        
+        <div class="game-canvas" id="gameCanvas">
+            <!-- Game will be rendered here by JavaScript -->
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Start Game</button>
+            <button id="pauseBtn">Pause</button>
+            <button id="resetBtn">Reset</button>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <p>Use the mouse to aim and click to shoot. Survive as long as you can!</p>
+            <p>Shoot the zombies before they reach you. Each zombie hit gives you points.</p>
+            <p>Avoid letting zombies reach the bottom of the screen or you'll lose a life.</p>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let gameRunning = false;
+        let gamePaused = false;
+        
+        // DOM elements
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const levelElement = document.getElementById('level');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const ctx = gameCanvas.getContext('2d');
+        
+        // Game objects
+        let player = {
+            x: gameCanvas.width / 2,
+            y: gameCanvas.height - 50,
+            width: 40,
+            height: 40,
+            speed: 5,
+            color: '#3498db'
+        };
+        
+        let zombies = [];
+        let bullets = [];
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', togglePause);
+        resetBtn.addEventListener('click', resetGame);
+        gameCanvas.addEventListener('click', shoot);
+        
+        // Game functions
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gamePaused = false;
+                resetGame();
+                gameLoop();
+                startBtn.textContent = 'Restart';
+            } else {
+                resetGame();
+            }
+        }
+        
+        function togglePause() {
+            if (!gameRunning) return;
+            
+            gamePaused = !gamePaused;
+            pauseBtn.textContent = gamePaused ? 'Resume' : 'Pause';
+            
+            if (!gamePaused) {
+                gameLoop();
+            }
+        }
+        
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            level = 1;
+            zombies = [];
+            bullets = [];
+            updateUI();
+        }
+        
+        function gameLoop() {
+            if (gamePaused || !gameRunning) return;
+            
+            update();
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function update() {
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= bullets[i].speed;
+                
+                // Remove bullets that are off screen
+                if (bullets[i].y < 0) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                // Check for bullet-zombie collisions
+                for (let j = zombies.length - 1; j >= 0; j--) {
+                    if (checkCollision(bullets[i], zombies[j])) {
+                        // Remove bullet and zombie
+                        bullets.splice(i, 1);
+                        zombies.splice(j, 1);
+                        
+                        // Increase score
+                        score += 10;
+                        updateUI();
+                        
+                        // Check for level up
+                        if (score % 100 === 0) {
+                            level++;
+                            updateUI();
+                        }
+                        
+                        break;
+                    }
+                }
+            }
+            
+            // Update zombies
+            for (let i = zombies.length - 1; i >= 0; i--) {
+                zombies[i].y += zombies[i].speed;
+                
+                // Check if zombie reached the bottom
+                if (zombies[i].y > gameCanvas.height) {
+                    zombies.splice(i, 1);
+                    lives--;
+                    updateUI();
+                    
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                }
+            }
+            
+            // Spawn new zombies
+            if (Math.random() < 0.02) {
+                spawnZombie();
+            }
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+            
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(
+                player.x - player.width / 2,
+                player.y - player.height / 2,
+                player.width,
+                player.height
+            );
+            
+            // Draw bullets
+            ctx.fillStyle = '#f1c40f';
+            for (const bullet of bullets) {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw zombies
+            ctx.fillStyle = '#2ecc71';
+            for (const zombie of zombies) {
+                ctx.fillRect(
+                    zombie.x - zombie.width / 2,
+                    zombie.y - zombie.height / 2,
+                    zombie.width,
+                    zombie.height
+                );
+            }
+            
+            // Draw game over message
+            if (!gameRunning) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', gameCanvas.width / 2, gameCanvas.height / 2);
+                
+                ctx.font = '24px Arial';
+                ctx.fillText(`Final Score: ${score}`, gameCanvas.width / 2, gameCanvas.height / 2 + 50);
+                
+                ctx.font = '20px Arial';
+                ctx.fillText('Click Start to play again', gameCanvas.width / 2, gameCanvas.height / 2 + 100);
+            }
+        }
+        
+        function spawnZombie() {
+            const zombie = {
+                x: Math.random() * (gameCanvas.width - 30) + 15,
+                y: -20,
+                width: 30,
+                height: 40,
+                speed: 1 + Math.random() * level * 0.2
+            };
+            zombies.push(zombie);
+        }
+        
+        function shoot(e) {
+            if (!gameRunning || gamePaused) return;
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Calculate direction from player to mouse
+            const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+            
+            // Create bullet
+            const bullet = {
+                x: player.x,
+                y: player.y,
+                radius: 5,
+                speed: 10,
+                dx: Math.cos(angle) * 10,
+                dy: Math.sin(angle) * 10
+            };
+            
+            bullets.push(bullet);
+        }
+        
+        function checkCollision(obj1, obj2) {
+            return (
+                obj1.x < obj2.x + obj2.width / 2 &&
+                obj1.x > obj2.x - obj2.width / 2 &&
+                obj1.y < obj2.y + obj2.height / 2 &&
+                obj1.y > obj2.y - obj2.height / 2
+            );
+        }
+        
+        function updateUI() {
+            scoreElement.textContent = score;
+            livesElement.textContent = lives;
+            levelElement.textContent = level;
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            draw();
+        }
+        
+        // Initialize canvas size
+        function resizeCanvas() {
+            gameCanvas.width = gameCanvas.offsetWidth;
+            gameCanvas.height = 400;
+            player.x = gameCanvas.width / 2;
+            player.y = gameCanvas.height - 50;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>
