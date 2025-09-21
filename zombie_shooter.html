@@ -68,9 +68,9 @@
             <div>Level: <span id="level">1</span></div>
         </div>
         
-        <div class="game-canvas" id="gameCanvas">
-            <!-- Game will be rendered here by JavaScript -->
-        </div>
+        <canvas class="game-canvas" id="gameCanvas">
+            <!-- Your browser does not support the HTML5 canvas tag. -->
+        </canvas>
         
         <div class="controls">
             <button id="startBtn">Start Game</button>
@@ -168,10 +168,17 @@
         function update() {
             // Update bullets
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].y -= bullets[i].speed;
-                
-                // Remove bullets that are off screen
-                if (bullets[i].y < 0) {
+                // Move bullet using its velocity
+                bullets[i].x += bullets[i].dx;
+                bullets[i].y += bullets[i].dy;
+
+                // Remove bullets that are off screen (any side)
+                if (
+                    bullets[i].x < 0 ||
+                    bullets[i].x > gameCanvas.width ||
+                    bullets[i].y < 0 ||
+                    bullets[i].y > gameCanvas.height
+                ) {
                     bullets.splice(i, 1);
                     continue;
                 }
