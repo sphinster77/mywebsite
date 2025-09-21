@@ -288,9 +288,9 @@
                 ctx.fill();
             }
             
-            // Draw zombies
-            ctx.fillStyle = '#2ecc71';
+            // Draw zombies (simple rectangles)
             for (const zombie of zombies) {
+                ctx.fillStyle = '#2ecc71';
                 ctx.fillRect(
                     zombie.x - zombie.width / 2,
                     zombie.y - zombie.height / 2,
@@ -443,8 +443,9 @@
         function resizeCanvas() {
             gameCanvas.width = gameCanvas.offsetWidth;
             gameCanvas.height = 400;
-            player.x = gameCanvas.width / 2;
-            player.y = gameCanvas.height - 50;
+            // Keep player within bounds
+            player.x = Math.max(player.width / 2, Math.min(gameCanvas.width - player.width / 2, player.x));
+            player.y = Math.max(player.height / 2, Math.min(gameCanvas.height - player.height / 2, player.y));
         }
         
         window.addEventListener('resize', resizeCanvas);
