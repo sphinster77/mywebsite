@@ -3,85 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Davide Kurek website</title>
+    <title>Davide Kurek — Tips & Tricks</title>
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f4f6fb;
+            color: #1a1a2e;
         }
+
+        /* ── Header ── */
         header {
-            background-color: rgb(220, 165, 12);
+            background: linear-gradient(135deg, #dca50c 0%, #f0c030 100%);
             color: white;
             text-align: center;
-            padding: 1rem 0;
+            padding: 2.5rem 1rem 2rem;
+            box-shadow: 0 4px 12px rgba(220,165,12,0.35);
         }
+        header h1 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        header p {
+            margin-top: 0.4rem;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* ── Nav ── */
         nav {
             display: flex;
             justify-content: center;
-            background-color: #172ab3;
+            gap: 0.25rem;
+            background: #172ab3;
+            padding: 0 1rem;
+            box-shadow: 0 2px 8px rgba(23,42,179,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
         nav a {
             color: white;
-            padding: 14px 20px;
+            padding: 14px 22px;
             text-decoration: none;
-            text-align: center;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+            border-bottom: 3px solid transparent;
+            transition: background 0.2s, border-color 0.2s;
         }
         nav a:hover {
-            background-color: #ddd;
-            color: black;
+            background: rgba(255,255,255,0.12);
+            border-bottom-color: #dca50c;
         }
-        section {
-            padding: 20px;
-            margin: 20px;
+
+        /* ── Main content ── */
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 6rem;
         }
+
+        /* ── Section headings ── */
+        .section-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #172ab3;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #dca50c;
+            display: inline-block;
+        }
+
+        section { margin-bottom: 3rem; }
+
+        /* ── Cards grid ── */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.1rem;
+            margin-top: 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 1.4rem 1.2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.18s, box-shadow 0.18s;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            border-top: 4px solid #172ab3;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(23,42,179,0.15);
+            border-top-color: #dca50c;
+        }
+        .card-icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #172ab3;
+        }
+        .card-desc {
+            font-size: 0.85rem;
+            color: #555;
+            line-height: 1.45;
+        }
+
+        /* ── About box ── */
+        .about-box {
+            background: white;
+            border-radius: 14px;
+            padding: 1.5rem 1.6rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+            border-left: 5px solid #dca50c;
+            font-size: 0.95rem;
+            color: #444;
+            line-height: 1.6;
+        }
+
+        /* ── Footer ── */
         footer {
-            background-color: rgb(220, 165, 12);
-            color: white;
+            background: linear-gradient(135deg, #172ab3 0%, #1e3ae0 100%);
+            color: rgba(255,255,255,0.85);
             text-align: center;
-            padding: 1rem 0;
+            padding: 1rem;
+            font-size: 0.85rem;
             position: fixed;
             bottom: 0;
             width: 100%;
+            box-shadow: 0 -2px 10px rgba(23,42,179,0.25);
         }
+        footer span { color: #dca50c; font-weight: 600; }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Tips and Tricks</h1>
-    </header>
-    <nav>
-        <a href="#papercrafts">Papercrafts</a>
-        <a href="#roblox-tricks">Roblox Tricks</a>
-        <a href="#about">About</a>
-    </nav>
+
+<header>
+    <h1>Tips &amp; Tricks</h1>
+    <p>Papercrafts, games and more — by Davide Kurek</p>
+</header>
+
+<nav>
+    <a href="#papercrafts">Papercrafts</a>
+    <a href="#games">Games</a>
+    <a href="#about">About</a>
+</nav>
+
+<main>
+
     <section id="papercrafts">
-    <h2>Papercrafts</h2>
-    <h3><a href="rocket_ship.html">Rocket ship</a></h3>
-    <p>This is my guide to make a rocket ship.</p>
-    <h3><a href="paper_airplane.html">Paper airplane</a></h3>
-    <p>Learn how to make a simple paper airplane. It's a fun and easy craft that flies well.</p>
-    <h3><a href="paper_boat.html">Paper boat</a></h3>
-    <p>Make a paper boat that you can float on water. It's perfect for a rainy day activity.</p>
-    <h3><a href="working_boomerang.html">Working boomerang</a></h3>
-    <p>Make a boomerang that actually returns to you.</p>
-</section>
-    <section id="roblox-tricks">
-        <h2>Roblox Tricks</h2>
-        <h3><a href="zombie_shooter.html">Zombie Shooter Game</a></h3>
-        <p>Test your reflexes in this exciting zombie shooter game! Shoot the zombies before they reach you and see how long you can survive.</p>
-        <h3><a href="racing_game.html">Racing Game</a></h3>
-        <p>Dodge oncoming traffic and see how far you can go! Use arrow keys to switch lanes and survive as long as possible.</p>
-        <h3><a href="player_game.html">2 Player Game</a></h3>
-        <p>Do you want to learn how to play games with your friends?</p>
+        <h2 class="section-title">Papercrafts</h2>
+        <div class="cards">
+            <a class="card" href="rocket_ship.html">
+                <div class="card-icon">🚀</div>
+                <div class="card-title">Rocket Ship</div>
+                <div class="card-desc">Build your own paper rocket ship step by step.</div>
+            </a>
+            <a class="card" href="paper_airplane.html">
+                <div class="card-icon">✈️</div>
+                <div class="card-title">Paper Airplane</div>
+                <div class="card-desc">A simple airplane that actually flies well.</div>
+            </a>
+            <a class="card" href="paper_boat.html">
+                <div class="card-icon">⛵</div>
+                <div class="card-title">Paper Boat</div>
+                <div class="card-desc">Float it on water — perfect for a rainy day.</div>
+            </a>
+            <a class="card" href="working_boomerang.html">
+                <div class="card-icon">🪃</div>
+                <div class="card-title">Boomerang</div>
+                <div class="card-desc">A boomerang that actually comes back to you.</div>
+            </a>
+        </div>
     </section>
+
+    <section id="games">
+        <h2 class="section-title">Games</h2>
+        <div class="cards">
+            <a class="card" href="zombie_shooter.html">
+                <div class="card-icon">🧟</div>
+                <div class="card-title">Zombie Shooter</div>
+                <div class="card-desc">Shoot zombies before they reach you. Survive the waves!</div>
+            </a>
+            <a class="card" href="racing_game.html">
+                <div class="card-icon">🏎️</div>
+                <div class="card-title">Racing Game</div>
+                <div class="card-desc">Dodge traffic and see how far you can go.</div>
+            </a>
+            <a class="card" href="player_game.html">
+                <div class="card-icon">🎮</div>
+                <div class="card-title">2 Player Game</div>
+                <div class="card-desc">Play games together with a friend.</div>
+            </a>
+        </div>
+    </section>
+
     <section id="about">
-        <h2>About</h2>
-        <p>This is a website for ideas</p>
+        <h2 class="section-title">About</h2>
+        <div class="about-box">
+            This is a website for ideas — papercrafts, games, and fun stuff made by Davide Kurek.
+        </div>
     </section>
-    <footer>
-        <p>&copy; 2025 Paper Crafts. All rights reserved.</p>
-        <p>Created by Davide Kurek</p>
-    </footer>
+
+</main>
+
+<footer>
+    &copy; 2025 <span>Davide Kurek</span>. All rights reserved.
+</footer>
+
 </body>
 </html>

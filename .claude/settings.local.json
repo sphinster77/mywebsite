@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd.exe /c start \"\" \"c:\\\\Users\\\\david\\\\GIT\\\\mywebsite\\\\index.html\")"
+    ]
+  }
+}
