@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Pet – Davide's Workshop</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0d0f1a;
+            color: #e8e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            background: #12152a;
+            border-bottom: 2px solid rgba(240,192,48,0.2);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        header a {
+            color: #f0c030;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        header a:hover { opacity: 1; }
+        header h1 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #f0c030;
+        }
+
+        .game-wrapper {
+            width: 100%;
+            max-width: 700px;
+            padding: 1.5rem 1rem 5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        /* ── Pet name + age ── */
+        .pet-header {
+            text-align: center;
+        }
+        #pet-name {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #f0c030;
+        }
+        #pet-age {
+            font-size: 0.85rem;
+            color: #9090b0;
+            margin-top: 0.2rem;
+        }
+
+        /* ── Canvas ── */
+        #petCanvas {
+            display: block;
+            margin: 0 auto;
+            background: #161828;
+            border-radius: 20px;
+            border: 2px solid rgba(240,192,48,0.2);
+            box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+        }
+
+        /* ── Speech bubble ── */
+        #speech {
+            text-align: center;
+            min-height: 2rem;
+            font-size: 1rem;
+            color: #e8e8f0;
+            background: #1e2240;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            border-left: 4px solid #f0c030;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #speech.visible { opacity: 1; }
+
+        /* ── Stats ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.8rem;
+        }
+        .stat-box {
+            background: #161828;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border-top: 3px solid #3498db;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: #9090b0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.4rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .stat-bar-bg {
+            background: #0d0f1a;
+            border-radius: 999px;
+            height: 10px;
+            overflow: hidden;
+        }
+        .stat-bar {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.5s ease, background 0.5s;
+        }
+        .stat-box.hunger  .stat-bar { background: #e74c3c; }
+        .stat-box.happy   .stat-bar { background: #f0c030; }
+        .stat-box.energy  .stat-bar { background: #2ecc71; }
+        .stat-box.xp      .stat-bar { background: #9b59b6; }
+        .stat-box.hunger  { border-top-color: #e74c3c; }
+        .stat-box.happy   { border-top-color: #f0c030; }
+        .stat-box.energy  { border-top-color: #2ecc71; }
+
+        /* ── Buttons ── */
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            background: #1e2240;
+            color: #e8e8f0;
+            border: 2px solid rgba(240,192,48,0.25);
+            border-radius: 12px;
+            padding: 0.65rem 1.3rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn:hover:not(:disabled) {
+            background: #2a3060;
+            border-color: #f0c030;
+            transform: translateY(-2px);
+        }
+        .btn:active:not(:disabled) { transform: scale(0.96); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn.primary {
+            background: linear-gradient(135deg, #dca50c, #f0c030);
+            color: #0d0f1a;
+            border-color: transparent;
+        }
+        .btn.primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #f0c030, #ffd966);
+            border-color: transparent;
+        }
+
+        /* ── Tricks section ── */
+        .section-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #f0c030;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+        .tricks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.6rem;
+        }
+        .trick-btn {
+            background: #161828;
+            border: 2px solid #1e2240;
+            border-radius: 10px;
+            padding: 0.7rem 0.8rem;
+            color: #e8e8f0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .trick-btn .t-icon { font-size: 1.5rem; }
+        .trick-btn:hover:not(:disabled) {
+            background: #1e2240;
+            border-color: #9b59b6;
+            transform: translateY(-2px);
+        }
+        .trick-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .trick-btn.learned { border-color: #2ecc71; }
+        .trick-btn.learned .t-icon::after { content: ' ✓'; font-size: 0.7rem; color: #2ecc71; }
+
+        /* ── XP / level ── */
+        .level-row {
+            background: #161828;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border-top: 3px solid #9b59b6;
+        }
+        .level-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #9090b0;
+            margin-bottom: 0.4rem;
+            font-weight: 700;
+        }
+        .level-bar-bg {
+            background: #0d0f1a;
+            border-radius: 999px;
+            height: 10px;
+            overflow: hidden;
+        }
+        .level-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: #9b59b6;
+            transition: width 0.5s ease;
+        }
+
+        /* ── Log ── */
+        .log-box {
+            background: #161828;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            font-size: 0.8rem;
+            color: #9090b0;
+            max-height: 90px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 0.25rem;
+        }
+        .log-entry { color: #b0b0c8; }
+        .log-entry.good  { color: #2ecc71; }
+        .log-entry.warn  { color: #e74c3c; }
+        .log-entry.info  { color: #f0c030; }
+
+        /* ── Name modal ── */
+        #name-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        #name-modal.hidden { display: none; }
+        .modal-box {
+            background: #161828;
+            border-radius: 16px;
+            padding: 2rem;
+            border: 2px solid #f0c030;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+            text-align: center;
+            max-width: 340px;
+            width: 90%;
+        }
+        .modal-box h2 {
+            font-size: 1.4rem;
+            color: #f0c030;
+            margin-bottom: 0.5rem;
+        }
+        .modal-box p {
+            color: #9090b0;
+            font-size: 0.85rem;
+            margin-bottom: 1.2rem;
+        }
+        .modal-box input {
+            width: 100%;
+            background: #0d0f1a;
+            border: 2px solid rgba(240,192,48,0.3);
+            border-radius: 8px;
+            color: #e8e8f0;
+            font-size: 1rem;
+            padding: 0.6rem 0.8rem;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+        .modal-box input:focus { border-color: #f0c030; }
+
+        /* ── Dead overlay ── */
+        #dead-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 998;
+        }
+        #dead-overlay.hidden { display: none; }
+        .dead-box {
+            background: #161828;
+            border-radius: 16px;
+            padding: 2rem;
+            border: 2px solid #e74c3c;
+            text-align: center;
+            max-width: 320px;
+            width: 90%;
+        }
+        .dead-box h2 { color: #e74c3c; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .dead-box p  { color: #9090b0; font-size: 0.9rem; margin-bottom: 1.2rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="index.html">← Back</a>
+    <h1>🐾 Virtual Pet</h1>
+</header>
+
+<!-- Name modal -->
+<div id="name-modal">
+    <div class="modal-box">
+        <h2>🐣 New Pet!</h2>
+        <p>You have a brand new egg hatching. What will you name your pet?</p>
+        <input type="text" id="name-input" placeholder="Enter a name..." maxlength="14">
+        <button class="btn primary" style="width:100%;justify-content:center" onclick="startGame()">Hatch!</button>
+    </div>
+</div>
+
+<!-- Dead overlay -->
+<div id="dead-overlay" class="hidden">
+    <div class="dead-box">
+        <h2>😢 Oh no...</h2>
+        <p id="dead-msg">Your pet has passed away from neglect.</p>
+        <button class="btn primary" style="width:100%;justify-content:center" onclick="resetGame()">Get a New Pet</button>
+    </div>
+</div>
+
+<div class="game-wrapper">
+
+    <div class="pet-header">
+        <div id="pet-name">—</div>
+        <div id="pet-age">Age: 0 days</div>
+    </div>
+
+    <canvas id="petCanvas" width="500" height="260"></canvas>
+
+    <div id="speech"></div>
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-box hunger">
+            <div class="stat-label"><span>🍖 Hunger</span><span id="hunger-val">100%</span></div>
+            <div class="stat-bar-bg"><div class="stat-bar" id="hunger-bar" style="width:100%"></div></div>
+        </div>
+        <div class="stat-box happy">
+            <div class="stat-label"><span>😊 Happiness</span><span id="happy-val">100%</span></div>
+            <div class="stat-bar-bg"><div class="stat-bar" id="happy-bar" style="width:100%"></div></div>
+        </div>
+        <div class="stat-box energy">
+            <div class="stat-label"><span>⚡ Energy</span><span id="energy-val">100%</span></div>
+            <div class="stat-bar-bg"><div class="stat-bar" id="energy-bar" style="width:100%"></div></div>
+        </div>
+    </div>
+
+    <!-- Level -->
+    <div class="level-row">
+        <div class="level-info">
+            <span id="level-label">⭐ Level 1</span>
+            <span id="xp-label">0 / 100 XP</span>
+        </div>
+        <div class="level-bar-bg"><div class="level-bar" id="level-bar" style="width:0%"></div></div>
+    </div>
+
+    <!-- Actions -->
+    <div>
+        <div class="section-title">Actions</div>
+        <div class="btn-row">
+            <button class="btn primary" id="btn-feed" onclick="doFeed()">🍖 Feed</button>
+            <button class="btn" id="btn-play" onclick="doPlay()">🎾 Play</button>
+            <button class="btn" id="btn-sleep" onclick="doSleep()">💤 Rest</button>
+            <button class="btn" id="btn-pet" onclick="doPet()">🤗 Pet</button>
+        </div>
+    </div>
+
+    <!-- Tricks -->
+    <div>
+        <div class="section-title">Teach Tricks</div>
+        <div class="tricks-grid" id="tricks-grid"></div>
+    </div>
+
+    <!-- Perform tricks -->
+    <div id="perform-section" style="display:none">
+        <div class="section-title">Perform Tricks</div>
+        <div class="btn-row" id="perform-grid"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-box" id="log-box"></div>
+
+</div>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+const TRICKS = [
+    { id:'sit',     label:'Sit',       icon:'🪑', xpCost:15, xpReward:10, happyBonus:8,  energyCost:10, msg:['sits perfectly!','strikes a pose!'] },
+    { id:'shake',   label:'Shake',     icon:'🤝', xpCost:20, xpReward:15, happyBonus:10, energyCost:12, msg:['offers a friendly paw!','shakes hands politely!'] },
+    { id:'rollover',label:'Roll Over', icon:'🔄', xpCost:30, xpReward:20, happyBonus:12, energyCost:18, msg:['rolls over like a pro!','flips around with style!'] },
+    { id:'fetch',   label:'Fetch',     icon:'🎾', xpCost:25, xpReward:18, happyBonus:15, energyCost:20, msg:['dashes off and brings it back!','fetches the ball!'] },
+    { id:'dance',   label:'Dance',     icon:'💃', xpCost:40, xpReward:25, happyBonus:20, energyCost:25, msg:['busts some moves!','dances like nobody\'s watching!'] },
+    { id:'speak',   label:'Speak',     icon:'🗣️', xpCost:20, xpReward:12, happyBonus:10, energyCost:8,  msg:['says "Woof woof!"','barks enthusiastically!'] },
+    { id:'spin',    label:'Spin',      icon:'🌀', xpCost:25, xpReward:15, happyBonus:12, energyCost:15, msg:['spins in circles!','twirls around dizzily!'] },
+    { id:'play_dead',label:'Play Dead',icon:'💀', xpCost:50, xpReward:30, happyBonus:18, energyCost:20, msg:['drops dramatically!','plays dead perfectly!'] },
+];
+
+const FOODS = [
+    { name:'Kibble', icon:'🥣', hungerRestore:20, energyRestore:5 },
+    { name:'Treat',  icon:'🦴', hungerRestore:10, energyRestore:3, happyBonus:10 },
+    { name:'Fish',   icon:'🐟', hungerRestore:35, energyRestore:10, happyBonus:5 },
+    { name:'Salad',  icon:'🥗', hungerRestore:25, energyRestore:8 },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let pet = {
+    name: 'Pet',
+    hunger: 100,
+    happy:  100,
+    energy: 100,
+    xp: 0,
+    level: 1,
+    age: 0,           // in seconds
+    learned: new Set(),
+    alive: true,
+    sleeping: false,
+    mood: 'happy',    // happy | hungry | sad | tired | sleeping | dead
+};
+
+let animState = {
+    bounce: 0,
+    bounceDir: 1,
+    bobAngle: 0,
+    actionAnim: null,   // { type, frame, maxFrames }
+    blinkTimer: 0,
+    isBlinking: false,
+    particles: [],
+};
+
+let speechTimer = null;
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function startGame() {
+    const n = document.getElementById('name-input').value.trim();
+    pet.name = n || 'Buddy';
+    document.getElementById('pet-name').textContent = pet.name;
+    document.getElementById('name-modal').classList.add('hidden');
+    buildTricksUI();
+    updateUI();
+    log(`${pet.name} has hatched! 🎉`, 'info');
+    speak('Hello! I\'m so happy to meet you! 🐾');
+    setInterval(gameTick, 1000);
+    requestAnimationFrame(renderLoop);
+}
+
+function resetGame() {
+    pet = {
+        name: 'Pet', hunger:100, happy:100, energy:100,
+        xp:0, level:1, age:0, learned:new Set(),
+        alive:true, sleeping:false, mood:'happy',
+    };
+    animState.actionAnim = null;
+    animState.particles = [];
+    document.getElementById('dead-overlay').classList.add('hidden');
+    document.getElementById('name-input').value = '';
+    document.getElementById('name-modal').classList.remove('hidden');
+}
+
+// ─── Game tick (every second) ─────────────────────────────────────────────────
+function gameTick() {
+    if (!pet.alive) return;
+
+    pet.age += 1;
+    document.getElementById('pet-age').textContent =
+        `Age: ${Math.floor(pet.age / 60)} min ${pet.age % 60}s`;
+
+    if (pet.sleeping) {
+        pet.energy = Math.min(100, pet.energy + 2);
+        if (pet.energy >= 100) {
+            pet.sleeping = false;
+            speak('I feel so refreshed! ⚡');
+            log('Woke up from nap', 'good');
+        }
+    } else {
+        // decay
+        pet.hunger = Math.max(0, pet.hunger - 0.5);
+        pet.happy  = Math.max(0, pet.happy  - 0.3);
+        pet.energy = Math.max(0, pet.energy - 0.2);
+    }
+
+    // update mood
+    if      (pet.energy < 20)  pet.mood = 'tired';
+    else if (pet.hunger < 20)  pet.mood = 'hungry';
+    else if (pet.happy  < 20)  pet.mood = 'sad';
+    else if (pet.sleeping)     pet.mood = 'sleeping';
+    else                       pet.mood = 'happy';
+
+    // random warnings
+    if (pet.hunger < 20 && Math.random() < 0.05)  speak('I\'m so hungry... 🍖');
+    if (pet.happy  < 20 && Math.random() < 0.05)  speak('I feel lonely... 😢');
+    if (pet.energy < 15 && Math.random() < 0.05)  speak('I\'m exhausted... 💤');
+
+    // death
+    if (pet.hunger <= 0 || pet.happy <= 0) {
+        pet.alive = false;
+        pet.mood = 'dead';
+        const reason = pet.hunger <= 0 ? 'hunger' : 'loneliness';
+        document.getElementById('dead-msg').textContent =
+            `${pet.name} passed away from ${reason}. 💔`;
+        document.getElementById('dead-overlay').classList.remove('hidden');
+        log(`${pet.name} has passed away...`, 'warn');
+    }
+
+    updateUI();
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+function doFeed() {
+    if (!pet.alive || pet.sleeping) return;
+    const food = FOODS[Math.floor(Math.random() * FOODS.length)];
+    pet.hunger = Math.min(100, pet.hunger + food.hungerRestore);
+    pet.energy = Math.min(100, pet.energy + food.energyRestore);
+    if (food.happyBonus) pet.happy = Math.min(100, pet.happy + food.happyBonus);
+    gainXP(5);
+    triggerAnim('eat');
+    speak(`Yum! ${food.icon} ${food.name}! Delicious!`);
+    log(`Fed ${pet.name} some ${food.name}`, 'good');
+    updateUI();
+}
+
+function doPlay() {
+    if (!pet.alive || pet.sleeping) return;
+    if (pet.energy < 15) { speak('I\'m too tired to play... 😴'); return; }
+    pet.happy  = Math.min(100, pet.happy  + 15);
+    pet.energy = Math.max(0,   pet.energy - 12);
+    pet.hunger = Math.max(0,   pet.hunger - 5);
+    gainXP(8);
+    triggerAnim('jump');
+    speak(['Yay, let\'s play!','This is so fun!','Wheee! 🎉'][Math.floor(Math.random()*3)]);
+    log(`Played with ${pet.name}`, 'good');
+    updateUI();
+}
+
+function doSleep() {
+    if (!pet.alive || pet.sleeping) return;
+    pet.sleeping = true;
+    pet.mood = 'sleeping';
+    speak('Zzz... 💤');
+    log(`${pet.name} is resting`, 'info');
+    updateUI();
+}
+
+function doPet() {
+    if (!pet.alive || pet.sleeping) return;
+    pet.happy = Math.min(100, pet.happy + 8);
+    gainXP(3);
+    triggerAnim('hearts');
+    speak(['Ooh, that\'s nice! 💖','I love pets!','Purrrr...'][Math.floor(Math.random()*3)]);
+    log(`Petted ${pet.name}`, 'good');
+    updateUI();
+}
+
+function doTeachTrick(trickId) {
+    if (!pet.alive || pet.sleeping) return;
+    const trick = TRICKS.find(t => t.id === trickId);
+    if (!trick || pet.learned.has(trickId)) return;
+    if (pet.xp < trick.xpCost) {
+        speak(`I need ${trick.xpCost} XP to learn ${trick.label}! Keep playing!`);
+        return;
+    }
+    if (pet.energy < 20) { speak('Too tired to learn right now... 😴'); return; }
+    pet.xp -= trick.xpCost;
+    pet.learned.add(trickId);
+    pet.happy  = Math.min(100, pet.happy  + 15);
+    pet.energy = Math.max(0,   pet.energy - 15);
+    gainXP(trick.xpReward);
+    triggerAnim('star');
+    speak(`I learned ${trick.label}! ${trick.icon} Watch me!`);
+    log(`${pet.name} learned ${trick.label}! 🌟`, 'info');
+    buildTricksUI();
+    updateUI();
+}
+
+function doPerformTrick(trickId) {
+    if (!pet.alive || pet.sleeping) return;
+    const trick = TRICKS.find(t => t.id === trickId);
+    if (!trick || !pet.learned.has(trickId)) return;
+    if (pet.energy < trick.energyCost) {
+        speak('I\'m too tired for that... 😴');
+        return;
+    }
+    pet.energy = Math.max(0,   pet.energy - trick.energyCost);
+    pet.happy  = Math.min(100, pet.happy  + trick.happyBonus);
+    gainXP(trick.xpReward);
+    triggerAnim('trick');
+    const m = trick.msg[Math.floor(Math.random() * trick.msg.length)];
+    speak(`${pet.name} ${m} ${trick.icon}`);
+    log(`${pet.name} performed ${trick.label}`, 'good');
+    updateUI();
+}
+
+function gainXP(amount) {
+    if (!pet.alive) return;
+    pet.xp += amount;
+    const needed = pet.level * 100;
+    if (pet.xp >= needed) {
+        pet.xp -= needed;
+        pet.level++;
+        triggerAnim('levelup');
+        speak(`Level ${pet.level}! I\'m getting stronger! ⭐`);
+        log(`${pet.name} reached level ${pet.level}! 🌟`, 'info');
+    }
+}
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+function updateUI() {
+    const clamp = v => Math.max(0, Math.min(100, v));
+    const pct   = v => clamp(v).toFixed(0) + '%';
+
+    document.getElementById('hunger-bar').style.width = pct(pet.hunger);
+    document.getElementById('happy-bar').style.width  = pct(pet.happy);
+    document.getElementById('energy-bar').style.width = pct(pet.energy);
+    document.getElementById('hunger-val').textContent = pct(pet.hunger);
+    document.getElementById('happy-val').textContent  = pct(pet.happy);
+    document.getElementById('energy-val').textContent = pct(pet.energy);
+
+    const needed = pet.level * 100;
+    document.getElementById('level-label').textContent = `⭐ Level ${pet.level}`;
+    document.getElementById('xp-label').textContent    = `${Math.floor(pet.xp)} / ${needed} XP`;
+    document.getElementById('level-bar').style.width   = (pet.xp / needed * 100).toFixed(1) + '%';
+
+    // button states
+    document.getElementById('btn-sleep').disabled = pet.sleeping;
+    document.getElementById('btn-play').disabled  = !pet.alive || (pet.energy < 15);
+}
+
+function buildTricksUI() {
+    const tg = document.getElementById('tricks-grid');
+    const pg = document.getElementById('perform-grid');
+    tg.innerHTML = '';
+    pg.innerHTML = '';
+
+    let hasLearned = false;
+    for (const trick of TRICKS) {
+        const learned = pet.learned.has(trick.id);
+        if (learned) hasLearned = true;
+
+        // teach button (only show unlearned)
+        if (!learned) {
+            const btn = document.createElement('button');
+            btn.className = 'trick-btn';
+            btn.innerHTML = `<span class="t-icon">${trick.icon}</span><span>${trick.label}</span><span style="font-size:0.7rem;color:#9b59b6;">${trick.xpCost} XP</span>`;
+            btn.onclick = () => doTeachTrick(trick.id);
+            tg.appendChild(btn);
+        } else {
+            // perform button
+            const pb = document.createElement('button');
+            pb.className = 'btn';
+            pb.innerHTML = `${trick.icon} ${trick.label}`;
+            pb.onclick = () => doPerformTrick(trick.id);
+            pg.appendChild(pb);
+        }
+    }
+
+    document.getElementById('perform-section').style.display = hasLearned ? '' : 'none';
+    if (tg.children.length === 0) {
+        tg.innerHTML = '<span style="color:#9090b0;font-size:0.85rem;">All tricks learned! 🏆</span>';
+    }
+}
+
+function speak(msg) {
+    const el = document.getElementById('speech');
+    el.textContent = msg;
+    el.classList.add('visible');
+    if (speechTimer) clearTimeout(speechTimer);
+    speechTimer = setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+function log(msg, type = '') {
+    const box = document.getElementById('log-box');
+    const el  = document.createElement('div');
+    el.className = 'log-entry ' + type;
+    const now = new Date();
+    el.textContent = `[${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}] ${msg}`;
+    box.prepend(el);
+    while (box.children.length > 20) box.removeChild(box.lastChild);
+}
+
+// ─── Animation ────────────────────────────────────────────────────────────────
+function triggerAnim(type) {
+    animState.actionAnim = { type, frame: 0, maxFrames: 40 };
+    if (type === 'hearts' || type === 'star' || type === 'levelup') {
+        for (let i = 0; i < 8; i++) {
+            animState.particles.push({
+                x: 250, y: 130,
+                vx: (Math.random()-0.5)*4,
+                vy: -(Math.random()*3+1),
+                life: 60,
+                maxLife: 60,
+                emoji: type === 'hearts' ? '💖' : type === 'levelup' ? '⭐' : '✨',
+            });
+        }
+    }
+}
+
+// ─── Canvas render ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('petCanvas');
+const ctx    = canvas.getContext('2d');
+
+// simple pixel-art-style dog using arcs
+function drawPet(x, y, mood, anim) {
+    ctx.save();
+
+    // bob
+    const bobY = Math.sin(animState.bobAngle) * 4;
+    ctx.translate(x, y + bobY);
+
+    // action animation offset
+    let jumpOff = 0, squishX = 1, squishY = 1;
+    if (anim && (anim.type === 'jump' || anim.type === 'trick')) {
+        const t = anim.frame / anim.maxFrames;
+        jumpOff = -Math.sin(t * Math.PI) * 35;
+        squishX = 1 + Math.sin(t * Math.PI * 2) * 0.1;
+        squishY = 1 - Math.sin(t * Math.PI * 2) * 0.1;
+    }
+    if (anim && anim.type === 'eat') {
+        squishX = 1 + Math.sin(anim.frame * 0.4) * 0.05;
+    }
+    ctx.translate(0, jumpOff);
+    ctx.scale(squishX, squishY);
+
+    // sleeping — draw Zzz and close eyes
+    const sleeping = mood === 'sleeping';
+    const dead     = mood === 'dead';
+
+    // ── body ──
+    const bodyColor = dead ? '#555' : '#f0a030';
+    const darkColor = dead ? '#333' : '#c07820';
+
+    // tail
+    ctx.beginPath();
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.moveTo(18, 10);
+    const tailWag = sleeping ? 0 : Math.sin(animState.bobAngle * 2) * 15;
+    ctx.quadraticCurveTo(5, -20 + tailWag, 18, -35 + tailWag);
+    ctx.stroke();
+
+    // body
+    ctx.beginPath();
+    ctx.fillStyle = bodyColor;
+    ctx.ellipse(0, 10, 50, 38, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // tummy
+    ctx.beginPath();
+    ctx.fillStyle = dead ? '#888' : '#ffd070';
+    ctx.ellipse(-5, 18, 28, 22, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // legs
+    ctx.fillStyle = bodyColor;
+    [[-30, 45], [-10, 48], [10, 48], [30, 45]].forEach(([lx, ly]) => {
+        ctx.beginPath();
+        ctx.roundRect(lx - 9, ly - 5, 18, 24, 6);
+        ctx.fill();
+        ctx.fillStyle = darkColor;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly + 19, 10, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor;
+    });
+
+    // head
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.ellipse(0, -45, 38, 35, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // ears
+    ctx.fillStyle = darkColor;
+    [[-32, -65], [32, -65]].forEach(([ex, ey]) => {
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, 14, 20, ex < 0 ? -0.3 : 0.3, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // snout
+    ctx.fillStyle = dead ? '#888' : '#ffd070';
+    ctx.beginPath();
+    ctx.ellipse(0, -38, 18, 13, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // nose
+    ctx.fillStyle = dead ? '#555' : '#1a0a00';
+    ctx.beginPath();
+    ctx.ellipse(0, -44, 7, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // eyes
+    const blink = animState.isBlinking || sleeping || dead;
+    if (blink) {
+        ctx.strokeStyle = dead ? '#555' : '#1a0a00';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        [[-15, -55], [15, -55]].forEach(([ex, ey]) => {
+            ctx.beginPath();
+            ctx.moveTo(ex - 8, ey);
+            ctx.lineTo(ex + 8, ey);
+            ctx.stroke();
+        });
+    } else {
+        const eyeColor = mood === 'sad' ? '#555' : '#1a0a00';
+        [[-15, -55], [15, -55]].forEach(([ex, ey]) => {
+            ctx.fillStyle = eyeColor;
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, 7, mood === 'sad' ? 5 : 7, 0, 0, Math.PI*2);
+            ctx.fill();
+            // shine
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.ellipse(ex + 2, ey - 2, 2.5, 2.5, 0, 0, Math.PI*2);
+            ctx.fill();
+        });
+    }
+
+    // mouth expression
+    ctx.strokeStyle = dead ? '#555' : '#1a0a00';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (mood === 'happy') {
+        ctx.arc(0, -34, 8, 0, Math.PI);
+    } else if (mood === 'sad' || mood === 'hungry' || dead) {
+        ctx.arc(0, -28, 8, Math.PI, 0);
+    } else {
+        ctx.moveTo(-8, -32);
+        ctx.lineTo(8, -32);
+    }
+    ctx.stroke();
+
+    // sleeping Zzz
+    if (sleeping) {
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillStyle = '#b0c4de';
+        const t = Date.now() / 800;
+        ctx.fillText('z', 35, -70 + Math.sin(t) * 5);
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText('z', 48, -85 + Math.sin(t + 1) * 5);
+    }
+
+    ctx.restore();
+}
+
+function renderLoop() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // background
+    ctx.fillStyle = '#161828';
+    ctx.fillRect(0, 0, W, H);
+
+    // ground
+    ctx.fillStyle = '#1e2240';
+    ctx.beginPath();
+    ctx.roundRect(30, H - 50, W - 60, 20, 8);
+    ctx.fill();
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(W/2, H - 42, 50, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // anim update
+    animState.bobAngle += 0.04;
+    if (animState.actionAnim) {
+        animState.actionAnim.frame++;
+        if (animState.actionAnim.frame >= animState.actionAnim.maxFrames)
+            animState.actionAnim = null;
+    }
+
+    // blink logic
+    animState.blinkTimer++;
+    if (animState.blinkTimer > 200 && Math.random() < 0.02) {
+        animState.isBlinking = true;
+        animState.blinkTimer = 0;
+        setTimeout(() => { animState.isBlinking = false; }, 150);
+    }
+
+    // draw pet
+    drawPet(W/2, H - 55, pet.mood, animState.actionAnim);
+
+    // particles
+    ctx.font = '18px sans-serif';
+    animState.particles = animState.particles.filter(p => p.life > 0);
+    for (const p of animState.particles) {
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.fillText(p.emoji, p.x - 10, p.y);
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05;
+        p.life--;
+    }
+    ctx.globalAlpha = 1;
+
+    // mood indicator
+    const moodMap = { happy:'😊', hungry:'😋', sad:'😢', tired:'😴', sleeping:'💤', dead:'💀' };
+    ctx.font = '22px sans-serif';
+    ctx.fillText(moodMap[pet.mood] || '😊', W - 50, 36);
+
+    requestAnimationFrame(renderLoop);
+}
+
+// focus name input when page loads
+document.getElementById('name-input').focus();
+document.getElementById('name-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startGame();
+});
+</script>
+</body>
+</html>
