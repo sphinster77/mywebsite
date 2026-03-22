@@ -184,9 +184,9 @@ const GHOST_COLS  = ['#ff0000','#ffb8ff','#00ffff','#ffb852'];
 const GHOST_NAMES = ['Blinky','Pinky','Inky','Clyde'];
 
 // Speed in cells/second
-const PAC_SPEED   = lvl => 1.0 + lvl * 0.05;
-const GHOST_SPEED = lvl => 0.8 + lvl * 0.05;
-const FRIGHT_SPEED = 0.5;
+const PAC_SPEED   = lvl => 0.4 + lvl * 0.03;
+const GHOST_SPEED = lvl => 0.32 + lvl * 0.03;
+const FRIGHT_SPEED = 0.22;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function isWall(col, row) {
