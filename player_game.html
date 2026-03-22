@@ -147,6 +147,52 @@
             padding: 0 0.2rem;
         }
         @media (pointer: coarse) { .football-touch { display: flex; } }
+
+        /* ── Bowling ── */
+        #bowlingCanvas { background: #1a3a1a; }
+        .bowling-score-board {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+        }
+        .bowling-player-score {
+            flex: 1;
+            min-width: 160px;
+            background: #12152a;
+            border-radius: 10px;
+            padding: 0.7rem 1rem;
+            border-top: 4px solid #f0c030;
+        }
+        .bowling-player-score.p2 { border-top-color: #3498db; }
+        .bowling-player-score .bps-name { font-weight: 800; font-size: 0.9rem; margin-bottom: 0.4rem; }
+        .bowling-player-score .bps-frames {
+            display: flex; gap: 3px; flex-wrap: wrap;
+        }
+        .bps-frame {
+            background: #0d0f1a; border-radius: 5px;
+            padding: 3px 5px; font-size: 0.7rem; text-align: center;
+            min-width: 28px;
+        }
+        .bps-frame .rolls { color: #9090b0; letter-spacing: 1px; }
+        .bps-frame .subtotal { font-weight: 700; color: #f0c030; }
+        .bps-frame.p2 .subtotal { color: #3498db; }
+        .bowling-status {
+            text-align: center; font-size: 1.1rem; font-weight: 700;
+            margin: 0.5rem 0; min-height: 1.8rem;
+            color: #f0c030;
+        }
+        .aim-bar-wrap {
+            width: 100%; background: #0d0f1a; border-radius: 999px;
+            height: 12px; overflow: hidden; margin: 0.4rem 0;
+        }
+        .aim-bar { height: 100%; border-radius: 999px; background: #f0c030; transition: width 0.05s; }
+        .power-bar-wrap {
+            width: 100%; background: #0d0f1a; border-radius: 999px;
+            height: 12px; overflow: hidden; margin: 0.4rem 0;
+        }
+        .power-bar { height: 100%; border-radius: 999px; background: #e74c3c; transition: width 0.05s; }
+        .bar-label { font-size: 0.75rem; color: #9090b0; font-weight: 600; margin-top: 0.2rem; }
     </style>
 </head>
 <body>
@@ -1454,6 +1500,578 @@
     document.getElementById('unoReset').addEventListener('click', () => init());
 
     init();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════
+     BOWLING
+══════════════════════════════════════════════════════════════ -->
+<div class="game-block">
+    <h2>🎳 Bowling</h2>
+    <p class="desc">
+        <strong>P1:</strong> Press <kbd>A</kbd> to set aim, then <kbd>A</kbd> again to set power &nbsp;|&nbsp;
+        <strong>P2:</strong> Press <kbd>L</kbd> to set aim, then <kbd>L</kbd> again to set power.<br>
+        10 frames each — strikes &amp; spares score bonus points!
+    </p>
+
+    <!-- Score boards -->
+    <div class="bowling-score-board">
+        <div class="bowling-player-score" id="bps1">
+            <div class="bps-name" style="color:#f0c030">🟡 Player 1</div>
+            <div class="bps-frames" id="bFrames1"></div>
+        </div>
+        <div class="bowling-player-score p2" id="bps2">
+            <div class="bps-name" style="color:#3498db">🔵 Player 2</div>
+            <div class="bps-frames" id="bFrames2"></div>
+        </div>
+    </div>
+
+    <div class="bowling-status" id="bowlStatus">Press Start to play!</div>
+
+    <div style="max-width:420px;margin:0 auto">
+        <div class="bar-label" id="aimLabel">Aim</div>
+        <div class="aim-bar-wrap"><div class="aim-bar" id="aimBar" style="width:50%"></div></div>
+        <div class="bar-label" id="powerLabel">Power</div>
+        <div class="power-bar-wrap"><div class="power-bar" id="powerBar" style="width:0%"></div></div>
+    </div>
+
+    <canvas id="bowlingCanvas" height="340"></canvas>
+    <div class="btn-row">
+        <button id="bowlStart">Start</button>
+        <button id="bowlReset">Reset</button>
+    </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+// ─── Canvas setup ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('bowlingCanvas');
+const ctx    = canvas.getContext('2d');
+function resizeCanvas() {
+    const w = canvas.parentElement.clientWidth - 32;
+    canvas.width  = Math.min(w, 600);
+    canvas.height = 340;
+}
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); render(); });
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const LANE_W   = canvas.width;
+const LANE_H   = canvas.height;
+const PIN_ROWS = [[0],[1,2],[3,4,5],[6,7,8,9]]; // triangle
+const NUM_PINS = 10;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+// frames[p] = array of frame objects: {rolls:[], subtotal:null}
+let state = 'idle'; // idle | aiming | powering | rolling | switching | gameover
+let players, currentPlayer, frames, currentFrame, rollInFrame;
+let ball, pins, aimAngle, aimDir, aimPct, powerPct, powerDir;
+let animId, ballAnimFrame;
+let statusMsg = '';
+
+function initGame() {
+    players     = ['Player 1', 'Player 2'];
+    frames      = [[], []];        // 10 frames each, each = {rolls:[],subtotal:null}
+    currentPlayer = 0;
+    currentFrame  = 0;
+    rollInFrame   = 0;
+    aimAngle      = 0;
+    aimDir        = 1;
+    aimPct        = 50;
+    powerPct      = 0;
+    powerDir      = 1;
+    state         = 'idle';
+    ball          = null;
+    resetLane();
+    setStatus('Press Start!');
+    updateScoreBoard();
+    render();
+}
+
+function resetLane() {
+    // standing pins
+    pins = buildPins(getKnockedSet());
+    ball = null;
+}
+
+function getKnockedSet() {
+    // which pins are already knocked for this half-frame
+    if (rollInFrame === 1) {
+        const f = frames[currentPlayer][currentFrame];
+        if (f && f.rolls[0] === 10) return new Set(); // strike — full reset
+        return f ? f.knocked : new Set();
+    }
+    return new Set();
+}
+
+function buildPins(knockedSet) {
+    const laneW = canvas.width;
+    const baseY = 55;
+    const pinR  = 10;
+    const rowGap = 26;
+    const colGap = 22;
+    let list = [], idx = 0;
+    for (let r = 0; r < 4; r++) {
+        const count = r + 1;
+        const startX = laneW/2 - (count-1)*colGap/2;
+        for (let c = 0; c < count; c++) {
+            list.push({
+                id: idx,
+                x: startX + c*colGap,
+                y: baseY + r*rowGap,
+                r: pinR,
+                standing: !knockedSet.has(idx),
+                fallAngle: 0, fallDir: 0, falling: false,
+            });
+            idx++;
+        }
+    }
+    return list;
+}
+
+// ─── Aim / power oscillators ──────────────────────────────────────────────────
+let aimInterval = null, powerInterval = null;
+
+function startAim() {
+    state = 'aiming';
+    aimPct = 0; aimDir = 1;
+    setStatus(`${players[currentPlayer]}: Press ${currentPlayer===0?'A':'L'} to lock aim!`);
+    clearInterval(aimInterval);
+    aimInterval = setInterval(() => {
+        aimPct += aimDir * 2.5;
+        if (aimPct >= 100) { aimPct = 100; aimDir = -1; }
+        if (aimPct <= 0)   { aimPct = 0;   aimDir =  1; }
+        document.getElementById('aimBar').style.width = aimPct + '%';
+        render();
+    }, 20);
+}
+
+function lockAim() {
+    clearInterval(aimInterval);
+    // aimPct 0-100 → angle offset from centre (-35° to +35°)
+    aimAngle = ((aimPct / 100) - 0.5) * 70; // degrees
+    state = 'powering';
+    powerPct = 0; powerDir = 1;
+    setStatus(`${players[currentPlayer]}: Press ${currentPlayer===0?'A':'L'} to set power!`);
+    clearInterval(powerInterval);
+    powerInterval = setInterval(() => {
+        powerPct += powerDir * 3;
+        if (powerPct >= 100) { powerPct = 100; powerDir = -1; }
+        if (powerPct <= 0)   { powerPct = 0;   powerDir =  1; }
+        document.getElementById('powerBar').style.width = powerPct + '%';
+        render();
+    }, 18);
+}
+
+function launchBall() {
+    clearInterval(powerInterval);
+    state = 'rolling';
+    const laneW = canvas.width;
+    const speed = 4 + powerPct * 0.08;
+    const angleRad = ((aimAngle) * Math.PI) / 180;
+    ball = {
+        x: laneW / 2,
+        y: LANE_H - 30,
+        r: 13,
+        vx: Math.sin(angleRad) * speed,
+        vy: -speed * Math.cos(angleRad) * 0.9,
+        trail: [],
+    };
+    setStatus('Rolling…');
+    animateBall();
+}
+
+// ─── Ball physics ─────────────────────────────────────────────────────────────
+function animateBall() {
+    if (state !== 'rolling') return;
+
+    ball.trail.push({x: ball.x, y: ball.y});
+    if (ball.trail.length > 12) ball.trail.shift();
+
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    ball.vy += 0.04; // slight deceleration illusion
+
+    // slight left/right drift toward centre
+    ball.vx *= 0.998;
+
+    // wall bounce
+    if (ball.x - ball.r < 0)             { ball.x = ball.r; ball.vx *= -0.6; }
+    if (ball.x + ball.r > canvas.width)  { ball.x = canvas.width - ball.r; ball.vx *= -0.6; }
+
+    // check pin collisions
+    pins.forEach(pin => {
+        if (!pin.standing) return;
+        const dx = ball.x - pin.x, dy = ball.y - pin.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < ball.r + pin.r + 2) {
+            pin.standing = false;
+            pin.falling   = true;
+            pin.fallDir   = dx >= 0 ? 1 : -1;
+            // chain reaction: knock nearby pins
+            setTimeout(() => chainKnock(pin), 120);
+        }
+    });
+
+    // ball reaches pin zone or exits top
+    if (ball.y < -20) {
+        finishRoll();
+        return;
+    }
+    // also stop if past pin area and no pins left to hit
+    if (ball.y < 40) {
+        finishRoll();
+        return;
+    }
+
+    // animate falling pins
+    pins.forEach(p => {
+        if (p.falling && p.fallAngle < 90) p.fallAngle += 6;
+    });
+
+    render();
+    requestAnimationFrame(animateBall);
+}
+
+function chainKnock(source) {
+    pins.forEach(pin => {
+        if (!pin.standing) return;
+        const dx = pin.x - source.x, dy = pin.y - source.y;
+        if (Math.sqrt(dx*dx+dy*dy) < 32) {
+            pin.standing = false;
+            pin.falling   = true;
+            pin.fallDir   = dx >= 0 ? 1 : -1;
+        }
+    });
+}
+
+function countKnockedThisRoll() {
+    return pins.filter(p => !p.standing).length;
+}
+
+function finishRoll() {
+    state = 'switching';
+    ball  = null;
+
+    // finish falling animation
+    pins.forEach(p => { if (p.falling) p.fallAngle = 90; });
+    render();
+
+    const knocked = countKnockedThisRoll();
+    const p = currentPlayer;
+    let f  = frames[p][currentFrame];
+    if (!f) { f = {rolls:[], knocked: new Set(), subtotal:null}; frames[p][currentFrame] = f; }
+
+    if (rollInFrame === 0) {
+        // first roll of frame
+        f.rolls.push(knocked);
+        f.knocked = new Set(pins.filter(p=>!p.standing).map(p=>p.id));
+
+        if (knocked === 10) {
+            // STRIKE
+            setStatus(`🎳 STRIKE! Well done ${players[p]}!`);
+            advanceFrame();
+        } else {
+            rollInFrame = 1;
+            setTimeout(() => {
+                resetLane(); // only clear knocked pins, leave standing
+                startAim();
+            }, 1200);
+        }
+    } else {
+        // second roll
+        const first = f.rolls[0];
+        f.rolls.push(knocked - first);
+        f.knocked = new Set(pins.filter(p=>!p.standing).map(p=>p.id));
+
+        const spare = (knocked === 10);
+        if (spare) setStatus(`✨ Spare! Nice one ${players[p]}!`);
+        else       setStatus(`${knocked - first} pins on second roll.`);
+
+        advanceFrame();
+    }
+
+    updateScoreBoard();
+}
+
+function advanceFrame() {
+    // 10th frame special: allow up to 3 rolls
+    const p = currentPlayer;
+    const f = frames[p][currentFrame];
+
+    // Compute running score
+    computeScores();
+    updateScoreBoard();
+
+    setTimeout(() => {
+        // switch player or next frame
+        if (currentPlayer === 0) {
+            currentPlayer = 1;
+            rollInFrame   = 0;
+            currentFrame  = frames[1].length; // p2 plays same frame number
+            setStatus(`${players[1]}'s turn — Frame ${currentFrame+1}`);
+        } else {
+            // both played this frame
+            const nextFrame = frames[0].length;
+            if (nextFrame >= 10) {
+                // game over
+                computeScores();
+                updateScoreBoard();
+                endGame();
+                return;
+            }
+            currentPlayer = 0;
+            currentFrame  = nextFrame;
+            rollInFrame   = 0;
+            setStatus(`${players[0]}'s turn — Frame ${currentFrame+1}`);
+        }
+        resetLane();
+        startAim();
+    }, 1500);
+}
+
+// ─── Scoring (standard bowling) ───────────────────────────────────────────────
+function computeScores() {
+    [0,1].forEach(p => {
+        let total = 0;
+        const fs  = frames[p];
+        for (let i = 0; i < fs.length; i++) {
+            const f = fs[i];
+            if (!f || !f.rolls.length) continue;
+            let fScore = f.rolls.reduce((a,b)=>a+b,0);
+
+            // bonus for strike
+            if (f.rolls[0] === 10 && i < 9) {
+                const next1 = nextRoll(fs, i, 0);
+                const next2 = nextRoll(fs, i, 1);
+                if (next1 !== null) fScore += next1;
+                if (next2 !== null) fScore += next2;
+            }
+            // bonus for spare (two rolls = 10, not strike)
+            else if (f.rolls.length >= 2 && f.rolls[0]+f.rolls[1] === 10 && f.rolls[0] !== 10 && i < 9) {
+                const next1 = nextRoll(fs, i, 0);
+                if (next1 !== null) fScore += next1;
+            }
+
+            total += fScore;
+            f.subtotal = total;
+        }
+    });
+}
+
+function nextRoll(frames, frameIdx, offset) {
+    // get the (offset)th roll after the end of frameIdx
+    let count = 0;
+    for (let i = frameIdx+1; i < frames.length; i++) {
+        const f = frames[i];
+        if (!f) return null;
+        for (const r of f.rolls) {
+            if (count === offset) return r;
+            count++;
+        }
+    }
+    return null;
+}
+
+// ─── Score board UI ────────────────────────────────────────────────────────────
+function updateScoreBoard() {
+    [0,1].forEach(p => {
+        const el = document.getElementById(`bFrames${p+1}`);
+        el.innerHTML = '';
+        for (let i = 0; i < 10; i++) {
+            const f   = frames[p][i];
+            const div = document.createElement('div');
+            div.className = 'bps-frame' + (p===1?' p2':'');
+            let rollStr = '';
+            if (f) {
+                f.rolls.forEach((r,ri) => {
+                    if (ri === 0 && r === 10) rollStr += 'X';
+                    else if (ri === 1 && f.rolls[0]+r === 10) rollStr += '/';
+                    else rollStr += r;
+                });
+            }
+            div.innerHTML = `<div class="rolls">${rollStr || (i+1)}</div><div class="subtotal">${f && f.subtotal !== null ? f.subtotal : ''}</div>`;
+            el.appendChild(div);
+        }
+    });
+}
+
+// ─── End game ─────────────────────────────────────────────────────────────────
+function endGame() {
+    state = 'gameover';
+    computeScores();
+    const s1 = frames[0][9] && frames[0][9].subtotal || 0;
+    const s2 = frames[1][9] && frames[1][9].subtotal || 0;
+    let msg;
+    if (s1 > s2)      msg = `🏆 Player 1 wins! ${s1} – ${s2}`;
+    else if (s2 > s1) msg = `🏆 Player 2 wins! ${s2} – ${s1}`;
+    else              msg = `🤝 It's a tie! ${s1} – ${s2}`;
+    setStatus(msg);
+    updateScoreBoard();
+    render();
+}
+
+// ─── Render ────────────────────────────────────────────────────────────────────
+function render() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // lane
+    ctx.fillStyle = '#c8a46e';
+    ctx.fillRect(0, 0, W, H);
+    // lane lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    for (let x = W*0.15; x < W; x += W*0.15) {
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    // foul line
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, H-50); ctx.lineTo(W, H-50); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('FOUL LINE', 6, H-54);
+
+    // pin area background
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.roundRect(W/2-70, 30, 140, 110, 8);
+    ctx.fill();
+
+    // draw pins
+    pins.forEach(pin => {
+        ctx.save();
+        ctx.translate(pin.x, pin.y);
+        if (pin.falling) ctx.rotate((pin.fallAngle * Math.PI/180) * pin.fallDir);
+        if (!pin.standing && !pin.falling) {
+            ctx.globalAlpha = 0.3;
+        }
+        // shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath(); ctx.ellipse(2,2,pin.r,pin.r*0.5,0,0,Math.PI*2); ctx.fill();
+        // pin
+        ctx.fillStyle = pin.standing ? '#fff' : '#aaa';
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(0,0,pin.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        // red stripe
+        if (pin.standing) {
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(0,0,pin.r*0.6,0,Math.PI*2); ctx.stroke();
+        }
+        ctx.restore();
+    });
+
+    // draw ball trail
+    if (ball) {
+        ball.trail.forEach((pt, i) => {
+            ctx.globalAlpha = (i / ball.trail.length) * 0.3;
+            ctx.fillStyle = currentPlayer === 0 ? '#f0c030' : '#3498db';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, ball.r * (i/ball.trail.length), 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+
+        // ball shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(ball.x+3, ball.y+4, ball.r, ball.r*0.5, 0, 0, Math.PI*2); ctx.fill();
+
+        // ball
+        const ballColor = currentPlayer === 0 ? '#f0c030' : '#3498db';
+        ctx.fillStyle = ballColor;
+        ctx.shadowColor = ballColor;
+        ctx.shadowBlur  = 12;
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // ball shine
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.arc(ball.x-4, ball.y-4, ball.r*0.35, 0, Math.PI*2); ctx.fill();
+    }
+
+    // aim arrow during aiming phase
+    if (state === 'aiming' || state === 'powering') {
+        const angleRad = (aimAngle * Math.PI / 180);
+        const startX   = W/2, startY = H-50;
+        const len      = 80;
+        const endX     = startX + Math.sin(angleRad)*len;
+        const endY     = startY - Math.cos(angleRad)*len;
+        const col      = currentPlayer===0 ? '#f0c030' : '#3498db';
+
+        ctx.save();
+        ctx.strokeStyle = col;
+        ctx.lineWidth   = 3;
+        ctx.setLineDash([8,5]);
+        ctx.globalAlpha = state === 'powering' ? 1 : (0.4 + Math.sin(Date.now()*0.005)*0.3);
+        ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+        ctx.setLineDash([]);
+        // arrowhead
+        const headLen = 12, headAngle = 0.4;
+        const ang = Math.atan2(endY-startY, endX-startX);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - headLen*Math.cos(ang-headAngle), endY - headLen*Math.sin(ang-headAngle));
+        ctx.lineTo(endX - headLen*Math.cos(ang+headAngle), endY - headLen*Math.sin(ang+headAngle));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    ctx.globalAlpha = 1;
+}
+
+// ─── Status helper ────────────────────────────────────────────────────────────
+function setStatus(msg) {
+    document.getElementById('bowlStatus').textContent = msg;
+}
+
+// ─── Input ────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    // P1 = 'a', P2 = 'l'
+    if (state === 'aiming') {
+        if (currentPlayer === 0 && key === 'a') { e.preventDefault(); lockAim(); }
+        if (currentPlayer === 1 && key === 'l') { e.preventDefault(); lockAim(); }
+    } else if (state === 'powering') {
+        if (currentPlayer === 0 && key === 'a') { e.preventDefault(); launchBall(); }
+        if (currentPlayer === 1 && key === 'l') { e.preventDefault(); launchBall(); }
+    }
+});
+
+// Mobile: tap canvas during aiming/powering
+canvas.addEventListener('click', () => {
+    if (state === 'aiming')   lockAim();
+    else if (state === 'powering') launchBall();
+});
+canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (state === 'aiming')   lockAim();
+    else if (state === 'powering') launchBall();
+}, {passive:false});
+
+document.getElementById('bowlStart').addEventListener('click', () => {
+    if (state === 'idle' || state === 'gameover') {
+        initGame();
+        setTimeout(() => startAim(), 300);
+    }
+});
+document.getElementById('bowlReset').addEventListener('click', () => {
+    clearInterval(aimInterval);
+    clearInterval(powerInterval);
+    initGame();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+initGame();
+render();
+
 })();
 </script>
 </body>
