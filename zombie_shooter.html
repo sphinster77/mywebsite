@@ -563,6 +563,51 @@
         
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+
+        // ── Touch support ────────────────────────────────────────────────────
+        // Left half = virtual joystick (move player), Right half = aim + shoot
+        function processTouch(e) {
+            const rect = gameCanvas.getBoundingClientRect();
+            const scaleX = gameCanvas.width  / rect.width;
+            const scaleY = gameCanvas.height / rect.height;
+
+            // Reset movement keys each frame from touch
+            keysPressed['ArrowUp'] = keysPressed['ArrowDown'] = keysPressed['ArrowLeft'] = keysPressed['ArrowRight'] = false;
+
+            for (const t of e.touches) {
+                const tx = (t.clientX - rect.left) * scaleX;
+                const ty = (t.clientY - rect.top)  * scaleY;
+
+                if (tx < gameCanvas.width / 2) {
+                    // Left half: move player toward touch point
+                    const dx = tx - player.x, dy = ty - player.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 20) {
+                        if (Math.abs(dx) > Math.abs(dy) * 0.5) keysPressed[dx > 0 ? 'ArrowRight' : 'ArrowLeft'] = true;
+                        if (Math.abs(dy) > Math.abs(dx) * 0.5) keysPressed[dy > 0 ? 'ArrowDown'  : 'ArrowUp']   = true;
+                    }
+                } else {
+                    // Right half: aim at touch and shoot
+                    mousePos.x = tx; mousePos.y = ty;
+                    mouseDown = true;
+                }
+            }
+        }
+
+        gameCanvas.addEventListener('touchstart', e => {
+            e.preventDefault(); processTouch(e);
+            tryShoot({ clientX: e.touches[0]?.clientX, clientY: e.touches[0]?.clientY });
+        }, { passive: false });
+        gameCanvas.addEventListener('touchmove',  e => { e.preventDefault(); processTouch(e); }, { passive: false });
+        gameCanvas.addEventListener('touchend',   e => {
+            e.preventDefault();
+            if (![...e.touches].some(t => (t.clientX - gameCanvas.getBoundingClientRect().left) * (gameCanvas.width / gameCanvas.getBoundingClientRect().width) >= gameCanvas.width / 2)) {
+                mouseDown = false;
+            }
+        }, { passive: false });
+
+        document.querySelector('.instructions p').insertAdjacentHTML('afterend',
+            '<p><em>On touch: drag left half to move, drag right half to aim and shoot.</em></p>');
     </script>
 </body>
 </html>

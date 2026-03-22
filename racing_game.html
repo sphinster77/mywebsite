@@ -85,6 +85,20 @@
             justify-content: space-between;
             margin-bottom: 10px;
         }
+        /* Touch steer buttons */
+        .touch-steer {
+            display: none;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.6rem;
+        }
+        @media (pointer: coarse) { .touch-steer { display: flex; } }
+        .steer-btn {
+            flex: 1; font-size: 2rem; padding: 18px 0;
+            background: #172ab3; color: white; border: none;
+            border-radius: 10px; cursor: pointer;
+            user-select: none; touch-action: manipulation;
+        }
         footer {
             background: linear-gradient(135deg, #172ab3 0%, #1e3ae0 100%);
             color: rgba(255,255,255,0.85);
@@ -115,6 +129,12 @@
         </div>
 
         <canvas class="game-canvas" id="gameCanvas"></canvas>
+
+        <!-- Touch steer buttons (shown on touch devices) -->
+        <div class="touch-steer">
+            <button class="steer-btn" id="btnLeft">◀ Left</button>
+            <button class="steer-btn" id="btnRight">Right ▶</button>
+        </div>
 
         <div class="controls">
             <button id="startBtn">Start Game</button>
@@ -272,6 +292,19 @@
             resize();
             if (!gameRunning) drawIdle();
         });
+
+        // Touch steer buttons
+        function bindSteer(id, key) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true;  }, { passive: false });
+            el.addEventListener('touchend',   e => { e.preventDefault(); keys[key] = false; }, { passive: false });
+            el.addEventListener('mousedown',  () => keys[key] = true);
+            el.addEventListener('mouseup',    () => keys[key] = false);
+            el.addEventListener('mouseleave', () => keys[key] = false);
+        }
+        bindSteer('btnLeft',  'ArrowLeft');
+        bindSteer('btnRight', 'ArrowRight');
 
         // ── Game loop ─────────────────────────────────────────────────────────
         function gameLoop(ts) {

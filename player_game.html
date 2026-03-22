@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paper Airplane</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2 Player Games</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -18,551 +18,542 @@
             padding: 2.5rem 1rem 2rem;
             box-shadow: 0 4px 12px rgba(220,165,12,0.35);
         }
-        header h1 {
-            font-size: 2.4rem;
-            font-weight: 800;
-            letter-spacing: 1px;
-            text-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
+        header h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         nav {
-            display: flex;
-            justify-content: center;
-            gap: 0.25rem;
-            background: #172ab3;
-            padding: 0 1rem;
+            display: flex; justify-content: center; gap: 0.25rem;
+            background: #172ab3; padding: 0 1rem;
             box-shadow: 0 2px 8px rgba(23,42,179,0.3);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            position: sticky; top: 0; z-index: 100;
         }
         nav a {
-            color: white;
-            padding: 14px 22px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.95rem;
+            color: white; padding: 14px 22px; text-decoration: none;
+            font-weight: 600; font-size: 0.95rem;
             border-bottom: 3px solid transparent;
             transition: background 0.2s, border-color 0.2s;
         }
-        nav a:hover {
-            background: rgba(255,255,255,0.12);
-            border-bottom-color: #dca50c;
-        }
-        main {
-            max-width: 860px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem 6rem;
-        }
+        nav a:hover { background: rgba(255,255,255,0.12); border-bottom-color: #dca50c; }
+        main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 6rem; }
         .game-block {
-            background: white;
-            border-radius: 14px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            margin-bottom: 2.5rem;
+            background: white; border-radius: 14px; padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 2.5rem;
         }
         .game-block h2 {
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #172ab3;
-            margin-bottom: 0.3rem;
-            border-bottom: 3px solid #dca50c;
-            display: inline-block;
-            padding-bottom: 0.3rem;
+            font-size: 1.4rem; font-weight: 800; color: #172ab3;
+            margin-bottom: 0.3rem; border-bottom: 3px solid #dca50c;
+            display: inline-block; padding-bottom: 0.3rem;
         }
-        .game-block p {
-            font-size: 0.88rem;
-            color: #555;
-            margin: 0.6rem 0 1rem;
-        }
-        canvas {
-            display: block;
-            width: 100%;
-            border-radius: 8px;
-            border: 2px solid #333;
-        }
-        .btn-row {
-            display: flex;
-            gap: 0.6rem;
-            margin-top: 0.9rem;
-            flex-wrap: wrap;
-        }
+        .game-block .desc { font-size: 0.88rem; color: #555; margin: 0.6rem 0 1rem; }
+        canvas { display: block; width: 100%; border-radius: 8px; border: 2px solid #333; touch-action: none; }
+        .btn-row { display: flex; gap: 0.6rem; margin-top: 0.9rem; flex-wrap: wrap; }
         button {
-            background: #172ab3;
-            color: white;
-            border: none;
-            padding: 9px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: background 0.2s;
+            background: #172ab3; color: white; border: none;
+            padding: 9px 20px; border-radius: 6px; cursor: pointer;
+            font-size: 0.9rem; font-weight: 600; transition: background 0.2s;
+            user-select: none; touch-action: manipulation;
         }
         button:hover { background: #0e1a7a; }
         footer {
             background: linear-gradient(135deg, #172ab3 0%, #1e3ae0 100%);
-            color: rgba(255,255,255,0.85);
-            text-align: center;
-            padding: 1rem;
-            font-size: 0.85rem;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
+            color: rgba(255,255,255,0.85); text-align: center;
+            padding: 1rem; font-size: 0.85rem;
+            position: fixed; bottom: 0; width: 100%;
             box-shadow: 0 -2px 10px rgba(23,42,179,0.25);
         }
         footer span { color: #dca50c; font-weight: 600; }
+
+        /* ── Touch controls ── */
+        .pong-touch {
+            display: none;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+        }
+        .pong-side { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+        .pong-side label { font-size: 0.78rem; font-weight: 700; text-align: center; color: #888; }
+        .pong-side .touch-btn {
+            font-size: 1.6rem; padding: 14px 0;
+            background: #172ab3; border-radius: 10px;
+        }
+        .p2-btn { background: #2980b9 !important; }
+
+        .tank-touch {
+            display: none;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+            padding: 0 0.2rem;
+        }
+        .tank-player { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .tank-player label { font-size: 0.78rem; font-weight: 700; color: #888; }
+        .dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 150px; }
+        .dpad-btn {
+            background: rgba(23,42,179,0.85); color: white; border: none;
+            border-radius: 8px; font-size: 1.2rem; height: 46px;
+            cursor: pointer; user-select: none; touch-action: manipulation;
+        }
+        .dpad-btn.empty { background: transparent; pointer-events: none; }
+        .shoot-btn {
+            background: #dca50c !important; width: 100%; border-radius: 8px;
+            font-size: 0.85rem; font-weight: 700; height: 42px;
+            color: white; border: none; cursor: pointer; touch-action: manipulation;
+            user-select: none;
+        }
+
+        /* Show touch controls only on touch screens */
+        @media (pointer: coarse) {
+            .pong-touch { display: flex; }
+            .tank-touch  { display: flex; }
+        }
     </style>
 </head>
 <body>
-    <header>
-        <h1>2 Player Game</h1>
-    </header>
-    <nav>
-        <a href="index.html">Go Back</a>
-    </nav>
-    <main>
+<header><h1>2 Player Games</h1></header>
+<nav><a href="index.html">Go Back</a></nav>
 
-        <!-- ── PONG ── -->
-        <div class="game-block">
-            <h2>Pong</h2>
-            <p>
-                <strong>Player 1 (left):</strong> W / S &nbsp;|&nbsp;
-                <strong>Player 2 (right):</strong> ↑ / ↓ &nbsp;|&nbsp; First to 7 wins!
-            </p>
-            <canvas id="pongCanvas" height="400"></canvas>
-            <div class="btn-row">
-                <button id="pongStart">Start</button>
-                <button id="pongPause">Pause</button>
-                <button id="pongReset">Reset</button>
+<main>
+
+    <!-- ── PONG ── -->
+    <div class="game-block">
+        <h2>Pong</h2>
+        <p class="desc">
+            <strong>P1 (left):</strong> W / S &nbsp;|&nbsp;
+            <strong>P2 (right):</strong> ↑ / ↓ &nbsp;|&nbsp; First to 7 wins!
+            <br><em>On touch: drag your finger on your half of the screen.</em>
+        </p>
+        <canvas id="pongCanvas" height="360"></canvas>
+        <div class="btn-row">
+            <button id="pongStart">Start</button>
+            <button id="pongPause">Pause</button>
+            <button id="pongReset">Reset</button>
+        </div>
+    </div>
+
+    <!-- ── TANK BATTLE ── -->
+    <div class="game-block">
+        <h2>Tank Battle</h2>
+        <p class="desc">
+            <strong>P1 (red):</strong> W/A/S/D + F to shoot &nbsp;|&nbsp;
+            <strong>P2 (blue):</strong> ↑←↓→ + L to shoot &nbsp;|&nbsp; First to 5 kills wins!
+        </p>
+        <canvas id="tankCanvas" height="380"></canvas>
+        <!-- On-screen D-pads for touch -->
+        <div class="tank-touch">
+            <div class="tank-player">
+                <label>P1 (red)</label>
+                <div class="dpad">
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="t1up">▲</button>
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="t1left">◀</button>
+                    <button class="dpad-btn" id="t1down">▼</button>
+                    <button class="dpad-btn" id="t1right">▶</button>
+                </div>
+                <button class="shoot-btn" id="t1shoot">💥 SHOOT</button>
+            </div>
+            <div class="tank-player">
+                <label>P2 (blue)</label>
+                <div class="dpad">
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="t2up">▲</button>
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="t2left">◀</button>
+                    <button class="dpad-btn" id="t2down">▼</button>
+                    <button class="dpad-btn" id="t2right">▶</button>
+                </div>
+                <button class="shoot-btn" id="t2shoot">💥 SHOOT</button>
             </div>
         </div>
-
-        <!-- ── TANK BATTLE ── -->
-        <div class="game-block">
-            <h2>Tank Battle</h2>
-            <p>
-                <strong>Player 1 (red):</strong> W/A/S/D to move, F to shoot &nbsp;|&nbsp;
-                <strong>Player 2 (blue):</strong> ↑/←/↓/→ to move, L to shoot
-            </p>
-            <canvas id="tankCanvas" height="420"></canvas>
-            <div class="btn-row">
-                <button id="tankStart">Start</button>
-                <button id="tankPause">Pause</button>
-                <button id="tankReset">Reset</button>
-            </div>
+        <div class="btn-row">
+            <button id="tankStart">Start</button>
+            <button id="tankPause">Pause</button>
+            <button id="tankReset">Reset</button>
         </div>
+    </div>
 
-    </main>
-    <footer>
-        &copy; 2025 <span>Davide Kurek</span>. All rights reserved.
-    </footer>
+    <!-- ── TIC TAC TOE ── -->
+    <div class="game-block">
+        <h2>Tic Tac Toe</h2>
+        <p class="desc">
+            <strong>Player 1:</strong> ✕ &nbsp;|&nbsp; <strong>Player 2:</strong> ○ &nbsp;|&nbsp;
+            Tap a square to play. Best of 3 rounds wins!
+        </p>
+        <canvas id="tttCanvas" height="320"></canvas>
+        <div class="btn-row">
+            <button id="tttReset">New Game</button>
+        </div>
+    </div>
+
+</main>
+
+<footer>&copy; 2025 <span>Davide Kurek</span>. All rights reserved.</footer>
 
 <script>
 // ════════════════════════════════════════════
-//  PONG
+//  PONG  (touch: drag on your canvas half)
 // ════════════════════════════════════════════
 (function () {
     const canvas = document.getElementById('pongCanvas');
-    const ctx    = canvas.getContext('2d');
-
-    const W = () => canvas.width;
-    const H = () => canvas.height;
-
+    const ctx = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
     const PAD_W = 12, PAD_H = 80, BALL_R = 9, WIN_SCORE = 7;
 
     let running = false, paused = false;
     let p1 = {}, p2 = {}, ball = {};
 
-    function resize() {
-        canvas.width = canvas.offsetWidth;
-    }
+    function resize() { canvas.width = canvas.offsetWidth; }
     window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
     resize();
 
     function reset() {
-        p1   = { x: 16,          y: H()/2 - PAD_H/2, score: 0, dy: 0 };
-        p2   = { x: W()-16-PAD_W, y: H()/2 - PAD_H/2, score: 0, dy: 0 };
+        p1 = { x: 16,            y: H()/2 - PAD_H/2, score: 0 };
+        p2 = { x: W()-16-PAD_W,  y: H()/2 - PAD_H/2, score: 0 };
         resetBall();
     }
-
     function resetBall() {
-        const ang = (Math.random() * 0.6 - 0.3) + (Math.random() < 0.5 ? 0 : Math.PI);
-        const spd = 5;
-        ball = { x: W()/2, y: H()/2, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, r: BALL_R };
+        const ang = (Math.random()*0.6-0.3) + (Math.random()<0.5?0:Math.PI);
+        ball = { x: W()/2, y: H()/2, vx: Math.cos(ang)*5, vy: Math.sin(ang)*5, r: BALL_R };
     }
 
+    // Keyboard
     const keys = {};
-    window.addEventListener('keydown', e => { keys[e.key] = true;  e.key.startsWith('Arrow') && e.preventDefault(); });
-    window.addEventListener('keyup',   e => { keys[e.key] = false; });
+    window.addEventListener('keydown', e => { keys[e.key]=true;  e.key.startsWith('Arrow')&&e.preventDefault(); });
+    window.addEventListener('keyup',   e => { keys[e.key]=false; });
+
+    // Touch — drag on left half moves P1, right half moves P2
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scaleY = H() / rect.height;
+        for (const t of e.touches) {
+            const x = (t.clientX - rect.left) * (W()/rect.width);
+            const y = (t.clientY - rect.top)  * scaleY;
+            if (x < W()/2) p1.y = Math.max(0, Math.min(H()-PAD_H, y - PAD_H/2));
+            else            p2.y = Math.max(0, Math.min(H()-PAD_H, y - PAD_H/2));
+        }
+    }, { passive: false });
 
     function update() {
-        const SPEED = 5;
-        if (keys['w'] || keys['W']) p1.y -= SPEED;
-        if (keys['s'] || keys['S']) p1.y += SPEED;
-        if (keys['ArrowUp'])   p2.y -= SPEED;
-        if (keys['ArrowDown']) p2.y += SPEED;
+        const SPD = 5;
+        if (keys['w']||keys['W'])        p1.y = Math.max(0,        p1.y - SPD);
+        if (keys['s']||keys['S'])        p1.y = Math.min(H()-PAD_H, p1.y + SPD);
+        if (keys['ArrowUp'])             p2.y = Math.max(0,        p2.y - SPD);
+        if (keys['ArrowDown'])           p2.y = Math.min(H()-PAD_H, p2.y + SPD);
 
-        p1.y = Math.max(0, Math.min(H() - PAD_H, p1.y));
-        p2.y = Math.max(0, Math.min(H() - PAD_H, p2.y));
+        ball.x += ball.vx; ball.y += ball.vy;
+        if (ball.y-ball.r < 0)    { ball.y=ball.r;      ball.vy*=-1; }
+        if (ball.y+ball.r > H())  { ball.y=H()-ball.r;  ball.vy*=-1; }
 
-        ball.x += ball.vx;
-        ball.y += ball.vy;
+        const hitP = pad => ball.x-ball.r < pad.x+PAD_W && ball.x+ball.r > pad.x && ball.y > pad.y && ball.y < pad.y+PAD_H;
+        if (hitP(p1)&&ball.vx<0) { ball.vx*=-1.05; ball.vy+=((ball.y-(p1.y+PAD_H/2))/(PAD_H/2))*3; }
+        if (hitP(p2)&&ball.vx>0) { ball.vx*=-1.05; ball.vy+=((ball.y-(p2.y+PAD_H/2))/(PAD_H/2))*3; }
+        const spd = Math.hypot(ball.vx,ball.vy);
+        if (spd>14) { ball.vx=ball.vx/spd*14; ball.vy=ball.vy/spd*14; }
 
-        // Top/bottom bounce
-        if (ball.y - ball.r < 0)      { ball.y = ball.r;      ball.vy *= -1; }
-        if (ball.y + ball.r > H())     { ball.y = H()-ball.r;  ball.vy *= -1; }
-
-        // Paddle collisions
-        function hitPad(pad) {
-            return ball.x - ball.r < pad.x + PAD_W &&
-                   ball.x + ball.r > pad.x &&
-                   ball.y > pad.y && ball.y < pad.y + PAD_H;
-        }
-        if (hitPad(p1) && ball.vx < 0) {
-            ball.vx *= -1.05;
-            ball.vy += ((ball.y - (p1.y + PAD_H/2)) / (PAD_H/2)) * 3;
-        }
-        if (hitPad(p2) && ball.vx > 0) {
-            ball.vx *= -1.05;
-            ball.vy += ((ball.y - (p2.y + PAD_H/2)) / (PAD_H/2)) * 3;
-        }
-        // Cap speed
-        const spd = Math.hypot(ball.vx, ball.vy);
-        if (spd > 14) { ball.vx = ball.vx/spd*14; ball.vy = ball.vy/spd*14; }
-
-        // Score
-        if (ball.x < 0)    { p2.score++; checkWin(p2, 'Player 2') || resetBall(); }
-        if (ball.x > W())   { p1.score++; checkWin(p1, 'Player 1') || resetBall(); }
+        if (ball.x<0)   { p2.score++; checkWin(p2,'Player 2')||resetBall(); }
+        if (ball.x>W()) { p1.score++; checkWin(p1,'Player 1')||resetBall(); }
     }
 
     function checkWin(player, name) {
         if (player.score >= WIN_SCORE) {
-            running = false;
-            draw();
-            ctx.fillStyle = 'rgba(0,0,0,0.65)';
-            ctx.fillRect(0,0,W(),H());
-            ctx.fillStyle = '#f0c030';
-            ctx.font = 'bold 42px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText(name + ' wins! 🏆', W()/2, H()/2 - 10);
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Segoe UI';
-            ctx.fillText('Press Start to play again', W()/2, H()/2 + 36);
+            running = false; draw();
+            ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W(),H());
+            ctx.fillStyle='#f0c030'; ctx.font='bold 38px Segoe UI'; ctx.textAlign='center';
+            ctx.fillText(name+' wins! 🏆', W()/2, H()/2-10);
+            ctx.fillStyle='white'; ctx.font='18px Segoe UI';
+            ctx.fillText('Press Start to play again', W()/2, H()/2+34);
             return true;
         }
         return false;
     }
 
     function draw() {
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0,0,W(),H());
-
-        // Centre line
-        ctx.setLineDash([10,10]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 2;
+        ctx.fillStyle='#111'; ctx.fillRect(0,0,W(),H());
+        ctx.setLineDash([10,10]); ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(W()/2,0); ctx.lineTo(W()/2,H()); ctx.stroke();
         ctx.setLineDash([]);
-
-        // Paddles
-        ctx.fillStyle = '#f0c030';
-        ctx.beginPath(); ctx.roundRect(p1.x, p1.y, PAD_W, PAD_H, 4); ctx.fill();
-        ctx.fillStyle = '#3498db';
-        ctx.beginPath(); ctx.roundRect(p2.x, p2.y, PAD_W, PAD_H, 4); ctx.fill();
-
-        // Ball
-        ctx.fillStyle = 'white';
-        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
-
-        // Scores
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.font = 'bold 48px Segoe UI';
-        ctx.textAlign = 'center';
-        ctx.fillText(p1.score, W()/4,   60);
-        ctx.fillText(p2.score, W()*3/4, 60);
+        ctx.fillStyle='#f0c030'; ctx.beginPath(); ctx.roundRect(p1.x,p1.y,PAD_W,PAD_H,4); ctx.fill();
+        ctx.fillStyle='#3498db'; ctx.beginPath(); ctx.roundRect(p2.x,p2.y,PAD_W,PAD_H,4); ctx.fill();
+        ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 44px Segoe UI'; ctx.textAlign='center';
+        ctx.fillText(p1.score, W()/4, 56); ctx.fillText(p2.score, W()*3/4, 56);
     }
 
     function drawIdle() {
-        resize();
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0,0,W(),H());
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '22px Segoe UI';
-        ctx.textAlign = 'center';
+        resize(); ctx.fillStyle='#111'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='22px Segoe UI'; ctx.textAlign='center';
         ctx.fillText('Press Start to play Pong!', W()/2, H()/2);
     }
 
-    function loop() {
-        if (!running || paused) return;
-        update(); draw();
-        requestAnimationFrame(loop);
-    }
+    function loop() { if (!running||paused) return; update(); draw(); requestAnimationFrame(loop); }
 
-    document.getElementById('pongStart').addEventListener('click', () => {
-        reset(); running = true; paused = false;
-        document.getElementById('pongPause').textContent = 'Pause';
-        loop();
-    });
-    document.getElementById('pongPause').addEventListener('click', () => {
-        if (!running) return;
-        paused = !paused;
-        document.getElementById('pongPause').textContent = paused ? 'Resume' : 'Pause';
+    document.getElementById('pongStart').onclick = () => { reset(); running=true; paused=false; document.getElementById('pongPause').textContent='Pause'; loop(); };
+    document.getElementById('pongPause').onclick = () => {
+        if (!running) return; paused=!paused;
+        document.getElementById('pongPause').textContent=paused?'Resume':'Pause';
         if (!paused) loop();
-    });
-    document.getElementById('pongReset').addEventListener('click', () => {
-        running = false; paused = false;
-        resize(); reset(); drawIdle();
-        document.getElementById('pongPause').textContent = 'Pause';
-    });
+    };
+    document.getElementById('pongReset').onclick = () => { running=false; paused=false; resize(); reset(); drawIdle(); document.getElementById('pongPause').textContent='Pause'; };
 
     reset(); drawIdle();
 })();
 
 
 // ════════════════════════════════════════════
-//  TANK BATTLE
+//  TANK BATTLE  (touch D-pads)
 // ════════════════════════════════════════════
 (function () {
     const canvas = document.getElementById('tankCanvas');
-    const ctx    = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
+    const TANK_SIZE=28, BULLET_R=5, SPEED=3, WIN_KILLS=5;
+    const WALLS=[{x:.3,y:.2,w:.08,h:.3},{x:.62,y:.5,w:.08,h:.3},{x:.45,y:.1,w:.1,h:.08},{x:.45,y:.82,w:.1,h:.08}];
 
-    const W = () => canvas.width;
-    const H = () => canvas.height;
+    let running=false, paused=false;
+    let t1={}, t2={}, bullets=[];
+    const keys={};
 
-    const TANK_SIZE = 28, BULLET_R = 5, SPEED = 3, WIN_KILLS = 5;
-    const WALLS = [
-        { x: 0.3, y: 0.2, w: 0.08, h: 0.3 },
-        { x: 0.62, y: 0.5, w: 0.08, h: 0.3 },
-        { x: 0.45, y: 0.1, w: 0.1,  h: 0.08 },
-        { x: 0.45, y: 0.82, w: 0.1, h: 0.08 },
-    ];
+    window.addEventListener('keydown', e => { keys[e.key]=true; ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&e.preventDefault(); });
+    window.addEventListener('keyup',   e => { keys[e.key]=false; });
 
-    let running = false, paused = false;
-    let t1 = {}, t2 = {}, bullets = [];
-    const keys = {};
-
-    window.addEventListener('keydown', e => {
-        keys[e.key] = true;
-        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
-    });
-    window.addEventListener('keyup', e => { keys[e.key] = false; });
+    // Wire D-pad buttons to keys
+    function bindBtn(id, key) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('touchstart', e => { e.preventDefault(); keys[key]=true;  }, {passive:false});
+        el.addEventListener('touchend',   e => { e.preventDefault(); keys[key]=false; }, {passive:false});
+        el.addEventListener('mousedown',  () => keys[key]=true);
+        el.addEventListener('mouseup',    () => keys[key]=false);
+        el.addEventListener('mouseleave', () => keys[key]=false);
+    }
+    bindBtn('t1up',    'w'); bindBtn('t1down',  's');
+    bindBtn('t1left',  'a'); bindBtn('t1right', 'd');
+    bindBtn('t1shoot', 'f');
+    bindBtn('t2up',    'ArrowUp');   bindBtn('t2down',  'ArrowDown');
+    bindBtn('t2left',  'ArrowLeft'); bindBtn('t2right', 'ArrowRight');
+    bindBtn('t2shoot', 'l');
 
     function resize() { canvas.width = canvas.offsetWidth; }
     window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
     resize();
 
-    function wall(frac) {
-        return { x: frac.x*W(), y: frac.y*H(), w: frac.w*W(), h: frac.h*H() };
-    }
+    const wall = f => ({ x:f.x*W(), y:f.y*H(), w:f.w*W(), h:f.h*H() });
 
     function reset() {
-        t1 = { x: W()*0.1, y: H()/2, angle: 0,    color: '#e74c3c', kills: 0, shootCool: 0 };
-        t2 = { x: W()*0.9, y: H()/2, angle: Math.PI, color: '#3498db', kills: 0, shootCool: 0 };
-        bullets = [];
+        t1={x:W()*.1,y:H()/2,angle:0,       color:'#e74c3c',kills:0,shootCool:0};
+        t2={x:W()*.9,y:H()/2,angle:Math.PI,  color:'#3498db',kills:0,shootCool:0};
+        bullets=[];
     }
 
     function shoot(tank) {
-        if (tank.shootCool > 0) return;
-        bullets.push({
-            x: tank.x + Math.cos(tank.angle) * (TANK_SIZE/2 + 6),
-            y: tank.y + Math.sin(tank.angle) * (TANK_SIZE/2 + 6),
-            vx: Math.cos(tank.angle) * 7,
-            vy: Math.sin(tank.angle) * 7,
-            owner: tank
-        });
-        tank.shootCool = 25;
+        if (tank.shootCool>0) return;
+        bullets.push({ x:tank.x+Math.cos(tank.angle)*(TANK_SIZE/2+6), y:tank.y+Math.sin(tank.angle)*(TANK_SIZE/2+6),
+                        vx:Math.cos(tank.angle)*7, vy:Math.sin(tank.angle)*7, owner:tank });
+        tank.shootCool=25;
     }
 
-    function moveTank(tank, fwd, turn) {
-        const nx = tank.x + Math.cos(tank.angle) * fwd * SPEED;
-        const ny = tank.y + Math.sin(tank.angle) * fwd * SPEED;
-        tank.angle += turn * 0.06;
-
-        // Boundary clamp
-        const half = TANK_SIZE / 2;
-        const cx = Math.max(half, Math.min(W()-half, nx));
-        const cy = Math.max(half, Math.min(H()-half, ny));
-
-        // Wall collision
-        let blocked = false;
-        for (const f of WALLS) {
-            const w = wall(f);
-            if (cx+half > w.x && cx-half < w.x+w.w && cy+half > w.y && cy-half < w.y+w.h) {
-                blocked = true; break;
-            }
-        }
-        if (!blocked) { tank.x = cx; tank.y = cy; }
+    function moveTank(tank,fwd,turn) {
+        const nx=tank.x+Math.cos(tank.angle)*fwd*SPEED, ny=tank.y+Math.sin(tank.angle)*fwd*SPEED;
+        tank.angle+=turn*0.06;
+        const half=TANK_SIZE/2;
+        const cx=Math.max(half,Math.min(W()-half,nx)), cy=Math.max(half,Math.min(H()-half,ny));
+        let blocked=false;
+        for (const f of WALLS) { const w=wall(f); if (cx+half>w.x&&cx-half<w.x+w.w&&cy+half>w.y&&cy-half<w.y+w.h){blocked=true;break;} }
+        if (!blocked){tank.x=cx;tank.y=cy;}
     }
 
     function update() {
-        // P1 controls: WASD, F to shoot
-        let fwd1 = 0, turn1 = 0;
-        if (keys['w'] || keys['W']) fwd1  =  1;
-        if (keys['s'] || keys['S']) fwd1  = -1;
-        if (keys['a'] || keys['A']) turn1 = -1;
-        if (keys['d'] || keys['D']) turn1 =  1;
-        if (keys['f'] || keys['F']) shoot(t1);
-        moveTank(t1, fwd1, turn1);
+        let fwd1=0,turn1=0;
+        if(keys['w']||keys['W'])fwd1=1; if(keys['s']||keys['S'])fwd1=-1;
+        if(keys['a']||keys['A'])turn1=-1; if(keys['d']||keys['D'])turn1=1;
+        if(keys['f']||keys['F'])shoot(t1);
+        moveTank(t1,fwd1,turn1);
 
-        // P2 controls: arrows, L to shoot
-        let fwd2 = 0, turn2 = 0;
-        if (keys['ArrowUp'])    fwd2  =  1;
-        if (keys['ArrowDown'])  fwd2  = -1;
-        if (keys['ArrowLeft'])  turn2 = -1;
-        if (keys['ArrowRight']) turn2 =  1;
-        if (keys['l'] || keys['L']) shoot(t2);
-        moveTank(t2, fwd2, turn2);
+        let fwd2=0,turn2=0;
+        if(keys['ArrowUp'])fwd2=1; if(keys['ArrowDown'])fwd2=-1;
+        if(keys['ArrowLeft'])turn2=-1; if(keys['ArrowRight'])turn2=1;
+        if(keys['l']||keys['L'])shoot(t2);
+        moveTank(t2,fwd2,turn2);
 
-        t1.shootCool = Math.max(0, t1.shootCool - 1);
-        t2.shootCool = Math.max(0, t2.shootCool - 1);
+        t1.shootCool=Math.max(0,t1.shootCool-1); t2.shootCool=Math.max(0,t2.shootCool-1);
 
-        // Move bullets
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            const b = bullets[i];
-            b.x += b.vx; b.y += b.vy;
-
-            // Off screen
-            if (b.x < 0 || b.x > W() || b.y < 0 || b.y > H()) { bullets.splice(i,1); continue; }
-
-            // Wall bounce
-            let bounced = false;
-            for (const f of WALLS) {
-                const w = wall(f);
-                if (b.x+BULLET_R > w.x && b.x-BULLET_R < w.x+w.w &&
-                    b.y+BULLET_R > w.y && b.y-BULLET_R < w.y+w.h) {
-                    // simple reflect
-                    const overlapL = (b.x+BULLET_R) - w.x;
-                    const overlapR = (w.x+w.w) - (b.x-BULLET_R);
-                    const overlapT = (b.y+BULLET_R) - w.y;
-                    const overlapB = (w.y+w.h) - (b.y-BULLET_R);
-                    const minH = Math.min(overlapL, overlapR);
-                    const minV = Math.min(overlapT, overlapB);
-                    if (minH < minV) b.vx *= -1; else b.vy *= -1;
-                    bounced = true; break;
-                }
-            }
-            if (bounced) continue;
-
-            // Hit tanks
-            function hitTank(tank) {
-                return Math.hypot(b.x - tank.x, b.y - tank.y) < TANK_SIZE/2 + BULLET_R;
-            }
-            if (b.owner !== t1 && hitTank(t1)) {
-                t2.kills++;
-                bullets.splice(i,1);
-                if (t2.kills >= WIN_KILLS) { endGame('Player 2'); return; }
-                respawn(t1, W()*0.1, H()/2, 0);
-                continue;
-            }
-            if (b.owner !== t2 && hitTank(t2)) {
-                t1.kills++;
-                bullets.splice(i,1);
-                if (t1.kills >= WIN_KILLS) { endGame('Player 1'); return; }
-                respawn(t2, W()*0.9, H()/2, Math.PI);
-                continue;
-            }
+        for (let i=bullets.length-1;i>=0;i--) {
+            const b=bullets[i]; b.x+=b.vx; b.y+=b.vy;
+            if(b.x<0||b.x>W()||b.y<0||b.y>H()){bullets.splice(i,1);continue;}
+            let bounced=false;
+            for (const f of WALLS){const w=wall(f);if(b.x+BULLET_R>w.x&&b.x-BULLET_R<w.x+w.w&&b.y+BULLET_R>w.y&&b.y-BULLET_R<w.y+w.h){const oL=(b.x+BULLET_R)-w.x,oR=(w.x+w.w)-(b.x-BULLET_R),oT=(b.y+BULLET_R)-w.y,oB=(w.y+w.h)-(b.y-BULLET_R);Math.min(oL,oR)<Math.min(oT,oB)?b.vx*=-1:b.vy*=-1;bounced=true;break;}}
+            if(bounced)continue;
+            const hit=tank=>Math.hypot(b.x-tank.x,b.y-tank.y)<TANK_SIZE/2+BULLET_R;
+            if(b.owner!==t1&&hit(t1)){t2.kills++;bullets.splice(i,1);if(t2.kills>=WIN_KILLS){endGame('Player 2');return;}t1.x=W()*.1;t1.y=H()/2;t1.angle=0;continue;}
+            if(b.owner!==t2&&hit(t2)){t1.kills++;bullets.splice(i,1);if(t1.kills>=WIN_KILLS){endGame('Player 1');return;}t2.x=W()*.9;t2.y=H()/2;t2.angle=Math.PI;continue;}
         }
     }
 
-    function respawn(tank, x, y, angle) {
-        tank.x = x; tank.y = y; tank.angle = angle;
-    }
-
     function endGame(name) {
-        running = false; draw();
-        ctx.fillStyle = 'rgba(0,0,0,0.65)';
-        ctx.fillRect(0,0,W(),H());
-        ctx.fillStyle = '#f0c030';
-        ctx.font = 'bold 42px Segoe UI';
-        ctx.textAlign = 'center';
-        ctx.fillText(name + ' wins! 🏆', W()/2, H()/2 - 10);
-        ctx.fillStyle = 'white';
-        ctx.font = '20px Segoe UI';
-        ctx.fillText('Press Start to play again', W()/2, H()/2 + 36);
+        running=false; draw();
+        ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle='#f0c030'; ctx.font='bold 38px Segoe UI'; ctx.textAlign='center';
+        ctx.fillText(name+' wins! 🏆',W()/2,H()/2-10);
+        ctx.fillStyle='white'; ctx.font='18px Segoe UI';
+        ctx.fillText('Press Start to play again',W()/2,H()/2+34);
     }
 
     function drawTank(tank) {
-        ctx.save();
-        ctx.translate(tank.x, tank.y);
-        ctx.rotate(tank.angle);
-        // Body
-        ctx.fillStyle = tank.color;
-        ctx.beginPath();
-        ctx.roundRect(-TANK_SIZE/2, -TANK_SIZE/2, TANK_SIZE, TANK_SIZE, 4);
-        ctx.fill();
-        // Barrel
-        ctx.fillStyle = tank.color;
-        ctx.fillRect(0, -4, TANK_SIZE/2 + 4, 8);
-        // Turret
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
-        ctx.beginPath(); ctx.arc(0, 0, TANK_SIZE/4, 0, Math.PI*2); ctx.fill();
+        ctx.save(); ctx.translate(tank.x,tank.y); ctx.rotate(tank.angle);
+        ctx.fillStyle=tank.color; ctx.beginPath(); ctx.roundRect(-TANK_SIZE/2,-TANK_SIZE/2,TANK_SIZE,TANK_SIZE,4); ctx.fill();
+        ctx.fillRect(0,-4,TANK_SIZE/2+4,8);
+        ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(0,0,TANK_SIZE/4,0,Math.PI*2); ctx.fill();
         ctx.restore();
     }
 
     function draw() {
-        ctx.fillStyle = '#2d5a27';
-        ctx.fillRect(0,0,W(),H());
-
-        // Walls
-        ctx.fillStyle = '#7a6652';
-        for (const f of WALLS) {
-            const w = wall(f);
-            ctx.beginPath(); ctx.roundRect(w.x, w.y, w.w, w.h, 4); ctx.fill();
-        }
-
+        ctx.fillStyle='#2d5a27'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle='#7a6652';
+        for(const f of WALLS){const w=wall(f);ctx.beginPath();ctx.roundRect(w.x,w.y,w.w,w.h,4);ctx.fill();}
         drawTank(t1); drawTank(t2);
-
-        // Bullets
-        ctx.fillStyle = '#f1c40f';
-        for (const b of bullets) {
-            ctx.beginPath(); ctx.arc(b.x, b.y, BULLET_R, 0, Math.PI*2); ctx.fill();
-        }
-
-        // Scores
-        ctx.font = 'bold 22px Segoe UI';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = t1.color;
-        ctx.fillText('P1: ' + t1.kills + ' / ' + WIN_KILLS, 12, 30);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = t2.color;
-        ctx.fillText('P2: ' + t2.kills + ' / ' + WIN_KILLS, W()-12, 30);
+        ctx.fillStyle='#f1c40f';
+        for(const b of bullets){ctx.beginPath();ctx.arc(b.x,b.y,BULLET_R,0,Math.PI*2);ctx.fill();}
+        ctx.font='bold 20px Segoe UI'; ctx.textAlign='left'; ctx.fillStyle=t1.color;
+        ctx.fillText('P1: '+t1.kills+'/'+WIN_KILLS,12,28);
+        ctx.textAlign='right'; ctx.fillStyle=t2.color;
+        ctx.fillText('P2: '+t2.kills+'/'+WIN_KILLS,W()-12,28);
     }
 
     function drawIdle() {
-        resize();
-        ctx.fillStyle = '#2d5a27';
-        ctx.fillRect(0,0,W(),H());
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '22px Segoe UI';
-        ctx.textAlign = 'center';
-        ctx.fillText('Press Start to play Tank Battle!', W()/2, H()/2);
+        resize(); ctx.fillStyle='#2d5a27'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='22px Segoe UI'; ctx.textAlign='center';
+        ctx.fillText('Press Start to play Tank Battle!',W()/2,H()/2);
     }
 
-    function loop() {
-        if (!running || paused) return;
-        update(); draw();
-        requestAnimationFrame(loop);
-    }
+    function loop(){if(!running||paused)return;update();draw();requestAnimationFrame(loop);}
 
-    document.getElementById('tankStart').addEventListener('click', () => {
-        resize(); reset(); running = true; paused = false;
-        document.getElementById('tankPause').textContent = 'Pause';
-        loop();
-    });
-    document.getElementById('tankPause').addEventListener('click', () => {
-        if (!running) return;
-        paused = !paused;
-        document.getElementById('tankPause').textContent = paused ? 'Resume' : 'Pause';
-        if (!paused) loop();
-    });
-    document.getElementById('tankReset').addEventListener('click', () => {
-        running = false; paused = false;
-        resize(); reset(); drawIdle();
-        document.getElementById('tankPause').textContent = 'Pause';
-    });
+    document.getElementById('tankStart').onclick = () => { resize(); reset(); running=true; paused=false; document.getElementById('tankPause').textContent='Pause'; loop(); };
+    document.getElementById('tankPause').onclick = () => {
+        if(!running)return; paused=!paused;
+        document.getElementById('tankPause').textContent=paused?'Resume':'Pause';
+        if(!paused)loop();
+    };
+    document.getElementById('tankReset').onclick = () => { running=false; paused=false; resize(); reset(); drawIdle(); document.getElementById('tankPause').textContent='Pause'; };
 
     reset(); drawIdle();
 })();
-</script>
 
+
+// ════════════════════════════════════════════
+//  TIC TAC TOE  (tap / click to play)
+// ════════════════════════════════════════════
+(function () {
+    const canvas = document.getElementById('tttCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
+
+    let board, turn, wins, gameOver;
+    const COLORS = { X: '#e74c3c', O: '#3498db' };
+
+    function resize() { canvas.width = canvas.offsetWidth; }
+    window.addEventListener('resize', () => { resize(); draw(); });
+    resize();
+
+    function newGame() {
+        board = Array(9).fill('');
+        turn = 'X'; gameOver = false;
+        draw();
+    }
+
+    function cellSize() { return Math.min(W(), H()) / 3; }
+
+    function cellIndex(px, py) {
+        const cs = cellSize();
+        const ox = (W() - cs*3) / 2, oy = (H() - cs*3) / 2;
+        const col = Math.floor((px - ox) / cs);
+        const row = Math.floor((py - oy) / cs);
+        if (col<0||col>2||row<0||row>2) return -1;
+        return row*3+col;
+    }
+
+    function checkWinner() {
+        const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for (const [a,b,c] of lines) {
+            if (board[a]&&board[a]===board[b]&&board[a]===board[c]) return { winner:board[a], line:[a,b,c] };
+        }
+        if (board.every(c=>c)) return { winner:'draw' };
+        return null;
+    }
+
+    function play(idx) {
+        if (gameOver||board[idx]) return;
+        board[idx]=turn;
+        const result=checkWinner();
+        if (result) { gameOver=true; draw(result); return; }
+        turn = turn==='X'?'O':'X';
+        draw();
+    }
+
+    function draw(result) {
+        ctx.clearRect(0,0,W(),H());
+        ctx.fillStyle='#f8f8f8'; ctx.fillRect(0,0,W(),H());
+
+        const cs=cellSize();
+        const ox=(W()-cs*3)/2, oy=(H()-cs*3)/2;
+
+        // Grid
+        ctx.strokeStyle='#ccc'; ctx.lineWidth=3;
+        for(let i=1;i<3;i++){
+            ctx.beginPath(); ctx.moveTo(ox+i*cs,oy); ctx.lineTo(ox+i*cs,oy+cs*3); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ox,oy+i*cs); ctx.lineTo(ox+cs*3,oy+i*cs); ctx.stroke();
+        }
+
+        // Symbols
+        for (let i=0;i<9;i++){
+            if(!board[i]) continue;
+            const col=i%3, row=Math.floor(i/3);
+            const cx=ox+col*cs+cs/2, cy=oy+row*cs+cs/2;
+            ctx.font=`bold ${Math.floor(cs*0.55)}px Segoe UI`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle=COLORS[board[i]];
+            ctx.fillText(board[i],cx,cy);
+        }
+
+        // Win line
+        if (result&&result.winner!=='draw') {
+            const [a,,c]=result.line;
+            const c1col=a%3, c1row=Math.floor(a/3), c2col=c%3, c2row=Math.floor(c/3);
+            ctx.strokeStyle=COLORS[result.winner]; ctx.lineWidth=6;
+            ctx.lineCap='round';
+            ctx.beginPath();
+            ctx.moveTo(ox+c1col*cs+cs/2, oy+c1row*cs+cs/2);
+            ctx.lineTo(ox+c2col*cs+cs/2, oy+c2row*cs+cs/2);
+            ctx.stroke();
+        }
+
+        // Status bar
+        const barH=42;
+        ctx.fillStyle='#172ab3'; ctx.fillRect(0,0,W(),barH);
+        ctx.font='bold 18px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        if (!result) {
+            ctx.fillStyle=COLORS[turn];
+            ctx.fillText('Player '+turn+"'s turn", W()/2, barH/2);
+        } else if (result.winner==='draw') {
+            ctx.fillStyle='#f0c030';
+            ctx.fillText("It's a draw! 🤝  Tap New Game", W()/2, barH/2);
+        } else {
+            ctx.fillStyle='#f0c030';
+            ctx.fillText('Player '+result.winner+' wins! 🏆  Tap New Game', W()/2, barH/2);
+        }
+    }
+
+    function getPos(e) {
+        const rect=canvas.getBoundingClientRect();
+        const scaleX=W()/rect.width, scaleY=H()/rect.height;
+        if (e.touches) return { x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY };
+        return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
+    }
+
+    canvas.addEventListener('click', e => { const {x,y}=getPos(e); play(cellIndex(x,y)); });
+    canvas.addEventListener('touchend', e => { e.preventDefault(); const {x,y}=getPos(e); play(cellIndex(x,y)); }, {passive:false});
+    document.getElementById('tttReset').onclick = newGame;
+
+    wins={X:0,O:0}; newGame();
+})();
+</script>
 </body>
 </html>
