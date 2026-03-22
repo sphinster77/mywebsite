@@ -519,16 +519,9 @@ function gameTick() {
     if (pet.happy  < 20 && Math.random() < 0.05)  speak('I feel lonely... 😢');
     if (pet.energy < 15 && Math.random() < 0.05)  speak('I\'m exhausted... 💤');
 
-    // death
-    if (pet.hunger <= 0 || pet.happy <= 0) {
-        pet.alive = false;
-        pet.mood = 'dead';
-        const reason = pet.hunger <= 0 ? 'hunger' : 'loneliness';
-        document.getElementById('dead-msg').textContent =
-            `${pet.name} passed away from ${reason}. 💔`;
-        document.getElementById('dead-overlay').classList.remove('hidden');
-        log(`${pet.name} has passed away...`, 'warn');
-    }
+    // floor stats at 1 so the pet never dies
+    if (pet.hunger <= 0) { pet.hunger = 1; speak('I\'m starving! Please feed me! 🍖'); }
+    if (pet.happy  <= 0) { pet.happy  = 1; speak('I\'m so lonely... please play with me! 😢'); }
 
     updateUI();
 }
