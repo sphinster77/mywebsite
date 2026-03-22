@@ -8,21 +8,22 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f4f6fb;
-            color: #1a1a2e;
+            background: #0d0f1a;
+            color: #e8e8f0;
         }
         header {
-            background: linear-gradient(135deg, #dca50c 0%, #f0c030 100%);
+            background: #0d0f1a;
+            border-bottom: 2px solid rgba(240,192,48,0.25);
             color: white;
             text-align: center;
             padding: 2.5rem 1rem 2rem;
-            box-shadow: 0 4px 12px rgba(220,165,12,0.35);
         }
-        header h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        header h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; text-shadow: 0 0 30px rgba(220,165,12,0.5), 0 2px 6px rgba(0,0,0,0.4); }
         nav {
             display: flex; justify-content: center; gap: 0.25rem;
-            background: #172ab3; padding: 0 1rem;
-            box-shadow: 0 2px 8px rgba(23,42,179,0.3);
+            background: #12152a; padding: 0 1rem;
+            border-bottom: 1px solid rgba(240,192,48,0.15);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
             position: sticky; top: 0; z-index: 100;
         }
         nav a {
@@ -34,15 +35,15 @@
         nav a:hover { background: rgba(255,255,255,0.12); border-bottom-color: #dca50c; }
         main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 6rem; }
         .game-block {
-            background: white; border-radius: 14px; padding: 1.5rem;
+            background: #161828; border-radius: 14px; padding: 1.5rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 2.5rem;
         }
         .game-block h2 {
-            font-size: 1.4rem; font-weight: 800; color: #172ab3;
+            font-size: 1.4rem; font-weight: 800; color: #f0c030;
             margin-bottom: 0.3rem; border-bottom: 3px solid #dca50c;
             display: inline-block; padding-bottom: 0.3rem;
         }
-        .game-block .desc { font-size: 0.88rem; color: #555; margin: 0.6rem 0 1rem; }
+        .game-block .desc { font-size: 0.88rem; color: #9090b0; margin: 0.6rem 0 1rem; }
         canvas { display: block; width: 100%; border-radius: 8px; border: 2px solid #333; touch-action: none; }
         .btn-row { display: flex; gap: 0.6rem; margin-top: 0.9rem; flex-wrap: wrap; }
         button {
@@ -53,13 +54,13 @@
         }
         button:hover { background: #0e1a7a; }
         footer {
-            background: linear-gradient(135deg, #172ab3 0%, #1e3ae0 100%);
-            color: rgba(255,255,255,0.85); text-align: center;
+            background: #12152a;
+            color: rgba(255,255,255,0.45); text-align: center;
+            border-top: 1px solid rgba(240,192,48,0.15);
             padding: 1rem; font-size: 0.85rem;
             position: fixed; bottom: 0; width: 100%;
-            box-shadow: 0 -2px 10px rgba(23,42,179,0.25);
         }
-        footer span { color: #dca50c; font-weight: 600; }
+        footer span { color: #f0c030; font-weight: 600; }
 
         /* ── Touch controls ── */
         .pong-touch {
@@ -69,7 +70,7 @@
             margin-top: 0.7rem;
         }
         .pong-side { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
-        .pong-side label { font-size: 0.78rem; font-weight: 700; text-align: center; color: #888; }
+        .pong-side label { font-size: 0.78rem; font-weight: 700; text-align: center; color: #9090b0; }
         .pong-side .touch-btn {
             font-size: 1.6rem; padding: 14px 0;
             background: #172ab3; border-radius: 10px;
@@ -84,7 +85,7 @@
             padding: 0 0.2rem;
         }
         .tank-player { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .tank-player label { font-size: 0.78rem; font-weight: 700; color: #888; }
+        .tank-player label { font-size: 0.78rem; font-weight: 700; color: #9090b0; }
         .dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 150px; }
         .dpad-btn {
             background: rgba(23,42,179,0.85); color: white; border: none;
@@ -120,7 +121,7 @@
         .ttt-name-field label {
             font-size: 0.78rem;
             font-weight: 700;
-            color: #888;
+            color: #9090b0;
         }
         .ttt-name-field input {
             background: #1a1a2e;
