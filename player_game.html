@@ -174,11 +174,12 @@
     <div class="game-block">
         <h2>Tic Tac Toe</h2>
         <p class="desc">
-            <strong>Player 1:</strong> ✕ &nbsp;|&nbsp; <strong>Player 2:</strong> ○ &nbsp;|&nbsp;
-            Tap a square to play. Best of 3 rounds wins!
+            <strong>P1 (gold ✕):</strong> click/tap &nbsp;|&nbsp;
+            <strong>P2 (blue ○):</strong> click/tap &nbsp;|&nbsp; First to 3 round wins takes the match!
         </p>
-        <canvas id="tttCanvas" height="320"></canvas>
+        <canvas id="tttCanvas" height="340"></canvas>
         <div class="btn-row">
+            <button id="tttNewRound">New Round</button>
             <button id="tttReset">New Game</button>
         </div>
     </div>
@@ -439,120 +440,195 @@
 
 
 // ════════════════════════════════════════════
-//  TIC TAC TOE  (tap / click to play)
+//  TIC TAC TOE  (arcade style — like Pong/Tank)
 // ════════════════════════════════════════════
 (function () {
     const canvas = document.getElementById('tttCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx    = canvas.getContext('2d');
     const W = () => canvas.width, H = () => canvas.height;
+    const WIN_MATCH = 3;
+    const COLORS = { X: '#f0c030', O: '#3498db' }; // gold / blue — match pong paddles
 
-    let board, turn, wins, gameOver;
-    const COLORS = { X: '#e74c3c', O: '#3498db' };
+    let board, turn, gameOver, scores, animCell, animSym, animProg, animRaf;
 
     function resize() { canvas.width = canvas.offsetWidth; }
     window.addEventListener('resize', () => { resize(); draw(); });
     resize();
 
-    function newGame() {
-        board = Array(9).fill('');
-        turn = 'X'; gameOver = false;
-        draw();
-    }
-
-    function cellSize() { return Math.min(W(), H()) / 3; }
-
-    function cellIndex(px, py) {
+    // ── layout helpers ──────────────────────────────────────────────
+    function cellSize() { return Math.min(W() * 0.88, H() * 0.72) / 3; }
+    function gridOrigin() {
         const cs = cellSize();
-        const ox = (W() - cs*3) / 2, oy = (H() - cs*3) / 2;
-        const col = Math.floor((px - ox) / cs);
-        const row = Math.floor((py - oy) / cs);
+        return { ox: (W() - cs*3) / 2, oy: H() * 0.18 + (H() * 0.72 - cs*3) / 2 };
+    }
+    function cellIndex(px, py) {
+        const cs = cellSize(), { ox, oy } = gridOrigin();
+        const col = Math.floor((px - ox) / cs), row = Math.floor((py - oy) / cs);
         if (col<0||col>2||row<0||row>2) return -1;
         return row*3+col;
     }
 
+    // ── game logic ──────────────────────────────────────────────────
+    function newRound() {
+        board = Array(9).fill(''); turn = 'X'; gameOver = false;
+        animCell = -1; animSym = ''; animProg = 1;
+        if (animRaf) { cancelAnimationFrame(animRaf); animRaf = null; }
+        draw();
+    }
+    function newGame() { scores = { X:0, O:0 }; newRound(); }
+
     function checkWinner() {
-        const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-        for (const [a,b,c] of lines) {
-            if (board[a]&&board[a]===board[b]&&board[a]===board[c]) return { winner:board[a], line:[a,b,c] };
-        }
-        if (board.every(c=>c)) return { winner:'draw' };
+        const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for (const [a,b,c] of lines)
+            if (board[a] && board[a]===board[b] && board[a]===board[c])
+                return { winner: board[a], line: [a,b,c] };
+        if (board.every(c=>c)) return { winner: 'draw' };
         return null;
     }
 
+    function animateMark(cell, sym, onDone) {
+        animCell = cell; animSym = sym; animProg = 0;
+        const FRAMES = 14;
+        function step() {
+            animProg = Math.min(animProg + 1/FRAMES, 1);
+            draw();
+            if (animProg < 1) animRaf = requestAnimationFrame(step);
+            else { animRaf = null; onDone(); }
+        }
+        animRaf = requestAnimationFrame(step);
+    }
+
     function play(idx) {
-        if (gameOver||board[idx]) return;
-        board[idx]=turn;
-        const result=checkWinner();
-        if (result) { gameOver=true; draw(result); return; }
-        turn = turn==='X'?'O':'X';
-        draw();
+        if (gameOver || board[idx] || animRaf) return;
+        board[idx] = turn;
+        const sym = turn;
+        animateMark(idx, sym, () => {
+            const result = checkWinner();
+            if (result) {
+                gameOver = true;
+                if (result.winner !== 'draw') scores[result.winner]++;
+                draw(result);
+                return;
+            }
+            turn = turn==='X' ? 'O' : 'X';
+            draw();
+        });
+    }
+
+    // ── drawing ─────────────────────────────────────────────────────
+    function drawSymbol(sym, cx, cy, cs, prog) {
+        const pad = cs * 0.2;
+        ctx.strokeStyle = COLORS[sym]; ctx.lineWidth = cs * 0.1; ctx.lineCap = 'round';
+        ctx.shadowColor = COLORS[sym]; ctx.shadowBlur = 18;
+        if (sym === 'X') {
+            const p1 = Math.min(prog * 2, 1), p2 = Math.max((prog - 0.5) * 2, 0);
+            const x0=cx-cs/2+pad, y0=cy-cs/2+pad, x1=cx+cs/2-pad, y1=cy+cs/2-pad;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + (x1-x0)*p1, y0 + (y1-y0)*p1);
+            ctx.stroke();
+            if (p2 > 0) {
+                ctx.beginPath();
+                ctx.moveTo(x1, y0);
+                ctx.lineTo(x1 - (x1-x0)*p2, y0 + (y1-y0)*p2);
+                ctx.stroke();
+            }
+        } else {
+            const r = cs/2 - pad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*prog);
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
     }
 
     function draw(result) {
-        ctx.clearRect(0,0,W(),H());
-        ctx.fillStyle='#f8f8f8'; ctx.fillRect(0,0,W(),H());
+        // Dark background — same as Pong
+        ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W(), H());
 
-        const cs=cellSize();
-        const ox=(W()-cs*3)/2, oy=(H()-cs*3)/2;
+        const cs = cellSize(), { ox, oy } = gridOrigin();
 
-        // Grid
-        ctx.strokeStyle='#ccc'; ctx.lineWidth=3;
-        for(let i=1;i<3;i++){
-            ctx.beginPath(); ctx.moveTo(ox+i*cs,oy); ctx.lineTo(ox+i*cs,oy+cs*3); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ox,oy+i*cs); ctx.lineTo(ox+cs*3,oy+i*cs); ctx.stroke();
+        // Score display (same position/style as Pong scores)
+        ctx.font = 'bold 44px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = COLORS.X;  ctx.fillText(scores.X, W()/4,    H()*0.08);
+        ctx.fillStyle = COLORS.O;  ctx.fillText(scores.O, W()*3/4,  H()*0.08);
+
+        // Win-to label
+        ctx.font = '13px Segoe UI'; ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillText('first to '+WIN_MATCH, W()/2, H()*0.08);
+
+        // Turn indicator
+        if (!gameOver) {
+            const pLabel = turn==='X' ? 'Player 1 (✕)' : 'Player 2 (○)';
+            ctx.font = 'bold 16px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = COLORS[turn]; ctx.shadowColor = COLORS[turn]; ctx.shadowBlur = 10;
+            ctx.fillText(pLabel + "'s turn", W()/2, H()*0.145);
+            ctx.shadowBlur = 0;
+        }
+
+        // Grid lines — semi-transparent white, like Pong's centre line
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 3; ctx.setLineDash([]);
+        for (let i=1; i<3; i++) {
+            ctx.beginPath(); ctx.moveTo(ox+i*cs, oy); ctx.lineTo(ox+i*cs, oy+cs*3); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ox, oy+i*cs); ctx.lineTo(ox+cs*3, oy+i*cs); ctx.stroke();
         }
 
         // Symbols
-        for (let i=0;i<9;i++){
-            if(!board[i]) continue;
+        for (let i=0; i<9; i++) {
+            if (!board[i]) continue;
             const col=i%3, row=Math.floor(i/3);
             const cx=ox+col*cs+cs/2, cy=oy+row*cs+cs/2;
-            ctx.font=`bold ${Math.floor(cs*0.55)}px Segoe UI`;
-            ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillStyle=COLORS[board[i]];
-            ctx.fillText(board[i],cx,cy);
+            drawSymbol(board[i], cx, cy, cs, i===animCell ? animProg : 1);
         }
 
         // Win line
-        if (result&&result.winner!=='draw') {
-            const [a,,c]=result.line;
-            const c1col=a%3, c1row=Math.floor(a/3), c2col=c%3, c2row=Math.floor(c/3);
-            ctx.strokeStyle=COLORS[result.winner]; ctx.lineWidth=6;
-            ctx.lineCap='round';
+        if (result && result.winner !== 'draw') {
+            const [a,,c] = result.line;
+            const r1c=a%3, r1r=Math.floor(a/3), r2c=c%3, r2r=Math.floor(c/3);
+            ctx.strokeStyle = COLORS[result.winner]; ctx.lineWidth = 7; ctx.lineCap = 'round';
+            ctx.shadowColor = COLORS[result.winner]; ctx.shadowBlur = 24;
             ctx.beginPath();
-            ctx.moveTo(ox+c1col*cs+cs/2, oy+c1row*cs+cs/2);
-            ctx.lineTo(ox+c2col*cs+cs/2, oy+c2row*cs+cs/2);
-            ctx.stroke();
+            ctx.moveTo(ox+r1c*cs+cs/2, oy+r1r*cs+cs/2);
+            ctx.lineTo(ox+r2c*cs+cs/2, oy+r2r*cs+cs/2);
+            ctx.stroke(); ctx.shadowBlur = 0;
         }
 
-        // Status bar
-        const barH=42;
-        ctx.fillStyle='#172ab3'; ctx.fillRect(0,0,W(),barH);
-        ctx.font='bold 18px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        if (!result) {
-            ctx.fillStyle=COLORS[turn];
-            ctx.fillText('Player '+turn+"'s turn", W()/2, barH/2);
-        } else if (result.winner==='draw') {
-            ctx.fillStyle='#f0c030';
-            ctx.fillText("It's a draw! 🤝  Tap New Game", W()/2, barH/2);
-        } else {
-            ctx.fillStyle='#f0c030';
-            ctx.fillText('Player '+result.winner+' wins! 🏆  Tap New Game', W()/2, barH/2);
+        // Win overlay — identical pattern to Pong / Tank Battle
+        if (result) {
+            ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(0, 0, W(), H());
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#f0c030'; ctx.font = 'bold 38px Segoe UI';
+            if (result.winner === 'draw') {
+                ctx.fillText("Draw! 🤝", W()/2, H()/2 - 14);
+            } else {
+                const pName = result.winner==='X' ? 'Player 1' : 'Player 2';
+                ctx.fillText(pName + ' wins the round! 🏆', W()/2, H()/2 - 14);
+                if (scores[result.winner] >= WIN_MATCH) {
+                    ctx.font = 'bold 26px Segoe UI';
+                    ctx.fillText('🎉 Match won! 🎉', W()/2, H()/2 + 28);
+                    ctx.fillStyle = 'white'; ctx.font = '18px Segoe UI';
+                    ctx.fillText('Press New Game to restart', W()/2, H()/2 + 60);
+                    return;
+                }
+            }
+            ctx.fillStyle = 'white'; ctx.font = '18px Segoe UI';
+            ctx.fillText('Press New Round to continue', W()/2, H()/2 + 34);
         }
     }
 
     function getPos(e) {
-        const rect=canvas.getBoundingClientRect();
-        const scaleX=W()/rect.width, scaleY=H()/rect.height;
-        if (e.touches) return { x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY };
-        return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
+        const rect = canvas.getBoundingClientRect();
+        const sx = W()/rect.width, sy = H()/rect.height;
+        if (e.touches) return { x:(e.touches[0].clientX-rect.left)*sx, y:(e.touches[0].clientY-rect.top)*sy };
+        return { x:(e.clientX-rect.left)*sx, y:(e.clientY-rect.top)*sy };
     }
 
-    canvas.addEventListener('click', e => { const {x,y}=getPos(e); play(cellIndex(x,y)); });
+    canvas.addEventListener('click',    e => { const {x,y}=getPos(e); play(cellIndex(x,y)); });
     canvas.addEventListener('touchend', e => { e.preventDefault(); const {x,y}=getPos(e); play(cellIndex(x,y)); }, {passive:false});
-    document.getElementById('tttReset').onclick = newGame;
+    document.getElementById('tttNewRound').onclick = () => newRound();
+    document.getElementById('tttReset').onclick    = () => newGame();
 
-    wins={X:0,O:0}; newGame();
+    newGame();
 })();
 </script>
 </body>
