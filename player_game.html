@@ -1535,7 +1535,7 @@
         <div class="power-bar-wrap"><div class="power-bar" id="powerBar" style="width:0%"></div></div>
     </div>
 
-    <canvas id="bowlingCanvas" height="340"></canvas>
+    <canvas id="bowlingCanvas" height="220"></canvas>
     <div class="btn-row">
         <button id="bowlStart">Start</button>
         <button id="bowlReset">Reset</button>
@@ -1551,8 +1551,8 @@ const canvas = document.getElementById('bowlingCanvas');
 const ctx    = canvas.getContext('2d');
 function resizeCanvas() {
     const w = canvas.parentElement.clientWidth - 32;
-    canvas.width  = Math.min(w, 600);
-    canvas.height = 340;
+    canvas.width  = Math.min(w, 400);
+    canvas.height = 220;
 }
 resizeCanvas();
 window.addEventListener('resize', () => { resizeCanvas(); render(); });
@@ -1608,10 +1608,10 @@ function getKnockedSet() {
 
 function buildPins(knockedSet) {
     const laneW = canvas.width;
-    const baseY = 55;
-    const pinR  = 10;
-    const rowGap = 26;
-    const colGap = 22;
+    const baseY = 35;
+    const pinR  = 7;
+    const rowGap = 18;
+    const colGap = 15;
     let list = [], idx = 0;
     for (let r = 0; r < 4; r++) {
         const count = r + 1;
@@ -1673,8 +1673,8 @@ function launchBall() {
     const angleRad = ((aimAngle) * Math.PI) / 180;
     ball = {
         x: laneW / 2,
-        y: LANE_H - 30,
-        r: 13,
+        y: LANE_H - 20,
+        r: 9,
         vx: Math.sin(angleRad) * speed,
         vy: -speed * Math.cos(angleRad) * 0.9,
         trail: [],
@@ -1939,7 +1939,7 @@ function render() {
     // pin area background
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.beginPath();
-    ctx.roundRect(W/2-70, 30, 140, 110, 8);
+    ctx.roundRect(W/2-50, 20, 100, 75, 6);
     ctx.fill();
 
     // draw pins
@@ -1999,7 +1999,7 @@ function render() {
     if (state === 'aiming' || state === 'powering') {
         const angleRad = (aimAngle * Math.PI / 180);
         const startX   = W/2, startY = H-50;
-        const len      = 80;
+        const len      = 55;
         const endX     = startX + Math.sin(angleRad)*len;
         const endY     = startY - Math.cos(angleRad)*len;
         const col      = currentPlayer===0 ? '#f0c030' : '#3498db';
