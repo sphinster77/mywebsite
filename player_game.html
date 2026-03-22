@@ -272,6 +272,20 @@
         </div>
     </div>
 
+    <!-- ── CHECKERS ── -->
+    <div class="game-block">
+        <h2>Checkers</h2>
+        <p class="desc">
+            <strong>P1 (red)</strong> moves up &nbsp;|&nbsp;
+            <strong>P2 (blue)</strong> moves down &nbsp;|&nbsp;
+            Click a piece then click a square to move. Captures are mandatory. Kings can move backwards!
+        </p>
+        <canvas id="checkersCanvas"></canvas>
+        <div class="btn-row">
+            <button id="checkersReset">New Game</button>
+        </div>
+    </div>
+
 </main>
 
 <footer>&copy; 2025 <span>Davide Kurek</span>. All rights reserved.</footer>
@@ -950,6 +964,199 @@
     });
 
     init(); drawIdle();
+})();
+
+// ════════════════════════════════════════════
+//  CHECKERS
+// ════════════════════════════════════════════
+(function () {
+    const canvas = document.getElementById('checkersCanvas');
+    const ctx    = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
+    const CELL = () => W() / 8;
+
+    // Board values: 0=empty, 1=P1, 2=P2, 3=P1 king, 4=P2 king
+    let board, turn, selected, inMultiJump, gameOver;
+
+    function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetWidth; }
+    window.addEventListener('resize', () => { resize(); drawBoard(); });
+    resize();
+
+    function initBoard() {
+        board = Array.from({length:8}, () => new Array(8).fill(0));
+        for (let r = 0; r < 3; r++)
+            for (let c = 0; c < 8; c++)
+                if ((r+c)%2===1) board[r][c] = 2;
+        for (let r = 5; r < 8; r++)
+            for (let c = 0; c < 8; c++)
+                if ((r+c)%2===1) board[r][c] = 1;
+        turn = 1; selected = null; inMultiJump = null; gameOver = false;
+    }
+
+    const isP = (v, p) => p===1 ? (v===1||v===3) : (v===2||v===4);
+    const isKing = v => v===3||v===4;
+    function dirs(v) {
+        if (v===1) return [[-1,-1],[-1,1]];
+        if (v===2) return [[1,-1],[1,1]];
+        return [[-1,-1],[-1,1],[1,-1],[1,1]];
+    }
+
+    function getJumps(r, c, b) {
+        const v = b[r][c]; if (!v) return [];
+        return dirs(v).reduce((acc,[dr,dc]) => {
+            const mr=r+dr, mc=c+dc, tr=r+2*dr, tc=c+2*dc;
+            if (tr>=0&&tr<=7&&tc>=0&&tc<=7) {
+                const mid=b[mr][mc];
+                if (mid && !isP(mid,turn) && b[tr][tc]===0)
+                    acc.push({r:tr,c:tc,mr,mc});
+            }
+            return acc;
+        }, []);
+    }
+
+    function getMoves(r, c) {
+        const v = board[r][c]; if (!v) return [];
+        return dirs(v).reduce((acc,[dr,dc]) => {
+            const tr=r+dr, tc=c+dc;
+            if (tr>=0&&tr<=7&&tc>=0&&tc<=7&&board[tr][tc]===0) acc.push({r:tr,c:tc});
+            return acc;
+        }, []);
+    }
+
+    function mustJumpPieces() {
+        const out = [];
+        for (let r=0;r<8;r++) for (let c=0;c<8;c++)
+            if (isP(board[r][c],turn) && getJumps(r,c,board).length) out.push({r,c});
+        return out;
+    }
+
+    function validMoves(r, c) {
+        if (inMultiJump)
+            return (r===inMultiJump.r&&c===inMultiJump.c) ? getJumps(r,c,board) : [];
+        const mjp = mustJumpPieces();
+        if (mjp.length) {
+            if (!mjp.some(p=>p.r===r&&p.c===c)) return [];
+            return getJumps(r,c,board);
+        }
+        return getMoves(r,c);
+    }
+
+    function doMove(fr, fc, mv) {
+        const v = board[fr][fc];
+        board[fr][fc] = 0;
+        board[mv.r][mv.c] = v;
+        let jumped = false;
+        if (mv.mr !== undefined) { board[mv.mr][mv.mc] = 0; jumped = true; }
+        if (v===1 && mv.r===0) board[mv.r][mv.c] = 3;
+        if (v===2 && mv.r===7) board[mv.r][mv.c] = 4;
+        if (jumped && getJumps(mv.r, mv.c, board).length) {
+            inMultiJump = {r:mv.r, c:mv.c}; return;
+        }
+        inMultiJump = null;
+        turn = turn===1 ? 2 : 1;
+        selected = null;
+        // Check if next player has any moves
+        let any = false;
+        outer: for (let r=0;r<8;r++) for (let c=0;c<8;c++)
+            if (isP(board[r][c],turn) && (getJumps(r,c,board).length||getMoves(r,c).length)) { any=true; break outer; }
+        if (!any) gameOver = true;
+    }
+
+    function pieceCount(p) {
+        let n=0;
+        for (let r=0;r<8;r++) for (let c=0;c<8;c++) if (isP(board[r][c],p)) n++;
+        return n;
+    }
+
+    function drawBoard() {
+        const cell = CELL();
+        // Squares
+        for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+            ctx.fillStyle = (r+c)%2===1 ? '#5c3d1e' : '#f0d9b5';
+            ctx.fillRect(c*cell, r*cell, cell, cell);
+        }
+        // Highlight selected
+        if (selected) {
+            ctx.fillStyle = 'rgba(240,192,48,0.35)';
+            ctx.fillRect(selected.c*cell, selected.r*cell, cell, cell);
+            for (const m of validMoves(selected.r, selected.c)) {
+                ctx.fillStyle = 'rgba(240,192,48,0.25)';
+                ctx.fillRect(m.c*cell, m.r*cell, cell, cell);
+                ctx.strokeStyle = '#f0c030'; ctx.lineWidth = 2;
+                ctx.strokeRect(m.c*cell+1, m.r*cell+1, cell-2, cell-2);
+            }
+        }
+        // Highlight mandatory-jump pieces
+        if (!inMultiJump) {
+            for (const p of mustJumpPieces()) {
+                ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 3;
+                ctx.strokeRect(p.c*cell+2, p.r*cell+2, cell-4, cell-4);
+            }
+        } else {
+            ctx.strokeStyle = '#ff8800'; ctx.lineWidth = 3;
+            ctx.strokeRect(inMultiJump.c*cell+2, inMultiJump.r*cell+2, cell-4, cell-4);
+        }
+        // Pieces
+        for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+            const v = board[r][c]; if (!v) continue;
+            const x=c*cell+cell/2, y=r*cell+cell/2, rad=cell*0.38;
+            const p1col='#c03030', p2col='#3060c0';
+            const col = isP(v,1) ? p1col : p2col;
+            const lit = isP(v,1) ? '#ff8080' : '#80a0ff';
+            ctx.fillStyle='rgba(0,0,0,0.25)';
+            ctx.beginPath(); ctx.ellipse(x+2,y+4,rad,rad*0.5,0,0,Math.PI*2); ctx.fill();
+            const g=ctx.createRadialGradient(x-rad*0.3,y-rad*0.3,rad*0.1,x,y,rad);
+            g.addColorStop(0,lit); g.addColorStop(1,col);
+            ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.stroke();
+            if (isKing(v)) {
+                ctx.fillStyle='#f0c030'; ctx.font=`bold ${Math.round(rad*0.9)}px Segoe UI`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText('♛', x, y);
+            }
+        }
+        // Status bar
+        ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0, H()-38, W(), 38);
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        if (gameOver) {
+            const winner = turn===1 ? 2 : 1;
+            ctx.fillStyle='#f0c030'; ctx.font=`bold ${Math.round(cell*0.45)}px Segoe UI`;
+            ctx.fillText(`Player ${winner} Wins! 🏆`, W()/2, H()-19);
+        } else {
+            ctx.fillStyle = turn===1 ? '#ff6666' : '#6699ff';
+            ctx.font=`bold ${Math.round(cell*0.38)}px Segoe UI`;
+            const p1c=pieceCount(1), p2c=pieceCount(2);
+            ctx.fillText(`Player ${turn}'s Turn   ♟ Red:${p1c}  Blue:${p2c}`, W()/2, H()-19);
+        }
+    }
+
+    function handleClick(px, py) {
+        if (gameOver) return;
+        const cell=CELL(), r=Math.floor(py/cell), c=Math.floor(px/cell);
+        if (r<0||r>7||c<0||c>7) return;
+        if (selected) {
+            const mv = validMoves(selected.r,selected.c).find(m=>m.r===r&&m.c===c);
+            if (mv) { doMove(selected.r,selected.c,mv); selected=inMultiJump?{...inMultiJump}:null; drawBoard(); return; }
+        }
+        if (board[r][c] && isP(board[r][c],turn)) {
+            if (inMultiJump && !(r===inMultiJump.r&&c===inMultiJump.c)) return;
+            selected={r,c};
+        } else { selected=null; }
+        drawBoard();
+    }
+
+    function evPos(e) {
+        const rect=canvas.getBoundingClientRect(), sx=W()/rect.width, sy=H()/rect.height;
+        const src=e.touches?e.touches[0]:e;
+        return {x:(src.clientX-rect.left)*sx, y:(src.clientY-rect.top)*sy};
+    }
+
+    canvas.addEventListener('click',    e => { const {x,y}=evPos(e); handleClick(x,y); });
+    canvas.addEventListener('touchend', e => { e.preventDefault(); const {x,y}=evPos(e); handleClick(x,y); },{passive:false});
+    document.getElementById('checkersReset').addEventListener('click', () => { initBoard(); drawBoard(); });
+
+    initBoard(); drawBoard();
 })();
 </script>
 </body>
