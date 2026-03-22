@@ -286,6 +286,20 @@
         </div>
     </div>
 
+    <!-- ── UNO ── -->
+    <div class="game-block">
+        <h2>UNO</h2>
+        <p class="desc">
+            <strong>P1 (red hand)</strong> &amp; <strong>P2 (blue hand)</strong> take turns — pass the screen between turns!
+            &nbsp;|&nbsp; Match color or number &nbsp;|&nbsp; First to empty their hand wins!
+            <br><em>Tap a card to select, tap again to play. Tap the draw pile to draw.</em>
+        </p>
+        <canvas id="unoCanvas"></canvas>
+        <div class="btn-row">
+            <button id="unoReset">New Game</button>
+        </div>
+    </div>
+
 </main>
 
 <footer>&copy; 2025 <span>Davide Kurek</span>. All rights reserved.</footer>
@@ -1157,6 +1171,289 @@
     document.getElementById('checkersReset').addEventListener('click', () => { initBoard(); drawBoard(); });
 
     initBoard(); drawBoard();
+})();
+
+// ════════════════════════════════════════════
+//  UNO
+// ════════════════════════════════════════════
+(function () {
+    const canvas = document.getElementById('unoCanvas');
+    const ctx    = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
+
+    function resize() {
+        canvas.width  = canvas.offsetWidth;
+        canvas.height = Math.round(canvas.offsetWidth * 0.72);
+    }
+    window.addEventListener('resize', () => { resize(); render(); });
+    resize();
+
+    const CCSS  = { r:'#e74c3c', g:'#27ae60', b:'#2980b9', y:'#f1c40f', w:'#333' };
+    const CLBL  = { r:'Red', g:'Green', b:'Blue', y:'Yellow' };
+    const VLBL  = { S:'⊘', R:'↺', D2:'+2', W:'W', WD4:'+4' };
+    const CW    = () => Math.max(36, Math.round(W() / 14));
+    const CH    = () => Math.round(CW() * 1.5);
+
+    // ── Deck ─────────────────────────────────────────────────────────
+    function makeDeck() {
+        const d = [];
+        for (const c of ['r','g','b','y']) {
+            d.push({c, v:'0'});
+            for (const v of ['1','2','3','4','5','6','7','8','9','S','R','D2'])
+                d.push({c,v}, {c,v});
+        }
+        for (let i=0;i<4;i++) d.push({c:'w',v:'W'}, {c:'w',v:'WD4'});
+        return shuffle(d);
+    }
+    function shuffle(a) {
+        for (let i=a.length-1;i>0;i--) {
+            const j=0|Math.random()*(i+1); [a[i],a[j]]=[a[j],a[i]];
+        }
+        return a;
+    }
+
+    // ── State ────────────────────────────────────────────────────────
+    let deck, discard, hands, turn, state, wildColor, wildPending, sel;
+    // state: 'handoff' | 'playing' | 'wild' | 'over'
+
+    function init() {
+        deck  = makeDeck();
+        hands = [[], []];
+        for (let i=0;i<7;i++) { hands[0].push(deck.pop()); hands[1].push(deck.pop()); }
+        let first; do { first = deck.pop(); } while (first.c === 'w');
+        discard = [first];
+        turn=0; state='handoff'; wildColor=null; wildPending=null; sel=null;
+        render();
+    }
+
+    const top     = () => discard[discard.length-1];
+    const effCol  = () => top().c === 'w' ? wildColor : top().c;
+
+    function canPlay(card) {
+        if (card.c === 'w') return true;
+        const ec = effCol(), t = top();
+        return card.c === ec || card.v === t.v;
+    }
+
+    function drawCards(player, n) {
+        for (let i=0;i<n;i++) {
+            if (!deck.length) { const t=discard.pop(); deck=shuffle(discard); discard=[t]; }
+            if (deck.length) hands[player].push(deck.pop());
+        }
+    }
+
+    function playCard(idx) {
+        const card = hands[turn][idx];
+        if (!canPlay(card)) { sel=null; render(); return; }
+        hands[turn].splice(idx, 1);
+        discard.push(card);
+        sel = null;
+        if (!hands[turn].length) { state='over'; render(); return; }
+        if (card.c === 'w') { wildPending=card.v; state='wild'; render(); return; }
+        // Skip / Reverse = play again in 2-player
+        if (card.v==='S' || card.v==='R') { state='handoff'; render(); return; }
+        // Draw Two: opponent draws 2 and is skipped
+        if (card.v==='D2') { turn^=1; drawCards(turn,2); turn^=1; state='handoff'; render(); return; }
+        turn^=1; state='handoff'; render();
+    }
+
+    function chooseColor(c) {
+        wildColor = c;
+        if (wildPending==='WD4') { turn^=1; drawCards(turn,4); turn^=1; }
+        else { turn^=1; }
+        wildPending=null; state='handoff'; render();
+    }
+
+    function doDraw() {
+        drawCards(turn, 1);
+        turn^=1; state='handoff'; render();
+    }
+
+    // ── Drawing helpers ───────────────────────────────────────────────
+    function rr(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+        ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+        ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+        ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+        ctx.closePath();
+    }
+
+    function paintCard(x, y, card, faceUp, hi) {
+        const cw=CW(), ch=CH();
+        ctx.save();
+        ctx.fillStyle='rgba(0,0,0,0.3)'; rr(x+2,y+3,cw,ch,5); ctx.fill();
+        if (!faceUp) {
+            ctx.fillStyle='#1a237e'; rr(x,y,cw,ch,5); ctx.fill();
+            ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; rr(x,y,cw,ch,5); ctx.stroke();
+            ctx.fillStyle='rgba(255,255,255,0.1)';
+            ctx.beginPath(); ctx.ellipse(x+cw/2,y+ch/2,cw*0.33,ch*0.38,0.25,0,Math.PI*2); ctx.fill();
+            ctx.restore(); return;
+        }
+        const col = CCSS[card.c];
+        if (hi) {
+            ctx.fillStyle='white'; rr(x,y,cw,ch,5); ctx.fill();
+            ctx.strokeStyle=col; ctx.lineWidth=3; rr(x,y,cw,ch,5); ctx.stroke();
+        } else {
+            ctx.fillStyle=col; rr(x,y,cw,ch,5); ctx.fill();
+        }
+        ctx.fillStyle = hi ? col : 'rgba(255,255,255,0.88)';
+        ctx.beginPath(); ctx.ellipse(x+cw/2,y+ch/2,cw*0.3,ch*0.36,0.25,0,Math.PI*2); ctx.fill();
+        const lbl = VLBL[card.v] || card.v;
+        const fs  = Math.round(cw * (lbl.length>2 ? 0.28 : 0.4));
+        ctx.fillStyle = hi ? 'white' : col;
+        ctx.font=`bold ${fs}px Segoe UI`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(lbl, x+cw/2, y+ch/2);
+        ctx.font=`bold ${Math.round(cw*0.24)}px Segoe UI`;
+        ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillText(lbl, x+3, y+2);
+        ctx.restore();
+    }
+
+    function handLayout(n) {
+        const cw=CW(), sp=Math.min(cw+4, (W()-20)/Math.max(n,1));
+        return { startX:(W()-Math.min((n-1)*sp+cw, W()-20))/2, sp };
+    }
+
+    function drawHandRow(player, y, faceUp) {
+        const hand=hands[player], {startX,sp}=handLayout(hand.length);
+        for (let i=0;i<hand.length;i++) {
+            const hi = faceUp && state==='playing' && turn===player && i===sel;
+            paintCard(startX+i*sp, y+(hi?-8:0), hand[i], faceUp, hi);
+        }
+    }
+
+    // ── Main render ───────────────────────────────────────────────────
+    function render() {
+        const cw=CW(), ch=CH();
+        ctx.fillStyle='#0d0f1a'; ctx.fillRect(0,0,W(),H());
+
+        const p2Y=6, p1Y=H()-ch-6;
+
+        // Card counts
+        ctx.font=`bold ${Math.round(W()*0.027)}px Segoe UI`; ctx.textBaseline='top';
+        ctx.fillStyle='#6699ff'; ctx.textAlign='left'; ctx.fillText(`P2 — ${hands[1].length} cards`, 8, p2Y+ch+4);
+        ctx.fillStyle='#ff6666'; ctx.fillText(`P1 — ${hands[0].length} cards`, 8, p1Y-20);
+
+        // Hands — show face-up only for the active player during 'playing'
+        drawHandRow(1, p2Y, state==='playing' && turn===1);
+        drawHandRow(0, p1Y, state==='playing' && turn===0);
+
+        // Middle area
+        const midY = H()/2, pileY = midY - ch/2 - 10;
+        const discX = W()/2 - cw - 14, drawX = W()/2 + 14;
+
+        ctx.fillStyle='#9090b0'; ctx.font=`${Math.round(W()*0.022)}px Segoe UI`;
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.fillText('Discard', discX+cw/2, pileY);
+        ctx.fillText('Draw',    drawX+cw/2,  pileY);
+
+        paintCard(discX, pileY, top(), true, false);
+        paintCard(drawX, pileY, null,  false, false);
+
+        // Deck count
+        ctx.fillStyle='#9090b0'; ctx.font=`${Math.round(W()*0.022)}px Segoe UI`;
+        ctx.textAlign='center'; ctx.textBaseline='top';
+        ctx.fillText(deck.length, drawX+cw/2, pileY+ch+2);
+
+        // Active color dot above discard
+        const ec = effCol();
+        if (ec) {
+            ctx.fillStyle=CCSS[ec];
+            ctx.beginPath(); ctx.arc(discX+cw/2, pileY-10, 8, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.arc(discX+cw/2, pileY-10, 8, 0, Math.PI*2); ctx.stroke();
+        }
+
+        if (state==='playing') {
+            ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font=`${Math.round(W()*0.022)}px Segoe UI`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('Tap card once to select • tap again to play • tap Draw pile to draw', W()/2, pileY+ch+18);
+        }
+
+        // ── Overlays ──────────────────────────────────────────────────
+        if (state==='handoff') {
+            ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,0,W(),H());
+            const col = turn===0 ? '#ff6666' : '#6699ff';
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle=col; ctx.font=`bold ${Math.round(W()*0.06)}px Segoe UI`;
+            ctx.fillText(`Player ${turn+1}'s Turn`, W()/2, H()/2-24);
+            ctx.fillStyle='white'; ctx.font=`${Math.round(W()*0.033)}px Segoe UI`;
+            ctx.fillText('Tap anywhere to reveal your cards', W()/2, H()/2+18);
+        }
+
+        if (state==='wild') {
+            ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,0,W(),H());
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle='white'; ctx.font=`bold ${Math.round(W()*0.048)}px Segoe UI`;
+            ctx.fillText('Choose a Color', W()/2, H()/2-60);
+            const btnR=Math.round(W()*0.075), sp=btnR*2.7, sx=W()/2-sp*1.5;
+            ['r','g','b','y'].forEach((c,i) => {
+                const cx=sx+i*sp, cy=H()/2+10;
+                ctx.fillStyle=CCSS[c]; ctx.beginPath(); ctx.arc(cx,cy,btnR,0,Math.PI*2); ctx.fill();
+                ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2;
+                ctx.beginPath(); ctx.arc(cx,cy,btnR,0,Math.PI*2); ctx.stroke();
+                ctx.fillStyle='white'; ctx.font=`bold ${Math.round(btnR*0.42)}px Segoe UI`;
+                ctx.textBaseline='top'; ctx.fillText(CLBL[c], cx, cy+btnR+6);
+            });
+        }
+
+        if (state==='over') {
+            ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,0,W(),H());
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle='#f0c030'; ctx.font=`bold ${Math.round(W()*0.065)}px Segoe UI`;
+            ctx.fillText(`Player ${turn+1} Wins! 🏆`, W()/2, H()/2-16);
+            ctx.fillStyle='white'; ctx.font=`${Math.round(W()*0.032)}px Segoe UI`;
+            ctx.fillText('Press New Game to play again', W()/2, H()/2+26);
+        }
+    }
+
+    // ── Input ─────────────────────────────────────────────────────────
+    function evPos(e) {
+        const rect=canvas.getBoundingClientRect(), sx=W()/rect.width, sy=H()/rect.height;
+        const src=e.touches?e.touches[0]:e;
+        return {x:(src.clientX-rect.left)*sx, y:(src.clientY-rect.top)*sy};
+    }
+
+    function handIdxAt(player, px, py) {
+        const hand=hands[player], cw=CW(), ch=CH();
+        const y = player===0 ? H()-ch-6 : 6;
+        if (py < y-10 || py > y+ch) return -1;
+        const {startX,sp} = handLayout(hand.length);
+        for (let i=hand.length-1; i>=0; i--) {
+            const x=startX+i*sp;
+            if (px>=x && px<=x+cw) return i;
+        }
+        return -1;
+    }
+
+    function isDrawPile(px, py) {
+        const cw=CW(), ch=CH(), drawX=W()/2+14, pileY=H()/2-ch/2-10;
+        return px>=drawX && px<=drawX+cw && py>=pileY && py<=pileY+ch;
+    }
+
+    function handleClick(px, py) {
+        if (state==='handoff') { state='playing'; render(); return; }
+        if (state==='over') return;
+        if (state==='wild') {
+            const btnR=Math.round(W()*0.075), sp=btnR*2.7, sx=W()/2-sp*1.5, cy=H()/2+10;
+            ['r','g','b','y'].forEach((c,i) => {
+                if (Math.hypot(px-(sx+i*sp), py-cy) <= btnR) chooseColor(c);
+            });
+            return;
+        }
+        if (state==='playing') {
+            if (isDrawPile(px,py)) { doDraw(); return; }
+            const idx = handIdxAt(turn, px, py);
+            if (idx>=0) { if (sel===idx) playCard(idx); else { sel=idx; render(); } }
+            else { sel=null; render(); }
+        }
+    }
+
+    canvas.addEventListener('click',    e => { const{x,y}=evPos(e); handleClick(x,y); });
+    canvas.addEventListener('touchend', e => { e.preventDefault(); const{x,y}=evPos(e); handleClick(x,y); }, {passive:false});
+    document.getElementById('unoReset').addEventListener('click', () => init());
+
+    init();
 })();
 </script>
 </body>
