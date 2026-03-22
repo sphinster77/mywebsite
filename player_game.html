@@ -104,6 +104,38 @@
             .pong-touch { display: flex; }
             .tank-touch  { display: flex; }
         }
+
+        /* ── TTT name inputs ── */
+        .ttt-names {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+        }
+        .ttt-name-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+        .ttt-name-field label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #888;
+        }
+        .ttt-name-field input {
+            background: #1a1a2e;
+            color: white;
+            border: 2px solid #333;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.95rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .ttt-name-field input:focus { border-color: #dca50c; }
+        #tttName1:focus { border-color: #f0c030; }
+        #tttName2:focus { border-color: #3498db; }
     </style>
 </head>
 <body>
@@ -173,10 +205,17 @@
     <!-- ── TIC TAC TOE ── -->
     <div class="game-block">
         <h2>Tic Tac Toe</h2>
-        <p class="desc">
-            <strong>P1 (gold ✕):</strong> click/tap &nbsp;|&nbsp;
-            <strong>P2 (blue ○):</strong> click/tap &nbsp;|&nbsp; First to 3 round wins takes the match!
-        </p>
+        <p class="desc">First to 3 round wins takes the match!</p>
+        <div class="ttt-names">
+            <div class="ttt-name-field">
+                <label for="tttName1">✕ Player 1 name</label>
+                <input id="tttName1" type="text" maxlength="14" placeholder="Player 1" spellcheck="false">
+            </div>
+            <div class="ttt-name-field">
+                <label for="tttName2">○ Player 2 name</label>
+                <input id="tttName2" type="text" maxlength="14" placeholder="Player 2" spellcheck="false">
+            </div>
+        </div>
         <canvas id="tttCanvas" height="340"></canvas>
         <div class="btn-row">
             <button id="tttNewRound">New Round</button>
@@ -449,6 +488,12 @@
     const WIN_MATCH = 3;
     const COLORS = { X: '#f0c030', O: '#3498db' }; // gold / blue — match pong paddles
 
+    const nameEl1 = document.getElementById('tttName1');
+    const nameEl2 = document.getElementById('tttName2');
+    function p1Name() { return nameEl1.value.trim() || 'Player 1'; }
+    function p2Name() { return nameEl2.value.trim() || 'Player 2'; }
+    function playerName(sym) { return sym === 'X' ? p1Name() : p2Name(); }
+
     let board, turn, gameOver, scores, animCell, animSym, animProg, animRaf;
 
     function resize() { canvas.width = canvas.offsetWidth; }
@@ -559,7 +604,8 @@
 
         // Turn indicator
         if (!gameOver) {
-            const pLabel = turn==='X' ? 'Player 1 (✕)' : 'Player 2 (○)';
+            const sym = turn === 'X' ? '✕' : '○';
+            const pLabel = playerName(turn) + ' (' + sym + ')';
             ctx.font = 'bold 16px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = COLORS[turn]; ctx.shadowColor = COLORS[turn]; ctx.shadowBlur = 10;
             ctx.fillText(pLabel + "'s turn", W()/2, H()*0.145);
@@ -601,8 +647,7 @@
             if (result.winner === 'draw') {
                 ctx.fillText("Draw! 🤝", W()/2, H()/2 - 14);
             } else {
-                const pName = result.winner==='X' ? 'Player 1' : 'Player 2';
-                ctx.fillText(pName + ' wins the round! 🏆', W()/2, H()/2 - 14);
+                ctx.fillText(playerName(result.winner) + ' wins the round! 🏆', W()/2, H()/2 - 14);
                 if (scores[result.winner] >= WIN_MATCH) {
                     ctx.font = 'bold 26px Segoe UI';
                     ctx.fillText('🎉 Match won! 🎉', W()/2, H()/2 + 28);
@@ -625,6 +670,8 @@
 
     canvas.addEventListener('click',    e => { const {x,y}=getPos(e); play(cellIndex(x,y)); });
     canvas.addEventListener('touchend', e => { e.preventDefault(); const {x,y}=getPos(e); play(cellIndex(x,y)); }, {passive:false});
+    nameEl1.addEventListener('input', () => { if (!animRaf) draw(); });
+    nameEl2.addEventListener('input', () => { if (!animRaf) draw(); });
     document.getElementById('tttNewRound').onclick = () => newRound();
     document.getElementById('tttReset').onclick    = () => newGame();
 
