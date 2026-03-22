@@ -34,6 +34,25 @@
             text-align: center;
             color: white;
             padding: 0 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .hero-row {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            justify-content: center;
+            margin-bottom: 0.6rem;
+        }
+        .hero-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #f0c030;
+            box-shadow: 0 0 18px rgba(240,192,48,0.5);
+            flex-shrink: 0;
         }
         .hero-content h1 {
             font-size: clamp(2.2rem, 6vw, 4rem);
@@ -177,7 +196,10 @@
 <section id="hero">
     <canvas id="heroCanvas"></canvas>
     <div class="hero-content">
-        <h1>Davide's Workshop</h1>
+        <div class="hero-row">
+            <img class="hero-avatar" src="images/web.jpeg" alt="Davide">
+            <h1>Davide's Workshop</h1>
+        </div>
         <p>Papercrafts, games and more</p>
         <a class="hero-btn" href="#papercrafts">Explore ↓</a>
     </div>
