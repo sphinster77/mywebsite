@@ -137,6 +137,16 @@
         .ttt-name-field input:focus { border-color: #dca50c; }
         #tttName1:focus { border-color: #f0c030; }
         #tttName2:focus { border-color: #3498db; }
+
+        /* ── Football touch controls ── */
+        .football-touch {
+            display: none;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+            padding: 0 0.2rem;
+        }
+        @media (pointer: coarse) { .football-touch { display: flex; } }
     </style>
 </head>
 <body>
@@ -221,6 +231,44 @@
         <div class="btn-row">
             <button id="tttNewRound">New Round</button>
             <button id="tttReset">New Game</button>
+        </div>
+    </div>
+
+    <!-- ── FOOTBALL ── -->
+    <div class="game-block">
+        <h2>Football</h2>
+        <p class="desc">
+            <strong>P1 (red):</strong> W/A/S/D &nbsp;|&nbsp;
+            <strong>P2 (blue):</strong> ↑←↓→ &nbsp;|&nbsp; First to 5 goals wins!
+        </p>
+        <canvas id="footballCanvas" height="400"></canvas>
+        <div class="football-touch">
+            <div class="tank-player">
+                <label>P1 (red)</label>
+                <div class="dpad">
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="fb1up">▲</button>
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="fb1left">◀</button>
+                    <button class="dpad-btn" id="fb1down">▼</button>
+                    <button class="dpad-btn" id="fb1right">▶</button>
+                </div>
+            </div>
+            <div class="tank-player">
+                <label>P2 (blue)</label>
+                <div class="dpad">
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="fb2up">▲</button>
+                    <div class="dpad-btn empty"></div>
+                    <button class="dpad-btn" id="fb2left">◀</button>
+                    <button class="dpad-btn" id="fb2down">▼</button>
+                    <button class="dpad-btn" id="fb2right">▶</button>
+                </div>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button id="footballStart">Start</button>
+            <button id="footballReset">Reset</button>
         </div>
     </div>
 
@@ -677,6 +725,231 @@
     document.getElementById('tttReset').onclick    = () => newGame();
 
     newGame();
+})();
+
+// ════════════════════════════════════════════
+//  FOOTBALL
+// ════════════════════════════════════════════
+(function () {
+    const canvas = document.getElementById('footballCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = () => canvas.width, H = () => canvas.height;
+    const GOAL_H = 110, PR = 14, BR = 9, PSPD = 4, WIN = 5;
+
+    let running = false, animId = null;
+    let p1, p2, ball, score;
+
+    function resize() { canvas.width = canvas.offsetWidth; }
+    window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
+    resize();
+
+    function initPositions() {
+        p1   = { x: W()*0.25, y: H()/2, vx: 0, vy: 0 };
+        p2   = { x: W()*0.75, y: H()/2, vx: 0, vy: 0 };
+        ball = { x: W()/2,    y: H()/2, vx: 0, vy: 0 };
+    }
+    function init() { score = [0, 0]; initPositions(); }
+
+    // Keyboard
+    const keys = {};
+    window.addEventListener('keydown', e => {
+        keys[e.key] = true;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // Touch D-pad
+    const fbK = { fb1up:false, fb1down:false, fb1left:false, fb1right:false,
+                  fb2up:false, fb2down:false, fb2left:false, fb2right:false };
+    Object.keys(fbK).forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('touchstart', e => { e.preventDefault(); fbK[id] = true;  }, {passive:false});
+        btn.addEventListener('touchend',   e => { e.preventDefault(); fbK[id] = false; }, {passive:false});
+    });
+
+    function movePlayer(p, dx, dy) {
+        const len = Math.hypot(dx, dy);
+        if (len === 0) { p.vx = 0; p.vy = 0; return; }
+        p.vx = dx/len * PSPD;
+        p.vy = dy/len * PSPD;
+        p.x = Math.max(PR, Math.min(W()-PR, p.x + p.vx));
+        p.y = Math.max(PR, Math.min(H()-PR, p.y + p.vy));
+    }
+
+    function ballCollide(p) {
+        const dx = ball.x - p.x, dy = ball.y - p.y;
+        const dist = Math.hypot(dx, dy) || 0.01;
+        const minD = PR + BR;
+        if (dist < minD) {
+            const nx = dx/dist, ny = dy/dist;
+            ball.x = p.x + nx * (minD + 1);
+            ball.y = p.y + ny * (minD + 1);
+            const kick = Math.max(7, Math.hypot(p.vx, p.vy) * 3.5);
+            ball.vx = nx * kick;
+            ball.vy = ny * kick;
+        }
+    }
+
+    function update() {
+        // P1 (WASD)
+        movePlayer(p1,
+            ((keys['d']||keys['D']||fbK.fb1right)?1:0) - ((keys['a']||keys['A']||fbK.fb1left)?1:0),
+            ((keys['s']||keys['S']||fbK.fb1down)?1:0)  - ((keys['w']||keys['W']||fbK.fb1up)?1:0));
+        // P2 (arrows)
+        movePlayer(p2,
+            ((keys['ArrowRight']||fbK.fb2right)?1:0) - ((keys['ArrowLeft']||fbK.fb2left)?1:0),
+            ((keys['ArrowDown'] ||fbK.fb2down)?1:0)  - ((keys['ArrowUp']  ||fbK.fb2up)?1:0));
+
+        // Ball physics
+        ball.vx *= 0.986; ball.vy *= 0.986;
+        ball.x += ball.vx; ball.y += ball.vy;
+
+        // Top / bottom walls
+        if (ball.y - BR < 0)   { ball.y = BR;    ball.vy *= -0.75; }
+        if (ball.y + BR > H())  { ball.y = H()-BR; ball.vy *= -0.75; }
+
+        const gY1 = H()/2 - GOAL_H/2, gY2 = H()/2 + GOAL_H/2;
+
+        // Left wall / goal
+        if (ball.x - BR < 0) {
+            if (ball.y > gY1 && ball.y < gY2) {
+                score[1]++;
+                if (score[1] >= WIN) { endGame(2); return; }
+                initPositions(); return;
+            }
+            ball.x = BR; ball.vx *= -0.75;
+        }
+        // Right wall / goal
+        if (ball.x + BR > W()) {
+            if (ball.y > gY1 && ball.y < gY2) {
+                score[0]++;
+                if (score[0] >= WIN) { endGame(1); return; }
+                initPositions(); return;
+            }
+            ball.x = W()-BR; ball.vx *= -0.75;
+        }
+
+        ballCollide(p1);
+        ballCollide(p2);
+
+        // Player separation
+        const ppDx = p2.x-p1.x, ppDy = p2.y-p1.y;
+        const ppD = Math.hypot(ppDx, ppDy) || 0.01;
+        if (ppD < PR*2) {
+            const push = (PR*2 - ppD)/2, nx = ppDx/ppD, ny = ppDy/ppD;
+            p1.x = Math.max(PR, Math.min(W()-PR, p1.x - nx*push));
+            p1.y = Math.max(PR, Math.min(H()-PR, p1.y - ny*push));
+            p2.x = Math.max(PR, Math.min(W()-PR, p2.x + nx*push));
+            p2.y = Math.max(PR, Math.min(H()-PR, p2.y + ny*push));
+        }
+    }
+
+    function endGame(winner) {
+        running = false; draw();
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0,0,W(),H());
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#f0c030';
+        ctx.font = `bold ${Math.round(W()*0.07)}px Segoe UI`;
+        ctx.fillText(`Player ${winner} Wins! 🏆`, W()/2, H()/2 - 14);
+        ctx.fillStyle = 'white';
+        ctx.font = `${Math.round(W()*0.04)}px Segoe UI`;
+        ctx.fillText('Press Reset to play again', W()/2, H()/2 + 38);
+    }
+
+    function drawPitch() {
+        // Grass stripes
+        ctx.fillStyle = '#1a6b1a'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        const sw = W()/8;
+        for (let i=0; i<8; i+=2) ctx.fillRect(i*sw, 0, sw, H());
+
+        const gY1 = H()/2 - GOAL_H/2, gY2 = H()/2 + GOAL_H/2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+        ctx.strokeRect(8, 8, W()-16, H()-16);
+        ctx.beginPath(); ctx.moveTo(W()/2, 8); ctx.lineTo(W()/2, H()-8); ctx.stroke();
+        ctx.beginPath(); ctx.arc(W()/2, H()/2, H()*0.16, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath(); ctx.arc(W()/2, H()/2, 3, 0, Math.PI*2); ctx.fill();
+        const bW = W()*0.14;
+        ctx.strokeRect(8, gY1-20, bW, GOAL_H+40);
+        ctx.strokeRect(W()-8-bW, gY1-20, bW, GOAL_H+40);
+
+        // Goal nets
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(0, gY1, 8, GOAL_H); ctx.fillRect(W()-8, gY1, 8, GOAL_H);
+        ctx.strokeStyle = 'white'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(8,gY1); ctx.lineTo(0,gY1); ctx.lineTo(0,gY2); ctx.lineTo(8,gY2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(W()-8,gY1); ctx.lineTo(W(),gY1); ctx.lineTo(W(),gY2); ctx.lineTo(W()-8,gY2); ctx.stroke();
+    }
+
+    function drawPlayer(p, color, num) {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(p.x+2, p.y+4, PR, PR*0.5, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.font = `bold ${PR}px Segoe UI`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(num, p.x, p.y);
+    }
+
+    function drawBall() {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(ball.x+2, ball.y+3, BR, BR*0.5, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#222';
+        for (let i=0; i<5; i++) {
+            const a = (i/5)*Math.PI*2 - Math.PI/2;
+            ctx.beginPath();
+            ctx.arc(ball.x+Math.cos(a)*BR*0.5, ball.y+Math.sin(a)*BR*0.5, BR*0.22, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, Math.PI*2); ctx.stroke();
+    }
+
+    function drawScore() {
+        ctx.font = `bold ${Math.round(W()*0.055)}px Segoe UI`; ctx.textBaseline = 'top';
+        ctx.fillStyle = '#ff5555'; ctx.textAlign = 'left';  ctx.fillText(`P1 ${score[0]}`, 18, 14);
+        ctx.fillStyle = '#5599ff'; ctx.textAlign = 'right'; ctx.fillText(`${score[1]} P2`, W()-18, 14);
+    }
+
+    function draw() {
+        drawPitch();
+        drawPlayer(p1, '#c03030', '1');
+        drawPlayer(p2, '#3060c0', '2');
+        drawBall();
+        drawScore();
+    }
+
+    function drawIdle() {
+        drawPitch();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0,0,W(),H());
+        ctx.fillStyle = '#f0c030';
+        ctx.font = `bold ${Math.round(W()*0.07)}px Segoe UI`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('⚽ Press Start', W()/2, H()/2);
+    }
+
+    function loop() {
+        if (!running) return;
+        update(); draw();
+        animId = requestAnimationFrame(loop);
+    }
+
+    document.getElementById('footballStart').addEventListener('click', () => {
+        if (!running) { running = true; loop(); }
+    });
+    document.getElementById('footballReset').addEventListener('click', () => {
+        running = false; cancelAnimationFrame(animId); init(); drawIdle();
+    });
+
+    init(); drawIdle();
 })();
 </script>
 </body>
