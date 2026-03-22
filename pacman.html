@@ -131,7 +131,7 @@ const TMAP = [
     '#...................#',
     '#.##.#.#####.#.##.  #',
     '#....#...#...#....  #',
-    '#####.## # ##.#####',
+    '#####.## # ##.#####  ',
     '    #.#       #.#    ',
     '#####.# ##-## #.#####',
     '         ###         ',
@@ -143,7 +143,7 @@ const TMAP = [
     '#O.#.....   .....#.O#',
     '###.#.#.#####.#.#.###',
     '#......#...#...#....#',
-    '#.##########.##.####',
+    '#.##########.##.#####',
     '#...................#',
     '#####################',
 ];
@@ -176,7 +176,7 @@ canvas.height = ROWS * CELL;
 
 // ─── Game state ───────────────────────────────────────────────────────────────
 let map, score, hiScore = 0, lives, level, totalDots, gameState;
-let pacman, ghosts, frighTimer;
+let pacman, ghosts, frighTimer, scorePopups = [];
 let animId;
 
 const FRIGHT_DUR  = 7000; // ms
@@ -185,7 +185,7 @@ const GHOST_NAMES = ['Blinky','Pinky','Inky','Clyde'];
 
 // Speed in cells/second
 const PAC_SPEED   = lvl => 0.4 + lvl * 0.03;
-const GHOST_SPEED = lvl => 0.55 + lvl * 0.03;
+const GHOST_SPEED = lvl => 0.36 + lvl * 0.02;
 const FRIGHT_SPEED = 0.22;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ function wrapCol(c) { return ((c % COLS) + COLS) % COLS; }
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function startGame() {
     score = 0; lives = 3; level = 1;
-    hiScore = hiScore || 0;
+    hiScore = parseInt(localStorage.getItem('pacman_hiscore') || '0');
     document.getElementById('overlay').style.display = 'none';
     initLevel();
 }
@@ -222,6 +222,7 @@ function initLevel() {
             if (map[r][c] === 0 || map[r][c] === 3) totalDots++;
 
     frighTimer = 0;
+    scorePopups = [];
 
     // Pac-Man: grid-based movement
     // col/row = current cell, nextCol/nextRow = target cell, progress 0→1
@@ -247,7 +248,6 @@ function initLevel() {
         eaten: false,
         inHouse: true,
         exitDelay: i * 3000,
-        ghostsEatenThisFright: 0,
     }));
 
     gameState = 'playing';
@@ -298,6 +298,8 @@ function loop(ts) {
         updatePacman(dt);
         ghosts.forEach(g => updateGhost(g, dt));
         checkCollisions();
+        scorePopups.forEach(p => p.age += dt);
+        scorePopups = scorePopups.filter(p => p.age < 900);
     } else if (gameState === 'dying') {
         pacman.deadAnim += dt * 0.003;
         if (pacman.deadAnim >= 1) {
@@ -334,13 +336,13 @@ function updatePacman(dt) {
         if (map[pm.row][wc] === 0) {
             map[pm.row][wc] = 2;
             score += 10; totalDots--;
-            if (score > hiScore) hiScore = score;
+            if (score > hiScore) { hiScore = score; localStorage.setItem('pacman_hiscore', hiScore); }
             updateHUD();
             if (totalDots <= 0) { nextLevel(); return; }
         } else if (map[pm.row][wc] === 3) {
             map[pm.row][wc] = 2;
             score += 50; totalDots--;
-            if (score > hiScore) hiScore = score;
+            if (score > hiScore) { hiScore = score; localStorage.setItem('pacman_hiscore', hiScore); }
             eatenThisFright = 0;
             frighTimer = FRIGHT_DUR;
             ghosts.forEach(g => { if (!g.eaten) g.frightened = true; });
@@ -399,7 +401,7 @@ function updateGhost(g, dt) {
     }
 
     const spd = g.eaten ? GHOST_SPEED(level) * 2 : g.frightened ? FRIGHT_SPEED : GHOST_SPEED(level);
-    g.progress += spd * dt / 1000;
+    g.progress += spd * dt / CELL;
 
     if (g.progress >= 1) {
         g.col = g.nextCol;
@@ -424,11 +426,12 @@ function chooseGhostDir(g) {
     const opp = {x:-g.dirX, y:-g.dirY};
 
     // Valid moves (no reverse, no walls)
+    const canPassGate = g.inHouse || g.eaten;
     const valid = DIRS.filter(d => {
         if (d.x === opp.x && d.y === opp.y) return false;
         const nc = wrapCol(g.col + d.x);
         const nr = g.row + d.y;
-        return !isBlockedForGhost(nc, nr, g.inHouse);
+        return !isBlockedForGhost(nc, nr, canPassGate);
     });
 
     if (valid.length === 0) {
@@ -436,7 +439,7 @@ function chooseGhostDir(g) {
         const rev = {x:-g.dirX, y:-g.dirY};
         const nc = wrapCol(g.col + rev.x);
         const nr = g.row + rev.y;
-        if (!isBlockedForGhost(nc, nr, false)) {
+        if (!isBlockedForGhost(nc, nr, canPassGate)) {
             g.dirX = rev.x; g.dirY = rev.y;
             g.nextCol = nc; g.nextRow = nr;
         } else {
@@ -502,7 +505,8 @@ function checkCollisions() {
                 g.eaten = true; g.frightened = false;
                 const bonus = [200,400,800,1600][Math.min(eatenThisFright, 3)];
                 score += bonus; eatenThisFright++;
-                if (score > hiScore) hiScore = score;
+                if (score > hiScore) { hiScore = score; localStorage.setItem('pacman_hiscore', hiScore); }
+                scorePopups.push({ x: gx * CELL + CELL/2, y: gy * CELL + CELL/2, text: '+' + bonus, age: 0 });
                 updateHUD();
             } else if (!g.eaten) {
                 gameState = 'dying';
@@ -514,6 +518,19 @@ function checkCollisions() {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+function drawScorePopups() {
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'center';
+    for (const p of scorePopups) {
+        const alpha = 1 - p.age / 900;
+        const y = p.y - (p.age / 900) * 28;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(p.text, p.x, y);
+    }
+    ctx.globalAlpha = 1;
+}
+
 // ─── Render ────────────────────────────────────────────────────────────────────
 function render(ts) {
     const W = canvas.width, H = canvas.height;
@@ -524,6 +541,7 @@ function render(ts) {
     drawDots(ts);
     drawPacman(ts);
     ghosts.forEach(g => drawGhost(g, ts));
+    drawScorePopups();
 
     if (gameState === 'levelup') {
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -705,13 +723,13 @@ const KEY_DIR = {
 
 document.addEventListener('keydown', e => {
     const d = KEY_DIR[e.key];
-    if (d) { e.preventDefault(); pacman.queueX = d.x; pacman.queueY = d.y; }
+    if (d) { e.preventDefault(); if (pacman) { pacman.queueX = d.x; pacman.queueY = d.y; } }
 });
 
-document.getElementById('btn-up').addEventListener('click',    () => { pacman.queueX=0;  pacman.queueY=-1; });
-document.getElementById('btn-down').addEventListener('click',  () => { pacman.queueX=0;  pacman.queueY=1;  });
-document.getElementById('btn-left').addEventListener('click',  () => { pacman.queueX=-1; pacman.queueY=0;  });
-document.getElementById('btn-right').addEventListener('click', () => { pacman.queueX=1;  pacman.queueY=0;  });
+document.getElementById('btn-up').addEventListener('click',    () => { if (pacman) { pacman.queueX=0;  pacman.queueY=-1; } });
+document.getElementById('btn-down').addEventListener('click',  () => { if (pacman) { pacman.queueX=0;  pacman.queueY=1;  } });
+document.getElementById('btn-left').addEventListener('click',  () => { if (pacman) { pacman.queueX=-1; pacman.queueY=0;  } });
+document.getElementById('btn-right').addEventListener('click', () => { if (pacman) { pacman.queueX=1;  pacman.queueY=0;  } });
 
 let swipeX, swipeY;
 canvas.addEventListener('touchstart', e => { swipeX=e.touches[0].clientX; swipeY=e.touches[0].clientY; e.preventDefault(); }, {passive:false});
@@ -724,7 +742,7 @@ canvas.addEventListener('touchend', e => {
 }, {passive:false});
 
 // Initial draw
-hiScore = 0;
+hiScore = parseInt(localStorage.getItem('pacman_hiscore') || '0');
 ctx.fillStyle = '#000';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 </script>
