@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cmd.exe /c start \"\" \"c:\\\\Users\\\\david\\\\GIT\\\\mywebsite\\\\index.html\")"
+      "Bash(cmd.exe /c start \"\" \"c:\\\\Users\\\\david\\\\GIT\\\\mywebsite\\\\index.html\")",
+      "Bash(wc -l *.html)"
     ]
   }
 }
