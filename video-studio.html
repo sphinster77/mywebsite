@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Studio</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a2e;
+    --surface2: #16213e;
+    --accent: #e94560;
+    --text: #eaeaea;
+    --text-dim: #888;
+    --border: #2a2a4a;
+    --success: #4caf50;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+  }
+
+  .tab {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .panel { display: none; flex: 1; padding: 2rem; flex-direction: column; gap: 1.5rem; }
+  .panel.active { display: flex; }
+
+  .record-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .video-box {
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16/9;
+  }
+
+  .video-box video { width: 100%; height: 100%; object-fit: contain; }
+
+  .rec-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: var(--accent);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .rec-badge.on { display: flex; }
+
+  .dot {
+    width: 8px; height: 8px;
+    background: white;
+    border-radius: 50%;
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+  .side-panel {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .cg { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  label { font-size: 0.82rem; color: var(--text-dim); }
+
+  select, input[type="text"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    width: 100%;
+    font-size: 0.88rem;
+  }
+
+  .btn {
+    padding: 0.65rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  .btn-red  { background: var(--accent); color: #fff; }
+  .btn-red:hover { background: #c73652; }
+  .btn-gray { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-gray:hover { border-color: var(--accent); }
+  .btn-green { background: var(--success); color: #fff; }
+  .btn-green:hover { background: #388e3c; }
+  .btn-yt { background: #ff0000; color: #fff; }
+  .btn-yt:hover { background: #cc0000; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .timer {
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+
+  .card h3 { margin-bottom: 1rem; font-size: 1rem; }
+
+  .recordings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .rec-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .rec-item:hover { border-color: var(--border); }
+  .rec-item.sel { border-color: var(--accent); }
+
+  .empty { color: var(--text-dim); font-size: 0.85rem; padding: 0.5rem 0; }
+
+  /* Edit tab */
+  .edit-layout { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .timeline {
+    position: relative;
+    height: 56px;
+    background: var(--surface2);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    margin-top: 0.75rem;
+  }
+
+  .tl-track { height: 100%; background: linear-gradient(90deg, #0f3460, #533483); }
+
+  .tl-trim {
+    position: absolute; top: 0; height: 100%;
+    background: rgba(233,69,96,0.25);
+    border-left: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+    pointer-events: none;
+    display: none;
+  }
+
+  .tl-head {
+    position: absolute; top: 0; width: 2px; height: 100%;
+    background: #fff; pointer-events: none;
+  }
+
+  .trim-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .trim-row code {
+    background: var(--surface2);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: monospace;
+    color: var(--accent);
+  }
+
+  /* Export tab */
+  .export-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .info-box {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .info-box code { background: #000; padding: 0.1rem 0.3rem; border-radius: 3px; color: var(--accent); }
+  .info-box a { color: var(--accent); }
+
+  .status {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    display: none;
+  }
+
+  .status.show { display: block; }
+  .status.info { background: rgba(15,52,96,.4); border: 1px solid #0f3460; }
+  .status.ok   { background: rgba(76,175,80,.15); border: 1px solid var(--success); color: var(--success); }
+  .status.err  { background: rgba(233,69,96,.15); border: 1px solid var(--accent); color: var(--accent); }
+
+  .pbar { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; display: none; }
+  .pbar.show { display: block; }
+  .pfill { height: 100%; background: var(--accent); width: 0%; transition: width .3s; }
+
+  .hidden { display: none !important; }
+  #editCanvas { display: none; }
+</style>
+</head>
+<body>
+
+<header><h1>🎬 Video Studio</h1></header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="record" onclick="switchTab('record')">⏺ Record</button>
+  <button class="tab" data-tab="edit" onclick="switchTab('edit')">✂ Edit</button>
+  <button class="tab" data-tab="export" onclick="switchTab('export')">🚀 Export</button>
+</div>
+
+<!-- RECORD -->
+<div id="panel-record" class="panel active">
+  <div class="record-layout">
+    <div>
+      <div class="video-box">
+        <video id="preview" autoplay muted playsinline></video>
+        <div class="rec-badge" id="recBadge"><div class="dot"></div>REC</div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="timer" id="timer">00:00</div>
+
+      <div class="cg">
+        <label>Camera</label>
+        <select id="camSel"></select>
+      </div>
+      <div class="cg">
+        <label>Microphone</label>
+        <select id="micSel"></select>
+      </div>
+      <div class="cg">
+        <label>Quality</label>
+        <select id="qualSel">
+          <option value="1080">1080p</option>
+          <option value="720" selected>720p</option>
+          <option value="480">480p</option>
+        </select>
+      </div>
+
+      <button class="btn btn-red" id="startBtn" onclick="startRec()">⏺ Start Recording</button>
+      <button class="btn btn-gray hidden" id="stopBtn" onclick="stopRec()">⏹ Stop</button>
+      <button class="btn btn-gray" onclick="initCam()">🔄 Refresh Camera</button>
+      <div id="recStatus" class="status"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+      <h3>Recordings</h3>
+      <button class="btn btn-gray" style="padding:.3rem .7rem;font-size:.8rem;" onclick="clearAll()">Clear All</button>
+    </div>
+    <div class="recordings-list" id="recList">
+      <div class="empty">No recordings yet — press Start Recording.</div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT -->
+<div id="panel-edit" class="panel">
+  <div class="edit-layout">
+    <div class="video-box" style="max-width:100%;aspect-ratio:16/9;">
+      <video id="editVid" controls playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>Trim</h3>
+        <span style="font-size:.78rem;color:var(--text-dim);">Click timeline to seek · Space to play/pause</span>
+      </div>
+
+      <div class="timeline" id="timeline" onclick="seekTL(event)">
+        <div class="tl-track"></div>
+        <div class="tl-trim" id="tlTrim"></div>
+        <div class="tl-head" id="tlHead"></div>
+      </div>
+
+      <div class="trim-row">
+        <span style="color:var(--text-dim);">In:</span> <code id="inDisp">0.00s</code>
+        <span style="color:var(--text-dim);">Out:</span> <code id="outDisp">--</code>
+        <button class="btn btn-gray" style="padding:.3rem .6rem;font-size:.78rem;" onclick="setIn()">Set In [I]</button>
+        <button class="btn btn-gray" style="padding:.3rem .6rem;font-size:.78rem;" onclick="setOut()">Set Out [O]</button>
+        <button class="btn btn-gray" style="padding:.3rem .6rem;font-size:.78rem;" onclick="resetTrim()">Reset</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-red" id="trimBtn" onclick="doTrim()" disabled>✂ Export Trimmed Clip</button>
+      <button class="btn btn-gray" onclick="switchTab('export')">→ Go to Export</button>
+    </div>
+
+    <div id="trimStatus" class="status"></div>
+    <div class="pbar" id="trimBar"><div class="pfill" id="trimFill"></div></div>
+  </div>
+</div>
+
+<!-- EXPORT -->
+<div id="panel-export" class="panel">
+  <div class="export-grid">
+
+    <div class="card" style="display:flex;flex-direction:column;gap:1rem;">
+      <h3>📥 Download</h3>
+      <p style="font-size:.85rem;color:var(--text-dim);">Save your recording as a WebM file.</p>
+      <div class="cg">
+        <label>Select Recording</label>
+        <select id="dlSel"><option value="">-- No recordings --</option></select>
+      </div>
+      <button class="btn btn-green" onclick="doDownload()">⬇ Download WebM</button>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:1rem;">
+      <h3>▶ Upload to YouTube</h3>
+
+      <div id="ytSetup">
+        <div class="info-box">
+          You need a Google OAuth2 Client ID to upload.<br><br>
+          1. Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a><br>
+          2. Create a project → enable <code>YouTube Data API v3</code><br>
+          3. Credentials → OAuth 2.0 → Web application<br>
+          4. Add this page's origin to Authorized JavaScript origins<br>
+          5. Paste the Client ID below
+        </div>
+        <div class="cg" style="margin-top:.75rem;">
+          <label>Google OAuth Client ID</label>
+          <input type="text" id="clientId" placeholder="xxxxxxxx.apps.googleusercontent.com">
+        </div>
+        <button class="btn btn-gray" style="margin-top:.5rem;" onclick="connectYT()">Connect to YouTube</button>
+      </div>
+
+      <div id="ytForm" class="hidden" style="display:flex;flex-direction:column;gap:.75rem;">
+        <div class="cg">
+          <label>Select Recording</label>
+          <select id="ytSel"><option value="">-- No recordings --</option></select>
+        </div>
+        <div class="cg">
+          <label>Title</label>
+          <input type="text" id="ytTitle" placeholder="My Video">
+        </div>
+        <div class="cg">
+          <label>Description</label>
+          <input type="text" id="ytDesc" placeholder="Description...">
+        </div>
+        <div class="cg">
+          <label>Privacy</label>
+          <select id="ytPrivacy">
+            <option value="private">Private</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.5rem;">
+          <button class="btn btn-yt" onclick="doUpload()">▶ Upload to YouTube</button>
+          <button class="btn btn-gray" style="padding:.4rem .8rem;font-size:.8rem;" onclick="signOut()">Sign Out</button>
+        </div>
+      </div>
+
+      <div id="ytStatus" class="status"></div>
+      <div class="pbar" id="ytBar"><div class="pfill" id="ytFill"></div></div>
+    </div>
+
+  </div>
+</div>
+
+<canvas id="editCanvas"></canvas>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let stream = null;
+let mr = null;          // MediaRecorder
+let chunks = [];
+let recordings = [];    // { blob, url, name, duration }
+let selIdx = -1;
+
+let timerIv = null;
+let recStart = 0;
+
+let inPt = 0;
+let outPt = null;
+
+let token = null;
+let clientId = '';
+
+// ── Tabs ───────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  if (name === 'edit') loadEdit();
+  if (name === 'export') refreshSelects();
+}
+
+// ── Camera ─────────────────────────────────────────────────────────────────────
+async function initCam() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const h = parseInt(document.getElementById('qualSel').value);
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: document.getElementById('camSel').value || undefined, height: { ideal: h } },
+      audio: { deviceId: document.getElementById('micSel').value || undefined }
+    });
+    document.getElementById('preview').srcObject = stream;
+    st('recStatus', '', '');
+    await fillDevices();
+  } catch (e) {
+    st('recStatus', 'Camera error: ' + e.message, 'err');
+  }
+}
+
+async function fillDevices() {
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const cs = document.getElementById('camSel');
+  const ms = document.getElementById('micSel');
+  const cv = cs.value, mv = ms.value;
+  cs.innerHTML = ms.innerHTML = '';
+  devs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.text = d.label || `${d.kind} (${d.deviceId.slice(0,8)})`;
+    if (d.kind === 'videoinput') cs.appendChild(o);
+    if (d.kind === 'audioinput') ms.appendChild(o);
+  });
+  if (cv) cs.value = cv;
+  if (mv) ms.value = mv;
+}
+
+// ── Record ─────────────────────────────────────────────────────────────────────
+function startRec() {
+  if (!stream) { st('recStatus', 'No camera – click Refresh Camera', 'err'); return; }
+  chunks = [];
+  const mime = bestMime();
+  mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+  mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  mr.onstop = saveRec;
+  mr.start(100);
+  recStart = Date.now();
+  timerIv = setInterval(() => {
+    document.getElementById('timer').textContent = fmt((Date.now() - recStart) / 1000);
+  }, 500);
+  toggle('startBtn', 'stopBtn');
+  document.getElementById('recBadge').classList.add('on');
+}
+
+function stopRec() {
+  if (mr && mr.state !== 'inactive') mr.stop();
+  clearInterval(timerIv);
+  document.getElementById('timer').textContent = '00:00';
+  document.getElementById('recBadge').classList.remove('on');
+  toggle('stopBtn', 'startBtn');
+}
+
+function saveRec() {
+  const mime = bestMime();
+  const blob = new Blob(chunks, { type: mime });
+  const url = URL.createObjectURL(blob);
+  const dur = (Date.now() - recStart) / 1000;
+  const name = `Recording ${recordings.length + 1} (${fmt(dur)})`;
+  recordings.push({ blob, url, name, duration: dur });
+  selIdx = recordings.length - 1;
+  renderList();
+  refreshSelects();
+  st('recStatus', `Saved: ${name}`, 'ok');
+}
+
+function renderList() {
+  const el = document.getElementById('recList');
+  if (!recordings.length) { el.innerHTML = '<div class="empty">No recordings yet — press Start Recording.</div>'; return; }
+  el.innerHTML = '';
+  recordings.forEach((r, i) => {
+    const d = document.createElement('div');
+    d.className = 'rec-item' + (i === selIdx ? ' sel' : '');
+    d.innerHTML = `<span>🎥 ${r.name}</span><span style="color:var(--text-dim)">${fmt(r.duration)}</span>`;
+    d.onclick = () => { selIdx = i; renderList(); };
+    el.appendChild(d);
+  });
+}
+
+function clearAll() {
+  recordings.forEach(r => URL.revokeObjectURL(r.url));
+  recordings = []; selIdx = -1;
+  renderList(); refreshSelects();
+}
+
+// ── Edit ───────────────────────────────────────────────────────────────────────
+function loadEdit() {
+  if (selIdx < 0 || !recordings[selIdx]) return;
+  const v = document.getElementById('editVid');
+  v.src = recordings[selIdx].url;
+  inPt = 0; outPt = null;
+  updTrim();
+  document.getElementById('trimBtn').disabled = false;
+  v.ontimeupdate = () => {
+    if (!v.duration) return;
+    document.getElementById('tlHead').style.left = (v.currentTime / v.duration * 100) + '%';
+  };
+}
+
+function seekTL(e) {
+  const v = document.getElementById('editVid');
+  if (!v.duration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  v.currentTime = ((e.clientX - r.left) / r.width) * v.duration;
+}
+
+function setIn()  { const v = document.getElementById('editVid'); inPt = v.currentTime; if (outPt !== null && outPt <= inPt) outPt = null; updTrim(); }
+function setOut() { const v = document.getElementById('editVid'); if (v.currentTime <= inPt) { st('trimStatus','Out must be after In','err'); return; } outPt = v.currentTime; updTrim(); }
+function resetTrim() { inPt = 0; outPt = null; updTrim(); }
+
+function updTrim() {
+  const v = document.getElementById('editVid');
+  const dur = v.duration || recordings[selIdx]?.duration || 1;
+  document.getElementById('inDisp').textContent = inPt.toFixed(2) + 's';
+  document.getElementById('outDisp').textContent = outPt !== null ? outPt.toFixed(2) + 's' : '--';
+  const trim = document.getElementById('tlTrim');
+  if (outPt !== null) {
+    trim.style.left  = (inPt / dur * 100) + '%';
+    trim.style.width = ((outPt - inPt) / dur * 100) + '%';
+    trim.style.display = 'block';
+  } else {
+    trim.style.display = 'none';
+  }
+}
+
+async function doTrim() {
+  if (selIdx < 0) return;
+  const rec = recordings[selIdx];
+  const v = document.getElementById('editVid');
+  const end = outPt !== null ? outPt : v.duration;
+  const dur = end - inPt;
+  if (dur <= 0) { st('trimStatus','Invalid trim range','err'); return; }
+
+  st('trimStatus','Exporting trim… please wait.','info');
+  prog('trimBar','trimFill', 0);
+  document.getElementById('trimBtn').disabled = true;
+
+  try {
+    const canvas = document.getElementById('editCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width  = v.videoWidth  || 1280;
+    canvas.height = v.videoHeight || 720;
+
+    const cs = canvas.captureStream(30);
+    const ac = new AudioContext();
+    const src = ac.createMediaElementSource(v);
+    const dst = ac.createMediaStreamDestination();
+    src.connect(dst);
+    src.connect(ac.destination);
+    const at = dst.stream.getAudioTracks()[0];
+    if (at) cs.addTrack(at);
+
+    const mime = bestMime();
+    const trimR = new MediaRecorder(cs, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+    const trimC = [];
+    trimR.ondataavailable = e => { if (e.data.size > 0) trimC.push(e.data); };
+
+    v.currentTime = inPt;
+    await new Promise(r => v.onseeked = r);
+    trimR.start(100);
+    v.play();
+
+    let raf;
+    const draw = () => {
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      prog('trimBar','trimFill', Math.min((v.currentTime - inPt) / dur * 100, 99));
+      if (v.currentTime >= end) { v.pause(); trimR.stop(); cancelAnimationFrame(raf); return; }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+
+    trimR.onstop = () => {
+      ac.close();
+      const blob = new Blob(trimC, { type: mime });
+      const url = URL.createObjectURL(blob);
+      const name = `Trim of ${rec.name}`;
+      recordings.push({ blob, url, name, duration: dur });
+      selIdx = recordings.length - 1;
+      renderList(); refreshSelects();
+      prog('trimBar','trimFill', 100);
+      st('trimStatus', `Saved "${name}"`, 'ok');
+      document.getElementById('trimBtn').disabled = false;
+      loadEdit();
+    };
+  } catch(e) {
+    st('trimStatus','Trim failed: ' + e.message,'err');
+    document.getElementById('trimBtn').disabled = false;
+  }
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────────
+function refreshSelects() {
+  ['dlSel','ytSel'].forEach(id => {
+    const s = document.getElementById(id);
+    s.innerHTML = recordings.length ? '' : '<option value="">-- No recordings --</option>';
+    recordings.forEach((r,i) => {
+      const o = document.createElement('option');
+      o.value = i; o.text = r.name;
+      s.appendChild(o);
+    });
+    if (selIdx >= 0) s.value = selIdx;
+  });
+}
+
+function doDownload() {
+  const i = parseInt(document.getElementById('dlSel').value);
+  if (isNaN(i) || !recordings[i]) return;
+  const r = recordings[i];
+  const a = document.createElement('a');
+  a.href = r.url;
+  a.download = r.name.replace(/[^a-z0-9]/gi,'_') + '.webm';
+  a.click();
+}
+
+// ── YouTube ────────────────────────────────────────────────────────────────────
+function connectYT() {
+  clientId = document.getElementById('clientId').value.trim();
+  if (!clientId) { st('ytStatus','Enter a Client ID first','err'); return; }
+  localStorage.setItem('yt_cid', clientId);
+  const base = window.location.href.split('?')[0].split('#')[0];
+  const scope = 'https://www.googleapis.com/auth/youtube.upload';
+  window.location.href =
+    `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(base)}&response_type=token&scope=${encodeURIComponent(scope)}`;
+}
+
+function checkHash() {
+  if (window.location.hash.includes('access_token')) {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    token = p.get('access_token');
+    history.replaceState(null,'',window.location.pathname);
+    clientId = localStorage.getItem('yt_cid') || '';
+    document.getElementById('clientId').value = clientId;
+    document.getElementById('ytSetup').classList.add('hidden');
+    document.getElementById('ytForm').classList.remove('hidden');
+    document.getElementById('ytForm').style.display = 'flex';
+    document.getElementById('ytForm').style.flexDirection = 'column';
+    st('ytStatus','✓ Connected to YouTube','ok');
+  } else {
+    const s = localStorage.getItem('yt_cid');
+    if (s) document.getElementById('clientId').value = s;
+  }
+}
+
+function signOut() {
+  token = null;
+  document.getElementById('ytSetup').classList.remove('hidden');
+  document.getElementById('ytForm').classList.add('hidden');
+  st('ytStatus','Signed out','info');
+}
+
+async function doUpload() {
+  if (!token) { st('ytStatus','Not connected','err'); return; }
+  const i = parseInt(document.getElementById('ytSel').value);
+  if (isNaN(i) || !recordings[i]) { st('ytStatus','Select a recording','err'); return; }
+
+  const r = recordings[i];
+  const title   = document.getElementById('ytTitle').value || r.name;
+  const desc    = document.getElementById('ytDesc').value  || '';
+  const privacy = document.getElementById('ytPrivacy').value;
+
+  st('ytStatus','Uploading to YouTube…','info');
+  prog('ytBar','ytFill', 0);
+
+  try {
+    const init = await fetch(
+      'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-Upload-Content-Type': r.blob.type,
+          'X-Upload-Content-Length': r.blob.size
+        },
+        body: JSON.stringify({
+          snippet: { title, description: desc, categoryId: '22' },
+          status: { privacyStatus: privacy }
+        })
+      }
+    );
+
+    if (!init.ok) { const e = await init.json(); throw new Error(e.error?.message || 'Init failed'); }
+
+    const uploadUrl = init.headers.get('Location');
+    const CHUNK = 5 * 1024 * 1024;
+    let offset = 0;
+
+    while (offset < r.blob.size) {
+      const end = Math.min(offset + CHUNK, r.blob.size);
+      const res = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Range': `bytes ${offset}-${end-1}/${r.blob.size}`,
+          'Content-Type': r.blob.type
+        },
+        body: r.blob.slice(offset, end)
+      });
+
+      if (res.status === 308) {
+        const range = res.headers.get('Range');
+        offset = range ? parseInt(range.split('-')[1]) + 1 : end;
+      } else if (res.ok) {
+        const vid = await res.json();
+        prog('ytBar','ytFill', 100);
+        st('ytStatus', `✓ Uploaded! ID: ${vid.id} — check YouTube Studio`, 'ok');
+        return;
+      } else {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error?.message || `Upload failed at offset ${offset}`);
+      }
+
+      prog('ytBar','ytFill', offset / r.blob.size * 100);
+    }
+  } catch(e) {
+    st('ytStatus', 'Error: ' + e.message, 'err');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function fmt(s) {
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  const ss = Math.floor(s%60).toString().padStart(2,'0');
+  return `${m}:${ss}`;
+}
+
+function bestMime() {
+  const t = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
+  return t.find(x => MediaRecorder.isTypeSupported(x)) || '';
+}
+
+function toggle(hide, show) {
+  document.getElementById(hide).classList.add('hidden');
+  document.getElementById(show).classList.remove('hidden');
+}
+
+function st(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'status' + (msg ? ` show ${type}` : '');
+}
+
+function prog(barId, fillId, pct) {
+  document.getElementById(barId).classList.toggle('show', pct < 100);
+  document.getElementById(fillId).style.width = pct + '%';
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('panel-edit').classList.contains('active')) return;
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'i' || e.key === 'I') { e.preventDefault(); setIn(); }
+  if (e.key === 'o' || e.key === 'O') { e.preventDefault(); setOut(); }
+  if (e.key === ' ') {
+    e.preventDefault();
+    const v = document.getElementById('editVid');
+    v.paused ? v.play() : v.pause();
+  }
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+checkHash();
+initCam();
+</script>
+</body>
+</html>
