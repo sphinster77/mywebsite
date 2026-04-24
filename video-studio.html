@@ -751,8 +751,8 @@ async function buildPipStream(dispStream, micStream) {
   const draw = () => {
     ctx.drawImage(sv, 0, 0, canvas.width, canvas.height);
     if (camV && camV.readyState >= 2) {
-      const x = canvas.width  - PIP_W - PAD;
-      const y = canvas.height - PIP_H - PAD;
+      const x = canvas.width - PIP_W - PAD;
+      const y = PAD;
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(x, y, PIP_W, PIP_H, 8);
