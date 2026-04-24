@@ -388,16 +388,14 @@
     <div class="side-panel">
       <div class="timer" id="screenTimer">00:00</div>
 
+      <div style="background:#000;border-radius:6px;overflow:hidden;aspect-ratio:16/9;width:100%;">
+        <video id="camPip" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+      </div>
+
       <div class="cg">
         <label class="toggle-label">
           <input type="checkbox" id="micToggle" checked>
           Include microphone audio
-        </label>
-      </div>
-      <div class="cg">
-        <label class="toggle-label">
-          <input type="checkbox" id="pipToggle">
-          Webcam overlay (picture-in-picture)
         </label>
       </div>
       <div class="cg">
@@ -407,7 +405,7 @@
         </label>
       </div>
 
-      <button class="btn btn-red" id="screenStartBtn" onclick="startScreenRec()">🖥 Start Screen Capture</button>
+      <button class="btn btn-red" id="screenStartBtn" onclick="startScreenRec()">🖥 Start Screen + Camera</button>
       <button class="btn btn-gray hidden" id="screenStopBtn" onclick="stopScreenRec()">⏹ Stop</button>
       <div id="screenStatus" class="status"></div>
     </div>
@@ -563,6 +561,7 @@ function switchTab(name) {
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
   if (name === 'edit') loadEdit();
   if (name === 'export') refreshSelects();
+  if (name === 'screen') initCamPip();
   if (name !== 'screen' && screenStream) stopScreenRec();
 }
 
@@ -663,6 +662,10 @@ function clearAll() {
 }
 
 // ── Screen Recording ──────────────────────────────────────────────────────────
+async function initCamPip() {
+  if (!stream) await initCam();
+  document.getElementById('camPip').srcObject = stream;
+}
 async function startScreenRec() {
   try {
     const wantSysAudio = document.getElementById('sysAudioToggle').checked;
@@ -672,7 +675,6 @@ async function startScreenRec() {
     });
 
     const wantMic = document.getElementById('micToggle').checked;
-    const wantPip = document.getElementById('pipToggle').checked;
 
     let micStream = null;
     if (wantMic) {
@@ -680,19 +682,7 @@ async function startScreenRec() {
       catch { st('screenStatus', 'Mic not available — recording without mic', 'info'); }
     }
 
-    let recordStream;
-
-    if (wantPip) {
-      recordStream = await buildPipStream(screenStream, micStream);
-    } else {
-      const sv = document.getElementById('screenPreview');
-      sv.srcObject = screenStream;
-      document.getElementById('screenPH').style.display = 'none';
-      recordStream = new MediaStream();
-      screenStream.getVideoTracks().forEach(t => recordStream.addTrack(t));
-      screenStream.getAudioTracks().forEach(t => recordStream.addTrack(t));
-      if (micStream) micStream.getAudioTracks().forEach(t => recordStream.addTrack(t));
-    }
+    const recordStream = await buildPipStream(screenStream, micStream);
 
     screenChunks = [];
     const mime = bestMime();
@@ -737,7 +727,14 @@ async function buildPipStream(dispStream, micStream) {
   canvas.width  = sv.videoWidth  || 1280;
   canvas.height = sv.videoHeight || 720;
 
-  // webcam for PiP
+  // webcam for PiP — auto-start camera if not already running
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      document.getElementById('preview').srcObject = stream;
+      document.getElementById('camPip').srcObject = stream;
+    } catch { /* no camera available */ }
+  }
   let camV = null;
   if (stream) {
     camV = document.createElement('video');
