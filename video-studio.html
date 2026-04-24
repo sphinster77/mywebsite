@@ -280,6 +280,35 @@
 
   .hidden { display: none !important; }
   #editCanvas { display: none; }
+  #screenCanvas { width: 100%; height: 100%; object-fit: contain; display: none; }
+
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .toggle-label input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px; height: 15px;
+    cursor: pointer;
+  }
+
+  .screen-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    gap: 0.75rem;
+  }
+
+  .screen-placeholder .ph-icon { font-size: 3rem; }
 </style>
 </head>
 <body>
@@ -288,6 +317,7 @@
 
 <div class="tabs">
   <button class="tab active" data-tab="record" onclick="switchTab('record')">⏺ Record</button>
+  <button class="tab" data-tab="screen" onclick="switchTab('screen')">🖥 Screen</button>
   <button class="tab" data-tab="edit" onclick="switchTab('edit')">✂ Edit</button>
   <button class="tab" data-tab="export" onclick="switchTab('export')">🚀 Export</button>
 </div>
@@ -336,6 +366,60 @@
     </div>
     <div class="recordings-list" id="recList">
       <div class="empty">No recordings yet — press Start Recording.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN -->
+<div id="panel-screen" class="panel">
+  <div class="record-layout">
+    <div>
+      <div class="video-box">
+        <video id="screenPreview" autoplay muted playsinline></video>
+        <canvas id="screenCanvas"></canvas>
+        <div class="screen-placeholder" id="screenPH">
+          <div class="ph-icon">🖥</div>
+          <div>Click Start to pick a window or screen to capture</div>
+        </div>
+        <div class="rec-badge" id="screenBadge"><div class="dot"></div>REC</div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="timer" id="screenTimer">00:00</div>
+
+      <div class="cg">
+        <label class="toggle-label">
+          <input type="checkbox" id="micToggle" checked>
+          Include microphone audio
+        </label>
+      </div>
+      <div class="cg">
+        <label class="toggle-label">
+          <input type="checkbox" id="pipToggle">
+          Webcam overlay (picture-in-picture)
+        </label>
+      </div>
+      <div class="cg">
+        <label class="toggle-label">
+          <input type="checkbox" id="sysAudioToggle" checked>
+          Request system audio
+        </label>
+      </div>
+
+      <button class="btn btn-red" id="screenStartBtn" onclick="startScreenRec()">🖥 Start Screen Capture</button>
+      <button class="btn btn-gray hidden" id="screenStopBtn" onclick="stopScreenRec()">⏹ Stop</button>
+      <div id="screenStatus" class="status"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+      <h3>Recordings</h3>
+      <button class="btn btn-gray" style="padding:.3rem .7rem;font-size:.8rem;" onclick="clearAll()">Clear All</button>
+    </div>
+    <div class="recordings-list" id="screenRecList">
+      <div class="empty">No recordings yet — press Start Screen Capture.</div>
     </div>
   </div>
 </div>
@@ -464,6 +548,13 @@ let outPt = null;
 let token = null;
 let clientId = '';
 
+let screenStream = null;
+let screenMr = null;
+let screenChunks = [];
+let screenTimerIv = null;
+let screenStart = 0;
+let screenRaf = null;
+
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -472,6 +563,7 @@ function switchTab(name) {
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
   if (name === 'edit') loadEdit();
   if (name === 'export') refreshSelects();
+  if (name !== 'screen' && screenStream) stopScreenRec();
 }
 
 // ── Camera ─────────────────────────────────────────────────────────────────────
@@ -547,15 +639,20 @@ function saveRec() {
 }
 
 function renderList() {
-  const el = document.getElementById('recList');
-  if (!recordings.length) { el.innerHTML = '<div class="empty">No recordings yet — press Start Recording.</div>'; return; }
-  el.innerHTML = '';
-  recordings.forEach((r, i) => {
-    const d = document.createElement('div');
-    d.className = 'rec-item' + (i === selIdx ? ' sel' : '');
-    d.innerHTML = `<span>🎥 ${r.name}</span><span style="color:var(--text-dim)">${fmt(r.duration)}</span>`;
-    d.onclick = () => { selIdx = i; renderList(); };
-    el.appendChild(d);
+  ['recList', 'screenRecList'].forEach(id => {
+    const el = document.getElementById(id);
+    const emptyMsg = id === 'recList'
+      ? 'No recordings yet — press Start Recording.'
+      : 'No recordings yet — press Start Screen Capture.';
+    if (!recordings.length) { el.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
+    el.innerHTML = '';
+    recordings.forEach((r, i) => {
+      const d = document.createElement('div');
+      d.className = 'rec-item' + (i === selIdx ? ' sel' : '');
+      d.innerHTML = `<span>${r.icon || '🎥'} ${r.name}</span><span style="color:var(--text-dim)">${fmt(r.duration)}</span>`;
+      d.onclick = () => { selIdx = i; renderList(); };
+      el.appendChild(d);
+    });
   });
 }
 
@@ -563,6 +660,151 @@ function clearAll() {
   recordings.forEach(r => URL.revokeObjectURL(r.url));
   recordings = []; selIdx = -1;
   renderList(); refreshSelects();
+}
+
+// ── Screen Recording ──────────────────────────────────────────────────────────
+async function startScreenRec() {
+  try {
+    const wantSysAudio = document.getElementById('sysAudioToggle').checked;
+    screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 },
+      audio: wantSysAudio
+    });
+
+    const wantMic = document.getElementById('micToggle').checked;
+    const wantPip = document.getElementById('pipToggle').checked;
+
+    let micStream = null;
+    if (wantMic) {
+      try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+      catch { st('screenStatus', 'Mic not available — recording without mic', 'info'); }
+    }
+
+    let recordStream;
+
+    if (wantPip) {
+      recordStream = await buildPipStream(screenStream, micStream);
+    } else {
+      recordStream = new MediaStream();
+      screenStream.getVideoTracks().forEach(t => recordStream.addTrack(t));
+      screenStream.getAudioTracks().forEach(t => recordStream.addTrack(t));
+      if (micStream) micStream.getAudioTracks().forEach(t => recordStream.addTrack(t));
+    }
+
+    screenChunks = [];
+    const mime = bestMime();
+    screenMr = new MediaRecorder(recordStream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    screenMr.ondataavailable = e => { if (e.data.size > 0) screenChunks.push(e.data); };
+    screenMr.onstop = () => {
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      saveScreenRec();
+    };
+    screenMr.start(100);
+
+    screenStart = Date.now();
+    screenTimerIv = setInterval(() => {
+      document.getElementById('screenTimer').textContent = fmt((Date.now() - screenStart) / 1000);
+    }, 500);
+
+    // stop recording if user closes the share picker
+    screenStream.getVideoTracks()[0].onended = stopScreenRec;
+
+    document.getElementById('screenStartBtn').classList.add('hidden');
+    document.getElementById('screenStopBtn').classList.remove('hidden');
+    document.getElementById('screenBadge').classList.add('on');
+    document.getElementById('screenPH').style.display = 'none';
+    st('screenStatus', '', '');
+  } catch (e) {
+    if (e.name !== 'NotAllowedError') st('screenStatus', 'Error: ' + e.message, 'err');
+  }
+}
+
+async function buildPipStream(dispStream, micStream) {
+  const canvas = document.getElementById('screenCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // screen preview in video element
+  const sv = document.getElementById('screenPreview');
+  sv.srcObject = dispStream;
+  await sv.play().catch(() => {});
+  canvas.width  = sv.videoWidth  || 1280;
+  canvas.height = sv.videoHeight || 720;
+
+  // webcam for PiP
+  let camV = null;
+  if (stream) {
+    camV = document.createElement('video');
+    camV.srcObject = stream;
+    camV.muted = true;
+    await camV.play().catch(() => {});
+  }
+
+  // show canvas, hide plain video
+  sv.style.display = 'none';
+  canvas.style.display = 'block';
+
+  const PIP_W = Math.round(canvas.width * 0.22);
+  const PIP_H = Math.round(PIP_W * 9 / 16);
+  const PAD = 16;
+
+  screenRaf = null;
+  const draw = () => {
+    ctx.drawImage(sv, 0, 0, canvas.width, canvas.height);
+    if (camV && camV.readyState >= 2) {
+      const x = canvas.width  - PIP_W - PAD;
+      const y = canvas.height - PIP_H - PAD;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, PIP_W, PIP_H, 8);
+      ctx.clip();
+      ctx.drawImage(camV, x, y, PIP_W, PIP_H);
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, PIP_W, PIP_H, 8);
+      ctx.stroke();
+    }
+    screenRaf = requestAnimationFrame(draw);
+  };
+  draw();
+
+  const cs = canvas.captureStream(30);
+  dispStream.getAudioTracks().forEach(t => cs.addTrack(t));
+  if (micStream) micStream.getAudioTracks().forEach(t => cs.addTrack(t));
+  return cs;
+}
+
+function stopScreenRec() {
+  if (screenRaf) { cancelAnimationFrame(screenRaf); screenRaf = null; }
+  if (screenMr && screenMr.state !== 'inactive') screenMr.stop();
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  clearInterval(screenTimerIv);
+
+  const sv = document.getElementById('screenPreview');
+  const sc = document.getElementById('screenCanvas');
+  sv.srcObject = null;
+  sv.style.display = '';
+  sc.style.display = 'none';
+
+  document.getElementById('screenTimer').textContent = '00:00';
+  document.getElementById('screenBadge').classList.remove('on');
+  document.getElementById('screenStartBtn').classList.remove('hidden');
+  document.getElementById('screenStopBtn').classList.add('hidden');
+  document.getElementById('screenPH').style.display = '';
+}
+
+function saveScreenRec() {
+  const mime = bestMime();
+  const blob = new Blob(screenChunks, { type: mime });
+  const url = URL.createObjectURL(blob);
+  const dur = (Date.now() - screenStart) / 1000;
+  const name = `Screen ${recordings.length + 1} (${fmt(dur)})`;
+  recordings.push({ blob, url, name, duration: dur, icon: '🖥' });
+  selIdx = recordings.length - 1;
+  renderList();
+  refreshSelects();
+  st('screenStatus', `Saved: ${name}`, 'ok');
 }
 
 // ── Edit ───────────────────────────────────────────────────────────────────────
