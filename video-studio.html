@@ -685,6 +685,9 @@ async function startScreenRec() {
     if (wantPip) {
       recordStream = await buildPipStream(screenStream, micStream);
     } else {
+      const sv = document.getElementById('screenPreview');
+      sv.srcObject = screenStream;
+      document.getElementById('screenPH').style.display = 'none';
       recordStream = new MediaStream();
       screenStream.getVideoTracks().forEach(t => recordStream.addTrack(t));
       screenStream.getAudioTracks().forEach(t => recordStream.addTrack(t));
@@ -723,9 +726,13 @@ async function buildPipStream(dispStream, micStream) {
   const canvas = document.getElementById('screenCanvas');
   const ctx = canvas.getContext('2d');
 
-  // screen preview in video element
+  // screen preview in video element — wait for metadata so dimensions are real
   const sv = document.getElementById('screenPreview');
   sv.srcObject = dispStream;
+  await new Promise(r => {
+    if (sv.videoWidth) { r(); return; }
+    sv.onloadedmetadata = r;
+  });
   await sv.play().catch(() => {});
   canvas.width  = sv.videoWidth  || 1280;
   canvas.height = sv.videoHeight || 720;
@@ -755,14 +762,14 @@ async function buildPipStream(dispStream, micStream) {
       const y = PAD;
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(x, y, PIP_W, PIP_H, 8);
+      roundRect(ctx, x, y, PIP_W, PIP_H, 8);
       ctx.clip();
       ctx.drawImage(camV, x, y, PIP_W, PIP_H);
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(x, y, PIP_W, PIP_H, 8);
+      roundRect(ctx, x, y, PIP_W, PIP_H, 8);
       ctx.stroke();
     }
     screenRaf = requestAnimationFrame(draw);
@@ -1042,6 +1049,18 @@ async function doUpload() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x,     y + h, x,     y + h - r, r);
+  ctx.lineTo(x,     y + r);
+  ctx.arcTo(x,     y,     x + r, y,         r);
+  ctx.closePath();
+}
 function fmt(s) {
   const m = Math.floor(s/60).toString().padStart(2,'0');
   const ss = Math.floor(s%60).toString().padStart(2,'0');
