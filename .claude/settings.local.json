@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(cmd.exe /c start \"\" \"c:\\\\Users\\\\david\\\\GIT\\\\mywebsite\\\\index.html\")",
-      "Bash(wc -l *.html)"
+      "Bash(wc -l *.html)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
