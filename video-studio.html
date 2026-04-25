@@ -388,7 +388,7 @@
     <div class="side-panel">
       <div class="timer" id="screenTimer">00:00</div>
 
-      <div style="background:#000;border-radius:6px;overflow:hidden;aspect-ratio:16/9;width:100%;">
+      <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.3);margin:0 auto;background:#000;">
         <video id="camPip" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
       </div>
 
@@ -747,26 +747,32 @@ async function buildPipStream(dispStream, micStream) {
   sv.style.display = 'none';
   canvas.style.display = 'block';
 
-  const PIP_W = Math.round(canvas.width * 0.22);
-  const PIP_H = Math.round(PIP_W * 9 / 16);
-  const PAD = 16;
+  const PIP_R = Math.round(canvas.width * 0.1);
+  const PAD = 20;
+  const cx = canvas.width - PIP_R - PAD;
+  const cy = PAD + PIP_R;
 
   screenRaf = null;
   const draw = () => {
     ctx.drawImage(sv, 0, 0, canvas.width, canvas.height);
     if (camV && camV.readyState >= 2) {
-      const x = canvas.width - PIP_W - PAD;
-      const y = PAD;
+      // center-crop the webcam to a square so it fills the circle without stretching
+      const vw = camV.videoWidth || 1, vh = camV.videoHeight || 1;
+      const sq = Math.min(vw, vh);
+      const sx = (vw - sq) / 2, sy = (vh - sq) / 2;
+
       ctx.save();
       ctx.beginPath();
-      roundRect(ctx, x, y, PIP_W, PIP_H, 8);
+      ctx.arc(cx, cy, PIP_R, 0, Math.PI * 2);
       ctx.clip();
-      ctx.drawImage(camV, x, y, PIP_W, PIP_H);
+      ctx.drawImage(camV, sx, sy, sq, sq, cx - PIP_R, cy - PIP_R, PIP_R * 2, PIP_R * 2);
       ctx.restore();
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-      ctx.lineWidth = 2;
+
+      // white border
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      roundRect(ctx, x, y, PIP_W, PIP_H, 8);
+      ctx.arc(cx, cy, PIP_R, 0, Math.PI * 2);
       ctx.stroke();
     }
     screenRaf = requestAnimationFrame(draw);
