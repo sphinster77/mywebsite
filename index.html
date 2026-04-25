@@ -186,6 +186,46 @@
             border-top: 1px solid rgba(240,192,48,0.15);
         }
         footer span { color: #f0c030; font-weight: 600; }
+
+        /* ── Tools lock ── */
+        .lock-box {
+            background: #161828;
+            border-radius: 14px;
+            padding: 2rem 1.6rem;
+            box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+            border-top: 4px solid #f0c030;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            max-width: 320px;
+        }
+        .lock-icon { font-size: 2.2rem; line-height: 1; }
+        .lock-label { font-size: 0.95rem; color: #9090b0; }
+        .lock-row { display: flex; gap: 0.5rem; }
+        .lock-row input {
+            background: #0d0f1a;
+            border: 1px solid #3a3a5a;
+            border-radius: 8px;
+            color: #e8e8e8;
+            padding: 8px 12px;
+            font-size: 1rem;
+            width: 130px;
+            outline: none;
+        }
+        .lock-row input:focus { border-color: #f0c030; }
+        .lock-row button {
+            background: linear-gradient(135deg, #dca50c, #f0c030);
+            color: #0d0f1a;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .lock-row button:hover { filter: brightness(1.1); }
+        .lock-error { color: #e05050; font-size: 0.85rem; min-height: 1.1em; }
     </style>
 </head>
 <body>
@@ -271,7 +311,18 @@
 
     <section id="tools">
         <h2 class="section-title">Tools</h2>
-        <div class="cards">
+        <div id="tools-lock">
+            <div class="lock-box">
+                <div class="lock-icon">🔒</div>
+                <p class="lock-label">Enter password to unlock</p>
+                <div class="lock-row">
+                    <input id="tools-pw" type="password" placeholder="Password" maxlength="20" autocomplete="off">
+                    <button onclick="unlockTools()">Unlock</button>
+                </div>
+                <p id="tools-pw-error" class="lock-error"></p>
+            </div>
+        </div>
+        <div id="tools-content" class="cards" style="display:none">
             <a class="card" href="video-studio.html">
                 <div class="card-icon">🎬</div>
                 <div class="card-title">Video Studio</div>
@@ -299,6 +350,27 @@
 </footer>
 
 <script>
+// ── Tools password ──────────────────────────────────────────────────────────
+function unlockTools() {
+    const input = document.getElementById('tools-pw');
+    if (input.value === '2543') {
+        document.getElementById('tools-lock').style.display = 'none';
+        document.getElementById('tools-content').style.display = 'grid';
+        sessionStorage.setItem('tools-unlocked', '1');
+    } else {
+        document.getElementById('tools-pw-error').textContent = 'Wrong password.';
+        input.value = '';
+        input.focus();
+    }
+}
+document.getElementById('tools-pw').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') unlockTools();
+});
+if (sessionStorage.getItem('tools-unlocked') === '1') {
+    document.getElementById('tools-lock').style.display = 'none';
+    document.getElementById('tools-content').style.display = 'grid';
+}
+
 // ── Hero canvas particle animation ──────────────────────────────────────────
 (function () {
     const canvas = document.getElementById('heroCanvas');
