@@ -417,20 +417,23 @@ function openToolsModal() {
         setTimeout(() => document.getElementById('tools-pw').focus(), 50);
     }
 }
-function closeToolsModal() {
-    document.getElementById('tools-modal').classList.remove('open');
-}
 function unlockTools() {
     const input = document.getElementById('tools-pw');
     if (input.value === '2543') {
         document.getElementById('tools-lock').style.display = 'none';
         document.getElementById('tools-cards').classList.add('visible');
-        sessionStorage.setItem('tools-unlocked', '1');
     } else {
         document.getElementById('tools-pw-error').textContent = 'Wrong password.';
         input.value = '';
         input.focus();
     }
+}
+function closeToolsModal() {
+    document.getElementById('tools-modal').classList.remove('open');
+    document.getElementById('tools-lock').style.display = '';
+    document.getElementById('tools-cards').classList.remove('visible');
+    document.getElementById('tools-pw').value = '';
+    document.getElementById('tools-pw-error').textContent = '';
 }
 document.getElementById('tools-pw').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') unlockTools();
@@ -438,10 +441,6 @@ document.getElementById('tools-pw').addEventListener('keydown', function(e) {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeToolsModal();
 });
-if (sessionStorage.getItem('tools-unlocked') === '1') {
-    document.getElementById('tools-lock').style.display = 'none';
-    document.getElementById('tools-cards').classList.add('visible');
-}
 
 // ── Hero canvas particle animation ──────────────────────────────────────────
 (function () {
