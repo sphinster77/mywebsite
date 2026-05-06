@@ -187,18 +187,69 @@
         }
         footer span { color: #f0c030; font-weight: 600; }
 
-        /* ── Tools lock ── */
-        .lock-box {
+        /* ── Tools corner button ── */
+        #tools-corner-btn {
+            position: fixed;
+            bottom: 48px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            opacity: 0.25;
+            transition: opacity 0.2s;
+            z-index: 200;
+        }
+        #tools-corner-btn:hover { opacity: 0.7; }
+
+        /* ── Tools modal ── */
+        #tools-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+        }
+        #tools-modal.open { display: flex; }
+        .tools-panel {
             background: #161828;
-            border-radius: 14px;
-            padding: 2rem 1.6rem;
-            box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+            border-radius: 16px;
+            padding: 2rem 1.8rem;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
             border-top: 4px solid #f0c030;
+            width: min(420px, 90vw);
+            position: relative;
+        }
+        .tools-panel h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #f0c030;
+            margin-bottom: 1.2rem;
+        }
+        .tools-close {
+            position: absolute;
+            top: 14px; right: 16px;
+            background: none;
+            border: none;
+            color: #9090b0;
+            font-size: 1.3rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .tools-close:hover { color: #fff; }
+        .lock-box {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 0.75rem;
-            max-width: 320px;
         }
         .lock-icon { font-size: 2.2rem; line-height: 1; }
         .lock-label { font-size: 0.95rem; color: #9090b0; }
@@ -226,6 +277,8 @@
         }
         .lock-row button:hover { filter: brightness(1.1); }
         .lock-error { color: #e05050; font-size: 0.85rem; min-height: 1.1em; }
+        #tools-cards { display: none; flex-direction: column; gap: 0.85rem; }
+        #tools-cards.visible { display: flex; }
     </style>
 </head>
 <body>
@@ -246,7 +299,6 @@
 <nav>
     <a href="#papercrafts">Papercrafts</a>
     <a href="#games">Games</a>
-    <a href="#tools">Tools</a>
     <a href="#about">About</a>
 </nav>
 
@@ -309,8 +361,24 @@
         </div>
     </section>
 
-    <section id="tools">
-        <h2 class="section-title">Tools</h2>
+
+    <section id="about">
+        <h2 class="section-title">About</h2>
+        <div class="about-box">
+            This is a website for ideas — papercrafts, games, and fun stuff made by Davide Kurek.
+        </div>
+    </section>
+
+</main>
+
+<!-- ── Tools corner button ── -->
+<button id="tools-corner-btn" onclick="openToolsModal()" title="Tools">⚙</button>
+
+<!-- ── Tools modal ── -->
+<div id="tools-modal" onclick="if(event.target===this)closeToolsModal()">
+    <div class="tools-panel">
+        <button class="tools-close" onclick="closeToolsModal()">✕</button>
+        <h2>🔧 Tools</h2>
         <div id="tools-lock">
             <div class="lock-box">
                 <div class="lock-icon">🔒</div>
@@ -322,7 +390,7 @@
                 <p id="tools-pw-error" class="lock-error"></p>
             </div>
         </div>
-        <div id="tools-content" class="cards" style="display:none">
+        <div id="tools-cards">
             <a class="card" href="video-studio.html">
                 <div class="card-icon">🎬</div>
                 <div class="card-title">Video Studio</div>
@@ -334,16 +402,8 @@
                 <div class="card-desc">Pick a mic and speaker — your voice becomes the light show.</div>
             </a>
         </div>
-    </section>
-
-    <section id="about">
-        <h2 class="section-title">About</h2>
-        <div class="about-box">
-            This is a website for ideas — papercrafts, games, and fun stuff made by Davide Kurek.
-        </div>
-    </section>
-
-</main>
+    </div>
+</div>
 
 <footer>
     &copy; 2026 <span>Davide Kurek</span>. All rights reserved.
@@ -351,11 +411,20 @@
 
 <script>
 // ── Tools password ──────────────────────────────────────────────────────────
+function openToolsModal() {
+    document.getElementById('tools-modal').classList.add('open');
+    if (sessionStorage.getItem('tools-unlocked') !== '1') {
+        setTimeout(() => document.getElementById('tools-pw').focus(), 50);
+    }
+}
+function closeToolsModal() {
+    document.getElementById('tools-modal').classList.remove('open');
+}
 function unlockTools() {
     const input = document.getElementById('tools-pw');
     if (input.value === '2543') {
         document.getElementById('tools-lock').style.display = 'none';
-        document.getElementById('tools-content').style.display = 'grid';
+        document.getElementById('tools-cards').classList.add('visible');
         sessionStorage.setItem('tools-unlocked', '1');
     } else {
         document.getElementById('tools-pw-error').textContent = 'Wrong password.';
@@ -366,9 +435,12 @@ function unlockTools() {
 document.getElementById('tools-pw').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') unlockTools();
 });
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeToolsModal();
+});
 if (sessionStorage.getItem('tools-unlocked') === '1') {
     document.getElementById('tools-lock').style.display = 'none';
-    document.getElementById('tools-content').style.display = 'grid';
+    document.getElementById('tools-cards').classList.add('visible');
 }
 
 // ── Hero canvas particle animation ──────────────────────────────────────────
