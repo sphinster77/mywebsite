@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Walkie Talkie — Davide's Workshop</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             background: #0d0f1a;
@@ -16,13 +16,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem;
+            padding: 1.5rem 1rem 2rem;
+            gap: 0.8rem;
         }
-
         .back-link {
             position: fixed;
-            top: 16px;
-            left: 16px;
+            top: 16px; left: 16px;
             color: #f0c030;
             text-decoration: none;
             font-weight: 700;
@@ -32,44 +31,76 @@
         }
         .back-link:hover { opacity: 1; }
 
-        /* ── Walkie Talkie body ── */
+        /* ── Device panel ── */
+        .device-panel {
+            width: min(320px, 90vw);
+            background: #161828;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border: 1px solid #2e3148;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .device-panel-title {
+            font-size: 0.6rem;
+            letter-spacing: 2px;
+            color: #5a5e7a;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .device-row { display: flex; gap: 0.5rem; }
+        .device-label {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            font-size: 0.68rem;
+            color: #9090b0;
+        }
+        .device-label select {
+            background: #0d0f1a;
+            border: 1px solid #3a3a5a;
+            border-radius: 6px;
+            color: #e8e8e8;
+            padding: 5px 6px;
+            font-size: 0.72rem;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+        }
+        .device-label select:focus { border-color: #f0c030; }
+
+        /* ── Walkie body ── */
         .walkie {
             background: linear-gradient(160deg, #2a2d3e 0%, #1a1c28 100%);
             border-radius: 28px 28px 40px 40px;
             width: min(320px, 90vw);
-            padding: 1.5rem 1.4rem 2rem;
+            padding: 1.4rem 1.3rem 1.8rem;
             box-shadow: 0 20px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
             border: 2px solid #2e3148;
             position: relative;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.85rem;
         }
-
-        /* Antenna */
         .antenna {
             position: absolute;
-            top: -52px;
-            right: 28px;
-            width: 10px;
-            height: 60px;
+            top: -52px; right: 28px;
+            width: 10px; height: 60px;
             background: linear-gradient(to top, #2e3148, #4a4e6a, #6a6e90);
             border-radius: 5px 5px 0 0;
         }
         .antenna::before {
             content: '';
             position: absolute;
-            top: -6px;
-            left: 50%;
+            top: -6px; left: 50%;
             transform: translateX(-50%);
-            width: 6px;
-            height: 6px;
+            width: 6px; height: 6px;
             background: #f0c030;
             border-radius: 50%;
             box-shadow: 0 0 8px #f0c030;
         }
-
-        /* Brand label */
         .brand {
             text-align: center;
             font-size: 0.65rem;
@@ -79,68 +110,33 @@
             text-transform: uppercase;
         }
 
-        /* Screen */
+        /* ── Screen ── */
         .screen {
             background: #0a1a0a;
             border-radius: 10px;
-            padding: 0.75rem 1rem;
+            padding: 0.7rem 0.9rem;
             border: 2px solid #1a3a1a;
-            box-shadow: inset 0 2px 8px rgba(0,0,0,0.6), 0 0 12px rgba(0,200,80,0.06);
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
             display: flex;
             flex-direction: column;
-            gap: 0.4rem;
+            gap: 0.3rem;
         }
-        .screen-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .freq-label {
-            font-size: 0.6rem;
-            color: #2a6a2a;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+        .screen-row { display: flex; justify-content: space-between; align-items: center; }
+        .freq-label { font-size: 0.6rem; color: #2a6a2a; letter-spacing: 1px; }
         .freq-value {
             font-family: 'Courier New', monospace;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
             color: #30ff60;
             letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(48,255,96,0.5);
+            text-shadow: 0 0 10px rgba(48,255,96,0.4);
         }
-        .channel-label {
-            font-size: 0.6rem;
-            color: #2a6a2a;
-            letter-spacing: 1px;
-        }
-        .channel-value {
-            font-family: 'Courier New', monospace;
-            font-size: 0.95rem;
-            color: #30ff60;
-        }
-
-        /* Signal bars */
-        .signal-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 3px;
-            height: 18px;
-        }
-        .bar {
-            width: 5px;
-            background: #1a4a1a;
-            border-radius: 2px;
-            transition: background 0.15s;
-        }
-        .bar:nth-child(1) { height: 5px; }
-        .bar:nth-child(2) { height: 8px; }
-        .bar:nth-child(3) { height: 11px; }
-        .bar:nth-child(4) { height: 14px; }
-        .bar:nth-child(5) { height: 18px; }
+        .signal-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+        .bar { width: 5px; background: #1a4a1a; border-radius: 2px; transition: background 0.15s; }
+        .bar:nth-child(1){height:5px} .bar:nth-child(2){height:8px}
+        .bar:nth-child(3){height:11px} .bar:nth-child(4){height:14px}
+        .bar:nth-child(5){height:18px}
         .bar.active { background: #30ff60; box-shadow: 0 0 4px rgba(48,255,96,0.5); }
-
-        /* Status */
         .status-line {
             font-family: 'Courier New', monospace;
             font-size: 0.7rem;
@@ -153,110 +149,137 @@
         .status-line.rx { color: #30ff60; opacity: 1; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* Speaker grille */
+        /* ── Connection section ── */
+        .conn-section {
+            background: #0e101e;
+            border-radius: 10px;
+            padding: 0.7rem;
+            border: 1px solid #2e3148;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .room-input-row { display: flex; gap: 0.4rem; }
+        #roomInput {
+            flex: 1;
+            background: #0d0f1a;
+            border: 1px solid #3a3a5a;
+            border-radius: 7px;
+            color: #e8e8e8;
+            padding: 7px 10px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            letter-spacing: 2px;
+            outline: none;
+            text-transform: uppercase;
+        }
+        #roomInput:focus { border-color: #f0c030; }
+        .btn-join {
+            background: linear-gradient(135deg, #dca50c, #f0c030);
+            color: #0d0f1a;
+            font-weight: 800;
+            border: none;
+            border-radius: 7px;
+            padding: 7px 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .btn-join:hover { filter: brightness(1.1); }
+        .conn-hint { font-size: 0.66rem; color: #5a5e7a; text-align: center; }
+        .room-active-row { display: flex; justify-content: space-between; align-items: center; }
+        .room-info {
+            font-family: 'Courier New', monospace;
+            font-size: 0.78rem;
+            color: #9090b0;
+        }
+        .room-info span { color: #f0c030; font-weight: 700; letter-spacing: 2px; }
+        #partnerStatus {
+            font-size: 0.76rem;
+            color: #5a5e7a;
+            font-family: 'Courier New', monospace;
+        }
+        .btn-leave {
+            background: #1a0a0a;
+            color: #e05050;
+            font-weight: 700;
+            border: 1px solid #e05050;
+            border-radius: 6px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .btn-leave:hover { background: #300a0a; }
+        .share-btn {
+            background: none;
+            border: 1px solid #3a3a5a;
+            border-radius: 6px;
+            color: #9090b0;
+            font-size: 0.68rem;
+            padding: 3px 7px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .share-btn:hover { border-color: #f0c030; color: #f0c030; }
+
+        /* ── Grille ── */
         .grille {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             gap: 4px;
-            padding: 0.5rem;
+            padding: 0.45rem;
             background: #141624;
             border-radius: 10px;
             border: 1px solid #2e3148;
         }
-        .grille-hole {
-            width: 100%;
-            aspect-ratio: 1;
-            background: #0d0f1a;
-            border-radius: 50%;
-        }
+        .grille-hole { width: 100%; aspect-ratio: 1; background: #0d0f1a; border-radius: 50%; }
 
-        /* Volume meter */
-        .meter-wrap {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
-        .meter-label { font-size: 0.65rem; color: #5a5e7a; letter-spacing: 1px; text-transform: uppercase; width: 32px; }
-        .meter-bar-bg {
-            flex: 1;
-            height: 8px;
-            background: #1a1c28;
-            border-radius: 4px;
-            overflow: hidden;
-            border: 1px solid #2e3148;
-        }
-        .meter-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(to right, #30ff60, #f0c030, #ff4040);
-            border-radius: 4px;
-            transition: width 0.05s;
-        }
+        /* ── Meter ── */
+        .meter-wrap { display: flex; align-items: center; gap: 0.6rem; }
+        .meter-label { font-size: 0.6rem; color: #5a5e7a; letter-spacing: 1px; width: 26px; text-transform: uppercase; }
+        .meter-bar-bg { flex: 1; height: 7px; background: #1a1c28; border-radius: 4px; overflow: hidden; border: 1px solid #2e3148; }
+        .meter-bar-fill { height: 100%; width: 0%; background: linear-gradient(to right, #30ff60, #f0c030, #ff4040); border-radius: 4px; transition: width 0.04s; }
 
-        /* Channel knob row */
-        .knob-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 0.2rem;
-        }
-        .knob-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.3rem;
-        }
-        .knob-label { font-size: 0.6rem; color: #5a5e7a; letter-spacing: 1px; text-transform: uppercase; }
+        /* ── Knob row ── */
+        .knob-row { display: flex; justify-content: space-between; align-items: center; padding: 0 0.2rem; }
+        .knob-group { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+        .knob-label { font-size: 0.58rem; color: #5a5e7a; letter-spacing: 1px; text-transform: uppercase; }
         .knob {
-            width: 38px;
-            height: 38px;
+            width: 38px; height: 38px;
             background: radial-gradient(circle at 35% 35%, #4a4e6a, #1a1c28);
             border-radius: 50%;
             border: 3px solid #2e3148;
             cursor: pointer;
             position: relative;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
             transition: transform 0.2s;
             user-select: none;
         }
         .knob::after {
             content: '';
             position: absolute;
-            top: 4px;
-            left: 50%;
+            top: 4px; left: 50%;
             transform: translateX(-50%);
-            width: 3px;
-            height: 8px;
+            width: 3px; height: 8px;
             background: #f0c030;
             border-radius: 2px;
         }
         .knob:hover { filter: brightness(1.15); }
 
-        /* PTT Button */
-        .ptt-wrap {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .ptt-label {
-            font-size: 0.65rem;
-            letter-spacing: 2px;
-            color: #5a5e7a;
-            text-transform: uppercase;
-        }
+        /* ── PTT ── */
+        .ptt-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+        .ptt-label { font-size: 0.62rem; letter-spacing: 2px; color: #5a5e7a; text-transform: uppercase; }
         .ptt-btn {
-            width: 100px;
-            height: 100px;
+            width: 96px; height: 96px;
             border-radius: 50%;
             border: 5px solid #c0392b;
             background: radial-gradient(circle at 38% 35%, #e74c3c, #922b21);
             cursor: pointer;
             box-shadow: 0 6px 20px rgba(231,76,60,0.4), 0 0 0 8px rgba(231,76,60,0.1), inset 0 2px 0 rgba(255,255,255,0.12);
-            transition: transform 0.08s, box-shadow 0.08s, background 0.08s;
+            transition: transform 0.08s, box-shadow 0.08s;
             color: white;
             font-weight: 900;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             letter-spacing: 2px;
             display: flex;
             flex-direction: column;
@@ -266,413 +289,554 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
-        .ptt-btn .ptt-icon { font-size: 1.6rem; }
-        .ptt-btn:active, .ptt-btn.pressed {
+        .ptt-btn .ptt-icon { font-size: 1.5rem; }
+        .ptt-btn:not(:disabled):active, .ptt-btn.pressed {
             transform: translateY(3px);
-            box-shadow: 0 2px 10px rgba(231,76,60,0.5), 0 0 0 8px rgba(231,76,60,0.2), inset 0 2px 6px rgba(0,0,0,0.3);
-            background: radial-gradient(circle at 38% 35%, #ff6b6b, #e74c3c);
+            box-shadow: 0 2px 10px rgba(231,76,60,0.5), 0 0 0 8px rgba(231,76,60,0.25), inset 0 2px 6px rgba(0,0,0,0.3);
         }
+        .ptt-btn:disabled { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.4); }
 
-        /* Mode toggle row */
-        .mode-row {
-            display: flex;
-            gap: 0.5rem;
-        }
+        /* ── Mode buttons ── */
+        .mode-row { display: flex; gap: 0.4rem; }
         .mode-btn {
             flex: 1;
-            padding: 0.45rem;
-            border-radius: 8px;
+            padding: 0.4rem;
+            border-radius: 7px;
             border: 1px solid #2e3148;
             background: #141624;
             color: #5a5e7a;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 1px;
             cursor: pointer;
             transition: all 0.15s;
             text-transform: uppercase;
         }
-        .mode-btn.active {
-            background: #1a2a1a;
-            border-color: #30ff60;
-            color: #30ff60;
-        }
+        .mode-btn.active { background: #1a2a1a; border-color: #30ff60; color: #30ff60; }
         .mode-btn:hover:not(.active) { border-color: #4a4e6a; color: #9090b0; }
 
-        /* Tip */
-        .tip {
-            text-align: center;
-            font-size: 0.72rem;
-            color: #5a5e7a;
-            padding-top: 0.25rem;
-        }
-
-        /* Permission denied banner */
-        #mic-denied {
-            display: none;
-            background: #2a0a0a;
-            border: 1px solid #e05050;
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            font-size: 0.8rem;
-            color: #e05050;
-            text-align: center;
-        }
+        #errMsg { font-size: 0.74rem; color: #e05050; text-align: center; min-height: 1em; }
+        .tip { text-align: center; font-size: 0.67rem; color: #5a5e7a; }
     </style>
 </head>
 <body>
 
 <a class="back-link" href="index.html">← Back</a>
 
+<!-- Device panel -->
+<div class="device-panel">
+    <div class="device-panel-title">Audio Devices</div>
+    <div class="device-row">
+        <label class="device-label">
+            🎤 Microphone
+            <select id="micSelect"><option value="">Loading...</option></select>
+        </label>
+        <label class="device-label">
+            🔊 Speaker
+            <select id="spkSelect"><option value="">Default</option></select>
+        </label>
+    </div>
+</div>
+
+<!-- Walkie Talkie -->
 <div class="walkie">
     <div class="antenna"></div>
-    <div class="brand">DK-Radio · Mk I</div>
+    <div class="brand">DK-Radio · Mk II</div>
 
-    <!-- Screen -->
     <div class="screen">
         <div class="screen-row">
             <span class="freq-label">MHz</span>
             <div class="signal-bars" id="signalBars">
-                <div class="bar active"></div>
-                <div class="bar active"></div>
-                <div class="bar active"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div>
             </div>
         </div>
-        <div class="freq-value" id="freqDisplay">462.550</div>
-        <div class="screen-row">
-            <span class="channel-label">CH</span>
-            <span class="channel-value" id="chDisplay">01</span>
+        <div class="freq-value" id="freqDisplay">---·---</div>
+        <div class="status-line" id="statusLine">OFFLINE</div>
+    </div>
+
+    <div class="conn-section">
+        <div id="connIdle">
+            <div class="room-input-row">
+                <input id="roomInput" type="text" maxlength="6" placeholder="ROOM CODE" autocomplete="off" spellcheck="false">
+                <button class="btn-join" onclick="joinRoom()">JOIN</button>
+            </div>
+            <div class="conn-hint">Same code on both devices · <button class="share-btn" onclick="shareRoom()">🔗 Share link</button></div>
         </div>
-        <div class="status-line" id="statusLine">STANDBY</div>
+        <div id="connActive" style="display:none; flex-direction:column; gap:0.45rem;">
+            <div class="room-active-row">
+                <div class="room-info">ROOM: <span id="roomDisplay"></span></div>
+                <button class="share-btn" onclick="shareRoom()">🔗 Share</button>
+            </div>
+            <div class="room-active-row">
+                <div id="partnerStatus">Waiting...</div>
+                <button class="btn-leave" onclick="leaveRoom()">LEAVE</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Speaker grille -->
-    <div class="grille" id="grille">
-        <script>for(let i=0;i<32;i++)document.write('<div class="grille-hole"></div>')</script>
-    </div>
+    <div class="grille" id="grille"></div>
 
-    <!-- Volume meter -->
     <div class="meter-wrap">
-        <span class="meter-label">VOL</span>
+        <span class="meter-label">TX</span>
         <div class="meter-bar-bg"><div class="meter-bar-fill" id="meterFill"></div></div>
     </div>
 
-    <!-- Channel / Volume knobs -->
     <div class="knob-row">
         <div class="knob-group">
-            <div class="knob" id="chKnob" title="Channel"></div>
+            <div class="knob" id="chanKnob"></div>
             <span class="knob-label">CHAN</span>
         </div>
         <div class="ptt-wrap">
             <span class="ptt-label">PTT</span>
-            <button class="ptt-btn" id="pttBtn">
+            <button class="ptt-btn" id="pttBtn" disabled>
                 <span class="ptt-icon">📡</span>
                 TALK
             </button>
         </div>
         <div class="knob-group">
-            <div class="knob" id="volKnob" title="Effect Strength"></div>
+            <div class="knob" id="volKnob"></div>
             <span class="knob-label">EFFECT</span>
         </div>
     </div>
 
-    <!-- Mode buttons -->
     <div class="mode-row">
         <button class="mode-btn active" id="modeRadio" onclick="setMode('radio')">RADIO</button>
         <button class="mode-btn" id="modeClear" onclick="setMode('clear')">CLEAR</button>
         <button class="mode-btn" id="modeBuzz" onclick="setMode('buzz')">BUZZ</button>
     </div>
 
-    <div id="mic-denied">🎤 Microphone access denied. Please allow mic in browser settings.</div>
-
-    <div class="tip">Hold TALK to transmit · Release to play back</div>
+    <div id="errMsg"></div>
+    <div class="tip">Hold TALK or SPACE to transmit</div>
 </div>
 
 <script>
-// ── State ────────────────────────────────────────────────────────────────────
-const CHANNELS = [
-    { ch:'01', freq:'462.550' }, { ch:'02', freq:'462.575' },
-    { ch:'03', freq:'462.600' }, { ch:'04', freq:'462.625' },
-    { ch:'05', freq:'462.650' }, { ch:'06', freq:'462.675' },
-    { ch:'07', freq:'462.700' }, { ch:'08', freq:'467.550' },
-];
+// Fill grille
+const grille = document.getElementById('grille');
+for (let i = 0; i < 32; i++) { const h = document.createElement('div'); h.className = 'grille-hole'; grille.appendChild(h); }
 
-let currentChannel = 0;
-let effectMode = 'radio'; // 'radio' | 'clear' | 'buzz'
-let effectStrength = 0.7; // 0..1
-let mediaRecorder = null;
-let audioChunks = [];
-let isRecording = false;
-let analyserNode = null;
-let meterAF = null;
-let micStream = null;
-let audioCtx = null;
+// ── State ─────────────────────────────────────────────────────────────────────
+let peer = null, localStream = null, mediaCall = null, dataConn = null;
+let remoteStream = null, remoteAudioEl = null, remoteCtx = null;
+let localCtx = null, localAnalyser = null, meterAF = null, uiCtx = null;
+let appState = 'idle', currentRoom = '', effectMode = 'radio', isTalking = false, isHost = false;
 
 // ── UI refs ───────────────────────────────────────────────────────────────────
-const pttBtn      = document.getElementById('pttBtn');
-const freqDisplay = document.getElementById('freqDisplay');
-const chDisplay   = document.getElementById('chDisplay');
-const statusLine  = document.getElementById('statusLine');
-const meterFill   = document.getElementById('meterFill');
-const signalBars  = document.getElementById('signalBars').children;
+const micSelect     = document.getElementById('micSelect');
+const spkSelect     = document.getElementById('spkSelect');
+const roomInput     = document.getElementById('roomInput');
+const pttBtn        = document.getElementById('pttBtn');
+const freqDisplay   = document.getElementById('freqDisplay');
+const statusLine    = document.getElementById('statusLine');
+const meterFill     = document.getElementById('meterFill');
+const signalBars    = document.getElementById('signalBars').children;
+const errMsg        = document.getElementById('errMsg');
+const connIdle      = document.getElementById('connIdle');
+const connActive    = document.getElementById('connActive');
+const roomDisplay   = document.getElementById('roomDisplay');
+const partnerStatus = document.getElementById('partnerStatus');
 
-// ── Channel knob ─────────────────────────────────────────────────────────────
-let chKnobAngle = 0;
-document.getElementById('chKnob').addEventListener('click', () => {
-    currentChannel = (currentChannel + 1) % CHANNELS.length;
-    chKnobAngle += 45;
-    document.getElementById('chKnob').style.transform = `rotate(${chKnobAngle}deg)`;
-    freqDisplay.textContent = CHANNELS[currentChannel].freq;
-    chDisplay.textContent   = CHANNELS[currentChannel].ch;
-    playClickSound(300, 0.04);
-    setStatus('STANDBY', '');
-});
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+    const hash = location.hash.slice(1).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+    if (hash) roomInput.value = hash;
 
-// ── Effect knob ───────────────────────────────────────────────────────────────
-let volKnobAngle = -60;
-document.getElementById('volKnob').style.transform = `rotate(${volKnobAngle}deg)`;
-document.getElementById('volKnob').addEventListener('click', () => {
-    effectStrength = effectStrength >= 0.9 ? 0.3 : effectStrength + 0.2;
-    const steps = (effectStrength - 0.3) / 0.2; // 0..3
-    volKnobAngle = -60 + steps * 40;
-    document.getElementById('volKnob').style.transform = `rotate(${volKnobAngle}deg)`;
-    playClickSound(500, 0.04);
-});
+    try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+        tmp.getTracks().forEach(t => t.stop());
+        await populateDevices();
+    } catch(e) {
+        showErr('Microphone access denied — allow mic and refresh.');
+    }
+}
 
-// ── Mode ──────────────────────────────────────────────────────────────────────
-function setMode(m) {
-    effectMode = m;
-    ['radio','clear','buzz'].forEach(id => {
-        document.getElementById('mode' + id.charAt(0).toUpperCase() + id.slice(1)).classList.toggle('active', id === m);
+async function populateDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    const spks = devices.filter(d => d.kind === 'audiooutput');
+    micSelect.innerHTML = mics.map((d,i) =>
+        `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i+1)}</option>`).join('');
+    if (spks.length) {
+        spkSelect.innerHTML = spks.map((d,i) =>
+            `<option value="${d.deviceId}">${d.label || 'Speaker ' + (i+1)}</option>`).join('');
+    }
+}
+
+// ── Room join ─────────────────────────────────────────────────────────────────
+async function joinRoom() {
+    const code = roomInput.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+    if (!code) { showErr('Enter a room code'); return; }
+    clearErr();
+    currentRoom = code;
+    setState('connecting');
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: micSelect.value ? { exact: micSelect.value } : undefined,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+            }
+        });
+        localStream.getAudioTracks().forEach(t => t.enabled = false);
+    } catch(e) {
+        setState('idle');
+        showErr('Microphone access failed');
+        return;
+    }
+
+    const hostId = 'dkwt2-' + code + '-h';
+    let tryPeer = new Peer(hostId, { debug: 0 });
+
+    tryPeer.on('open', () => {
+        peer = tryPeer;
+        isHost = true;
+        setState('waiting');
+
+        peer.on('connection', conn => {
+            if (dataConn) { conn.close(); return; }
+            dataConn = conn;
+            setupDataConn();
+        });
+        peer.on('call', call => {
+            if (mediaCall) { call.close(); return; }
+            mediaCall = call;
+            call.answer(localStream);
+            call.on('stream', s => { remoteStream = s; playRemote(s); setState('connected'); });
+            call.on('error', () => handleCallEnd());
+            call.on('close', () => handleCallEnd());
+        });
     });
-    playClickSound(400, 0.04);
+
+    tryPeer.on('error', err => {
+        if (err.type === 'unavailable-id') {
+            tryPeer.destroy();
+            joinAsGuest(code);
+        } else {
+            tryPeer.destroy();
+            setState('idle');
+            showErr('Connection error: ' + (err.message || err.type));
+            stopLocalStream();
+        }
+    });
 }
 
-// ── Status helper ─────────────────────────────────────────────────────────────
-function setStatus(text, cls) {
-    statusLine.textContent = text;
-    statusLine.className = 'status-line' + (cls ? ' ' + cls : '');
+function joinAsGuest(code) {
+    const hostId = 'dkwt2-' + code + '-h';
+    peer = new Peer(undefined, { debug: 0 });
+    isHost = false;
+
+    peer.on('open', () => {
+        setStatus('CONNECTING...', '');
+        dataConn = peer.connect(hostId, { reliable: true });
+        dataConn.on('open', () => {
+            setupDataConn();
+            mediaCall = peer.call(hostId, localStream);
+            mediaCall.on('stream', s => { remoteStream = s; playRemote(s); setState('connected'); });
+            mediaCall.on('error', () => handleCallEnd());
+            mediaCall.on('close', () => handleCallEnd());
+        });
+        dataConn.on('error', () => {
+            setState('idle');
+            showErr('Room not found — is the other device waiting?');
+            cleanup();
+        });
+    });
+    peer.on('error', err => {
+        setState('idle');
+        showErr('Error: ' + (err.message || err.type));
+        cleanup();
+    });
 }
 
-// ── Signal bars animation ─────────────────────────────────────────────────────
-function animateSignal(level) { // level 0..1
-    const lit = Math.round(level * 5);
-    for (let i = 0; i < 5; i++) {
-        signalBars[i].classList.toggle('active', i < lit);
+function setupDataConn() {
+    dataConn.on('data', d => {
+        if (d === 'TX') {
+            partnerStatus.textContent = '● PARTNER TALKING';
+            partnerStatus.style.color = '#ff6060';
+            animateSignal(1);
+        } else if (d === 'RX') {
+            partnerStatus.textContent = '● CONNECTED';
+            partnerStatus.style.color = '#30ff60';
+            animateSignal(0.6);
+        }
+    });
+    dataConn.on('close', () => { if (appState !== 'idle') handleCallEnd(); });
+}
+
+function handleCallEnd() {
+    if (appState === 'idle') return;
+    if (isTalking) stopTalking();
+    if (isHost) {
+        mediaCall = null; dataConn = null; remoteStream = null;
+        if (remoteAudioEl) { remoteAudioEl.srcObject = null; remoteAudioEl = null; }
+        if (remoteCtx) { try { remoteCtx.close(); } catch(e){} remoteCtx = null; }
+        setState('waiting');
+    } else {
+        setState('idle');
+        showErr('Disconnected from partner');
+        cleanup();
     }
 }
 
-// ── AudioContext lazy init ────────────────────────────────────────────────────
-function getAudioCtx() {
-    if (!audioCtx || audioCtx.state === 'closed') {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function leaveRoom() { setState('idle'); cleanup(); }
+
+function cleanup() {
+    if (isTalking) stopTalking();
+    if (mediaCall) { try { mediaCall.close(); } catch(e){} mediaCall = null; }
+    if (dataConn)  { try { dataConn.close();  } catch(e){} dataConn  = null; }
+    if (peer)      { try { peer.destroy();    } catch(e){} peer      = null; }
+    stopLocalStream();
+    if (remoteAudioEl) { remoteAudioEl.srcObject = null; remoteAudioEl = null; }
+    if (remoteCtx) { try { remoteCtx.close(); } catch(e){} remoteCtx = null; }
+    remoteStream = null;
+}
+
+function stopLocalStream() {
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+}
+
+// ── Remote audio ──────────────────────────────────────────────────────────────
+function playRemote(stream) {
+    if (remoteAudioEl) remoteAudioEl.srcObject = null;
+    if (remoteCtx) { try { remoteCtx.close(); } catch(e){} }
+
+    remoteCtx = new AudioContext();
+    if (remoteCtx.state === 'suspended') remoteCtx.resume();
+
+    const src = remoteCtx.createMediaStreamSource(stream);
+    let node = src;
+
+    if (effectMode === 'radio') {
+        const bp = remoteCtx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 0.8;
+        node.connect(bp); node = bp;
+        const dist = remoteCtx.createWaveShaper();
+        dist.curve = makeDistCurve(60); dist.oversample = '4x';
+        node.connect(dist); node = dist;
+        const comp = remoteCtx.createDynamicsCompressor();
+        comp.threshold.value = -20; comp.ratio.value = 8;
+        comp.attack.value = 0.001; comp.release.value = 0.05;
+        node.connect(comp); node = comp;
+    } else if (effectMode === 'buzz') {
+        const hp = remoteCtx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 300;
+        node.connect(hp); node = hp;
+        const dist = remoteCtx.createWaveShaper();
+        dist.curve = makeDistCurve(200); dist.oversample = '4x';
+        node.connect(dist); node = dist;
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
-}
 
-// ── Click/beep sounds ─────────────────────────────────────────────────────────
-function playClickSound(freq, dur) {
-    try {
-        const ctx = getAudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.12, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-        osc.start(); osc.stop(ctx.currentTime + dur);
-    } catch(e) {}
-}
+    const gain = remoteCtx.createGain();
+    gain.gain.value = 1.5;
+    node.connect(gain);
+    const dst = remoteCtx.createMediaStreamDestination();
+    gain.connect(dst);
 
-function playStaticBurst(duration, vol = 0.15) {
-    try {
-        const ctx = getAudioCtx();
-        const bufLen = ctx.sampleRate * duration;
-        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+    remoteAudioEl = new Audio();
+    remoteAudioEl.srcObject = dst.stream;
+    remoteAudioEl.autoplay = true;
 
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-
-        const bp = ctx.createBiquadFilter();
-        bp.type = 'bandpass'; bp.frequency.value = 2000; bp.Q.value = 0.5;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(vol, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-        src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
-        src.start(); src.stop(ctx.currentTime + duration);
-    } catch(e) {}
-}
-
-// ── Mic + recording ───────────────────────────────────────────────────────────
-async function getMicStream() {
-    if (micStream && micStream.active) return micStream;
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    return micStream;
-}
-
-async function startRecording() {
-    if (isRecording) return;
-    try {
-        const stream = await getMicStream();
-        document.getElementById('mic-denied').style.display = 'none';
-
-        isRecording = true;
-        audioChunks = [];
-        pttBtn.classList.add('pressed');
-        setStatus('TX ●', 'tx');
-        playStaticBurst(0.12, 0.2);
-        playClickSound(1200, 0.06);
-
-        // Volume meter while recording
-        const ctx = getAudioCtx();
-        const src = ctx.createMediaStreamSource(stream);
-        analyserNode = ctx.createAnalyser();
-        analyserNode.fftSize = 256;
-        src.connect(analyserNode);
-        startMeterLoop();
-
-        animateSignal(0.8);
-
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        mediaRecorder.start();
-    } catch(err) {
-        document.getElementById('mic-denied').style.display = 'block';
-        setStatus('MIC ERROR', '');
+    if (spkSelect.value && remoteAudioEl.setSinkId) {
+        remoteAudioEl.setSinkId(spkSelect.value).catch(() => {});
     }
+    remoteAudioEl.play().catch(() => {
+        showErr('Tap anywhere to activate audio');
+        const resume = () => { remoteAudioEl && remoteAudioEl.play(); clearErr(); };
+        document.addEventListener('click', resume, { once: true });
+        document.addEventListener('touchstart', resume, { once: true });
+    });
 }
 
-function stopRecording() {
-    if (!isRecording || !mediaRecorder) return;
-    isRecording = false;
+// ── PTT ───────────────────────────────────────────────────────────────────────
+function startTalking() {
+    if (isTalking || appState !== 'connected') return;
+    isTalking = true;
+    if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = true);
+    if (dataConn && dataConn.open) dataConn.send('TX');
+    pttBtn.classList.add('pressed');
+    setStatus('TX ●', 'tx');
+    playStaticBurst(0.1, 0.2);
+    playClickSound(1200, 0.06);
+    animateSignal(0.9);
+    startLocalMeter();
+}
+
+function stopTalking() {
+    if (!isTalking) return;
+    isTalking = false;
+    if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
+    if (dataConn && dataConn.open) dataConn.send('RX');
     pttBtn.classList.remove('pressed');
-
-    stopMeterLoop();
-    meterFill.style.width = '0%';
-
-    mediaRecorder.stop();
-    mediaRecorder.onstop = () => {
-        playStaticBurst(0.1, 0.18);
-        playClickSound(900, 0.05);
-        setStatus('RX ▶', 'rx');
-        animateSignal(0.6);
-        setTimeout(() => playback(), 150);
-    };
+    setStatus('CONNECTED', 'rx');
+    playStaticBurst(0.08, 0.15);
+    playClickSound(900, 0.05);
+    stopLocalMeter();
+    animateSignal(0.6);
 }
 
-// ── Volume meter ──────────────────────────────────────────────────────────────
-function startMeterLoop() {
-    if (!analyserNode) return;
-    const data = new Uint8Array(analyserNode.frequencyBinCount);
+// ── Local TX meter ────────────────────────────────────────────────────────────
+function startLocalMeter() {
+    if (!localStream) return;
+    if (!localCtx || localCtx.state === 'closed') localCtx = new AudioContext();
+    if (localCtx.state === 'suspended') localCtx.resume();
+    const src = localCtx.createMediaStreamSource(localStream);
+    localAnalyser = localCtx.createAnalyser();
+    localAnalyser.fftSize = 256;
+    src.connect(localAnalyser);
+    const data = new Uint8Array(localAnalyser.frequencyBinCount);
     function tick() {
-        analyserNode.getByteFrequencyData(data);
-        const avg = data.reduce((a,b) => a+b,0) / data.length;
-        meterFill.style.width = Math.min(avg / 128 * 140, 100) + '%';
+        localAnalyser.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0) / data.length;
+        meterFill.style.width = Math.min(avg / 128 * 160, 100) + '%';
         meterAF = requestAnimationFrame(tick);
     }
     meterAF = requestAnimationFrame(tick);
 }
-function stopMeterLoop() {
-    if (meterAF) cancelAnimationFrame(meterAF);
-    meterAF = null;
+function stopLocalMeter() {
+    if (meterAF) { cancelAnimationFrame(meterAF); meterAF = null; }
+    meterFill.style.width = '0%';
 }
 
-// ── Playback with radio effect ────────────────────────────────────────────────
-async function playback() {
-    if (audioChunks.length === 0) { setStatus('STANDBY', ''); return; }
+// ── State machine ─────────────────────────────────────────────────────────────
+function setState(s) {
+    appState = s;
+    connIdle.style.display   = s === 'idle' ? '' : 'none';
+    connActive.style.display = s !== 'idle' ? 'flex' : 'none';
+    pttBtn.disabled = s !== 'connected';
 
-    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-    const arrayBuf = await blob.arrayBuffer();
-    const ctx = getAudioCtx();
-
-    let decoded;
-    try { decoded = await ctx.decodeAudioData(arrayBuf); }
-    catch(e) { setStatus('STANDBY', ''); return; }
-
-    const src = ctx.createBufferSource();
-    src.buffer = decoded;
-
-    // Build effect chain
-    let node = src;
-
-    if (effectMode === 'radio') {
-        // Bandpass to simulate radio narrowband
-        const bp = ctx.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.value = 1100;
-        bp.Q.value = 0.6 + effectStrength * 0.8;
-        node.connect(bp); node = bp;
-
-        // Distortion / saturation
-        const dist = ctx.createWaveShaper();
-        dist.curve = makeDistCurve(80 * effectStrength);
-        dist.oversample = '4x';
-        node.connect(dist); node = dist;
-
-        // Compression
-        const comp = ctx.createDynamicsCompressor();
-        comp.threshold.value = -20;
-        comp.knee.value = 10;
-        comp.ratio.value = 8;
-        comp.attack.value = 0.001;
-        comp.release.value = 0.05;
-        node.connect(comp); node = comp;
-
-    } else if (effectMode === 'buzz') {
-        // Ring modulator style buzz
-        const osc = ctx.createOscillator();
-        osc.frequency.value = 60;
-        const ring = ctx.createGain();
-        ring.gain.value = 0;
-        osc.connect(ring.gain);
-        node.connect(ring); node = ring;
-        osc.start();
-
-        // High-pass to thin it out
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass'; hp.frequency.value = 400;
-        node.connect(hp); node = hp;
-
-        src.onended = () => osc.stop();
-    }
-    // 'clear' mode: no effect, just connect directly
-
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = 1.4;
-    node.connect(masterGain);
-    masterGain.connect(ctx.destination);
-
-    // Animate signal + meter during playback
-    const dur = decoded.duration;
-    animateSignal(1);
-    let elapsed = 0;
-    const step = 80;
-    const ticker = setInterval(() => {
-        elapsed += step;
-        const fake = 0.5 + 0.5 * Math.sin(elapsed / 120) * Math.random();
-        meterFill.style.width = (fake * 70) + '%';
-        animateSignal(0.4 + fake * 0.6);
-        if (elapsed >= dur * 1000) {
-            clearInterval(ticker);
-            meterFill.style.width = '0%';
+    switch (s) {
+        case 'idle':
+            setStatus('OFFLINE', ''); animateSignal(0);
+            freqDisplay.textContent = '---·---';
+            roomDisplay.textContent = '';
+            break;
+        case 'connecting':
+            setStatus('CONNECTING...', '');
+            roomDisplay.textContent = currentRoom;
+            partnerStatus.textContent = 'Connecting...';
+            partnerStatus.style.color = '#f0c030';
+            animateSignal(0.3);
+            break;
+        case 'waiting':
+            setStatus('WAITING...', '');
+            roomDisplay.textContent = currentRoom;
+            partnerStatus.textContent = 'Waiting for partner...';
+            partnerStatus.style.color = '#5a5e7a';
+            freqDisplay.textContent = calcFreq(currentRoom);
+            animateSignal(0.4);
+            break;
+        case 'connected':
+            setStatus('CONNECTED', 'rx');
+            roomDisplay.textContent = currentRoom;
+            partnerStatus.textContent = '● CONNECTED';
+            partnerStatus.style.color = '#30ff60';
+            freqDisplay.textContent = calcFreq(currentRoom);
             animateSignal(0.6);
-            setStatus('STANDBY', '');
-        }
-    }, step);
-
-    src.start();
+            playStaticBurst(0.15, 0.2);
+            playClickSound(800, 0.1);
+            break;
+    }
 }
 
+function calcFreq(code) {
+    let n = 0;
+    for (const c of code) n = (n * 31 + c.charCodeAt(0)) & 0xffff;
+    return '46' + (2 + (n % 6)) + '.' + String(500 + (n >> 4) % 200).padStart(3, '0');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setStatus(txt, cls) {
+    statusLine.textContent = txt;
+    statusLine.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+function animateSignal(level) {
+    const lit = Math.round(level * 5);
+    for (let i = 0; i < 5; i++) signalBars[i].classList.toggle('active', i < lit);
+}
+function showErr(m) { errMsg.textContent = m; }
+function clearErr() { errMsg.textContent = ''; }
+
+function setMode(m) {
+    effectMode = m;
+    ['Radio','Clear','Buzz'].forEach(id =>
+        document.getElementById('mode'+id).classList.toggle('active', id.toLowerCase() === m));
+    playClickSound(400, 0.04);
+    if (remoteStream) playRemote(remoteStream);
+}
+
+function shareRoom() {
+    const code = currentRoom || roomInput.value.trim().toUpperCase();
+    if (!code) { showErr('Enter a room code first'); return; }
+    const url = location.origin + location.pathname + '#' + code;
+    navigator.clipboard.writeText(url)
+        .then(() => {
+            const btns = document.querySelectorAll('.share-btn');
+            btns.forEach(b => { b.textContent = '✓ Copied!'; setTimeout(()=>b.textContent='🔗 Share',2000); });
+        })
+        .catch(() => prompt('Share this link:', url));
+}
+
+// ── Device change ─────────────────────────────────────────────────────────────
+micSelect.addEventListener('change', async () => {
+    if (!localStream || appState === 'idle') return;
+    try {
+        const ns = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: micSelect.value }, echoCancellation: true, noiseSuppression: true }
+        });
+        const oldT = localStream.getAudioTracks()[0];
+        const newT = ns.getAudioTracks()[0];
+        newT.enabled = isTalking;
+        if (mediaCall?.peerConnection) {
+            const sender = mediaCall.peerConnection.getSenders().find(s => s.track?.kind === 'audio');
+            if (sender) await sender.replaceTrack(newT);
+        }
+        localStream.removeTrack(oldT);
+        oldT.stop();
+        localStream.addTrack(newT);
+    } catch(e) { showErr('Could not switch microphone'); }
+});
+
+spkSelect.addEventListener('change', () => {
+    if (remoteAudioEl?.setSinkId) remoteAudioEl.setSinkId(spkSelect.value).catch(()=>{});
+});
+
+// ── Sound effects ─────────────────────────────────────────────────────────────
+function getUiCtx() {
+    if (!uiCtx || uiCtx.state === 'closed') uiCtx = new AudioContext();
+    if (uiCtx.state === 'suspended') uiCtx.resume();
+    return uiCtx;
+}
+function playClickSound(freq, dur) {
+    try {
+        const ctx = getUiCtx();
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0.12, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+        osc.start(); osc.stop(ctx.currentTime + dur);
+    } catch(e) {}
+}
+function playStaticBurst(dur, vol = 0.15) {
+    try {
+        const ctx = getUiCtx();
+        const len = Math.floor(ctx.sampleRate * dur);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=0.5;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vol, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+        src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+        src.start(); src.stop(ctx.currentTime + dur);
+    } catch(e) {}
+}
 function makeDistCurve(amount) {
-    const n = 256, curve = new Float32Array(n);
-    const deg = Math.PI / 180;
+    const n = 256, curve = new Float32Array(n), deg = Math.PI / 180;
     for (let i = 0; i < n; i++) {
         const x = (i * 2) / n - 1;
         curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x));
@@ -680,22 +844,34 @@ function makeDistCurve(amount) {
     return curve;
 }
 
-// ── PTT button events ─────────────────────────────────────────────────────────
-pttBtn.addEventListener('mousedown', e => { e.preventDefault(); startRecording(); });
-pttBtn.addEventListener('mouseup',   () => stopRecording());
-pttBtn.addEventListener('mouseleave',() => { if (isRecording) stopRecording(); });
+// ── PTT events ────────────────────────────────────────────────────────────────
+pttBtn.addEventListener('mousedown',  e => { e.preventDefault(); startTalking(); });
+pttBtn.addEventListener('mouseup',    () => stopTalking());
+pttBtn.addEventListener('mouseleave', () => { if (isTalking) stopTalking(); });
+pttBtn.addEventListener('touchstart', e => { e.preventDefault(); startTalking(); }, { passive: false });
+pttBtn.addEventListener('touchend',   e => { e.preventDefault(); stopTalking(); });
+pttBtn.addEventListener('touchcancel',e => { e.preventDefault(); stopTalking(); });
+document.addEventListener('keydown', e => { if (e.code==='Space' && !e.repeat) { e.preventDefault(); startTalking(); } });
+document.addEventListener('keyup',   e => { if (e.code==='Space') { e.preventDefault(); stopTalking(); } });
 
-pttBtn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, { passive: false });
-pttBtn.addEventListener('touchend',   e => { e.preventDefault(); stopRecording(); });
-pttBtn.addEventListener('touchcancel',e => { e.preventDefault(); stopRecording(); });
+// ── Room input ────────────────────────────────────────────────────────────────
+roomInput.addEventListener('input', e => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+});
+roomInput.addEventListener('keydown', e => { if (e.key==='Enter') joinRoom(); });
 
-// Space bar shortcut
-document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && !e.repeat && !isRecording) { e.preventDefault(); startRecording(); }
+// ── Decorative knobs ──────────────────────────────────────────────────────────
+let chanA = 0, volA = -60;
+document.getElementById('volKnob').style.transform = `rotate(${volA}deg)`;
+document.getElementById('chanKnob').addEventListener('click', () => {
+    chanA += 45; document.getElementById('chanKnob').style.transform = `rotate(${chanA}deg)`; playClickSound(350, 0.04);
 });
-document.addEventListener('keyup', e => {
-    if (e.code === 'Space') { e.preventDefault(); stopRecording(); }
+document.getElementById('volKnob').addEventListener('click', () => {
+    volA += 45; document.getElementById('volKnob').style.transform = `rotate(${volA}deg)`; playClickSound(500, 0.04);
 });
+
+window.addEventListener('beforeunload', cleanup);
+init();
 </script>
 </body>
 </html>
