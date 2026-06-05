@@ -377,12 +377,16 @@
                     <div class="step-text">Leave the frame empty, then click "Capture Background"</div>
                 </div>
                 <div class="step">
-                    <div class="step-num">Step 2</div>
-                    <div class="step-text">Walk into the frame — you will magically disappear!</div>
+                    <div class="step-num">Step 2 (optional)</div>
+                    <div class="step-text">Hold your object in position, step aside, then click "Capture Object" — it will stay floating!</div>
                 </div>
                 <div class="step">
                     <div class="step-num">Step 3</div>
-                    <div class="step-text">Record and download your vanishing clip.</div>
+                    <div class="step-text">Walk into the frame — you vanish, the object stays!</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">Step 4</div>
+                    <div class="step-text">Record and download your magic clip.</div>
                 </div>
             </div>
 
@@ -401,6 +405,11 @@
                 <div class="controls">
                     <button class="btn btn-gold" onclick="captureBackground()">📸 Capture Background</button>
                     <span id="vanish-bg-status" class="badge badge-gray">No background set</span>
+                </div>
+
+                <div class="controls" id="vanish-obj-controls" style="display:none">
+                    <button class="btn btn-outline" onclick="captureObjectFrame()">🪄 Capture Object</button>
+                    <span id="vanish-obj-status" class="badge badge-gray">No object set</span>
                 </div>
 
                 <div class="slider-row">
@@ -505,6 +514,7 @@ let colorPhase = 0;
 // Vanish live tab
 let vanishLoopId    = null;
 let vanishBgData    = null;
+let vanishObjData   = null;
 let vanishSens      = 25;
 let vanishShowOrig  = false;
 let vanishRecording = false;
@@ -774,32 +784,69 @@ function applyVanish() {
     const w = vanishCanvas.width, h = vanishCanvas.height;
     const frame = vanishCtx.getImageData(0, 0, w, h);
     const fd = frame.data, bd = vanishBgData.data;
-    const thresh = vanishSens * 3;
+    const thresh    = vanishSens * 3;
+    const od        = vanishObjData ? vanishObjData.data : null;
+    const objThresh = vanishSens * 2;
 
     for (let i = 0; i < fd.length; i += 4) {
         const dr = Math.abs(fd[i]   - bd[i]);
         const dg = Math.abs(fd[i+1] - bd[i+1]);
         const db = Math.abs(fd[i+2] - bd[i+2]);
+
         if (dr + dg + db > thresh) {
-            fd[i]   = bd[i];
-            fd[i+1] = bd[i+1];
-            fd[i+2] = bd[i+2];
+            if (od) {
+                // Check whether this pixel was part of the captured object
+                const odr = Math.abs(od[i]   - bd[i]);
+                const odg = Math.abs(od[i+1] - bd[i+1]);
+                const odb = Math.abs(od[i+2] - bd[i+2]);
+                if (odr + odg + odb > objThresh) {
+                    // Object pixel — keep it visible (show the captured object frame)
+                    fd[i]   = od[i];
+                    fd[i+1] = od[i+1];
+                    fd[i+2] = od[i+2];
+                } else {
+                    // Person pixel — replace with background
+                    fd[i]   = bd[i];
+                    fd[i+1] = bd[i+1];
+                    fd[i+2] = bd[i+2];
+                }
+            } else {
+                fd[i]   = bd[i];
+                fd[i+1] = bd[i+1];
+                fd[i+2] = bd[i+2];
+            }
         }
     }
     vanishCtx.putImageData(frame, 0, 0);
+}
+
+function captureObjectFrame() {
+    if (!videoEl || videoEl.readyState < 2) return;
+    vanishCtx.drawImage(videoEl, 0, 0, vanishCanvas.width, vanishCanvas.height);
+    vanishObjData = vanishCtx.getImageData(0, 0, vanishCanvas.width, vanishCanvas.height);
+    const st = document.getElementById('vanish-obj-status');
+    st.textContent = '✓ Object captured';
+    st.className   = 'badge badge-green';
 }
 
 function captureBackground() {
     if (!videoEl || videoEl.readyState < 2) return;
     const w = vanishCanvas.width, h = vanishCanvas.height;
     vanishCtx.drawImage(videoEl, 0, 0, w, h);
-    vanishBgData = vanishCtx.getImageData(0, 0, w, h);
+    vanishBgData  = vanishCtx.getImageData(0, 0, w, h);
+    vanishObjData = null;
 
     const st = document.getElementById('vanish-bg-status');
     st.textContent = '✓ Background captured';
     st.className   = 'badge badge-green';
-    document.getElementById('vanish-toggle-btn').style.display = '';
-    document.getElementById('vanish-rec-btn').style.display    = '';
+
+    const objSt = document.getElementById('vanish-obj-status');
+    objSt.textContent = 'No object set';
+    objSt.className   = 'badge badge-gray';
+
+    document.getElementById('vanish-obj-controls').style.display = '';
+    document.getElementById('vanish-toggle-btn').style.display   = '';
+    document.getElementById('vanish-rec-btn').style.display      = '';
 }
 
 function toggleVanishView() {
