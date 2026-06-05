@@ -374,18 +374,14 @@
             <div class="steps">
                 <div class="step">
                     <div class="step-num">Step 1</div>
-                    <div class="step-text">Leave the frame empty, then click "Capture Background"</div>
+                    <div class="step-text">Leave the frame completely empty, then click "Capture Background"</div>
                 </div>
                 <div class="step">
-                    <div class="step-num">Step 2 (optional)</div>
-                    <div class="step-text">Hold your object in position, step aside, then click "Capture Object" — it will stay floating!</div>
+                    <div class="step-num">Step 2</div>
+                    <div class="step-text">Walk in holding any object — AI removes only your body, the object moves freely!</div>
                 </div>
                 <div class="step">
                     <div class="step-num">Step 3</div>
-                    <div class="step-text">Walk into the frame — you vanish, the object stays!</div>
-                </div>
-                <div class="step">
-                    <div class="step-num">Step 4</div>
                     <div class="step-text">Record and download your magic clip.</div>
                 </div>
             </div>
@@ -402,14 +398,13 @@
                     <div class="rec-indicator" id="vanish-rec-badge">● REC</div>
                 </div>
 
+                <div style="text-align:center;margin:0.6rem 0">
+                    <span id="vanish-ml-status" class="badge badge-gray" style="display:none">Loading AI model…</span>
+                </div>
+
                 <div class="controls">
                     <button class="btn btn-gold" onclick="captureBackground()">📸 Capture Background</button>
                     <span id="vanish-bg-status" class="badge badge-gray">No background set</span>
-                </div>
-
-                <div class="controls" id="vanish-obj-controls" style="display:none">
-                    <button class="btn btn-outline" onclick="captureObjectFrame()">🪄 Capture Object</button>
-                    <span id="vanish-obj-status" class="badge badge-gray">No object set</span>
                 </div>
 
                 <div class="slider-row">
@@ -514,9 +509,9 @@ let colorPhase = 0;
 // Vanish live tab
 let vanishLoopId    = null;
 let vanishBgData    = null;
-let vanishObjData   = null;
 let vanishSens      = 25;
 let vanishShowOrig  = false;
+let segmenter       = null;
 let vanishRecording = false;
 let vanishMR        = null;
 let vanishChunks    = [];
@@ -552,7 +547,7 @@ async function startCamera(caller) {
         } else {
             document.getElementById('vanish-permission').style.display = 'none';
             document.getElementById('vanish-main').style.display = '';
-            startVanishLoop();
+            initMediaPipe();
         }
     } catch (err) {
         alert('Camera not available: ' + err.message);
@@ -769,84 +764,104 @@ function setFilmRecUI(active) {
 // ─────────────────────────────────────────────
 const vanishCanvas = document.getElementById('vanish-canvas');
 const vanishCtx    = vanishCanvas.getContext('2d', { willReadFrequently: true });
+// Off-screen canvas for compositing person removal
+const offCanvas = document.createElement('canvas');
+const offCtx    = offCanvas.getContext('2d');
+offCanvas.width  = 1280;
+offCanvas.height = 720;
 
+// ─────────────────────────────────────────────
+//  MediaPipe AI person removal
+// ─────────────────────────────────────────────
+async function initMediaPipe() {
+    if (typeof SelfieSegmentation === 'undefined') {
+        // CDN not available — fall back to pixel-diff
+        startVanishLoop(); return;
+    }
+    const statusEl = document.getElementById('vanish-ml-status');
+    statusEl.style.display = '';
+    try {
+        segmenter = new SelfieSegmentation({
+            locateFile: f =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`
+        });
+        segmenter.setOptions({ modelSelection: 1 });
+        segmenter.onResults(onSegmentResults);
+        await segmenter.initialize();
+        statusEl.style.display = 'none';
+        startVanishMLLoop();
+    } catch {
+        statusEl.style.display = 'none';
+        startVanishLoop(); // fallback
+    }
+}
+
+function onSegmentResults({ segmentationMask, image }) {
+    const w = vanishCanvas.width, h = vanishCanvas.height;
+    // Always show live camera first
+    vanishCtx.drawImage(image, 0, 0, w, h);
+    if (!vanishBgData || vanishShowOrig) return;
+
+    // Cut person out of frame using mask, composite over background
+    offCtx.clearRect(0, 0, w, h);
+    offCtx.drawImage(image, 0, 0, w, h);
+    offCtx.globalCompositeOperation = 'destination-out';
+    offCtx.drawImage(segmentationMask, 0, 0, w, h); // erases person area
+    offCtx.globalCompositeOperation = 'source-over';
+
+    vanishCtx.putImageData(vanishBgData, 0, 0);  // background fills person gap
+    vanishCtx.drawImage(offCanvas, 0, 0);         // camera minus person on top
+}
+
+function startVanishMLLoop() {
+    if (vanishLoopId) cancelAnimationFrame(vanishLoopId);
+    async function loop() {
+        if (videoEl && videoEl.readyState >= 2 && segmenter) {
+            await segmenter.send({ image: videoEl }).catch(() => {});
+        }
+        vanishLoopId = requestAnimationFrame(loop);
+    }
+    loop();
+}
+
+// Fallback: background-subtraction loop (used when MediaPipe can't load)
 function startVanishLoop() {
     if (vanishLoopId) cancelAnimationFrame(vanishLoopId);
     (function loop() {
         vanishLoopId = requestAnimationFrame(loop);
         if (!videoEl || videoEl.readyState < 2) return;
         vanishCtx.drawImage(videoEl, 0, 0, vanishCanvas.width, vanishCanvas.height);
-        if (vanishBgData && !vanishShowOrig) applyVanish();
+        if (vanishBgData && !vanishShowOrig) applyVanishFallback();
     })();
 }
 
-function applyVanish() {
+function applyVanishFallback() {
     const w = vanishCanvas.width, h = vanishCanvas.height;
     const frame = vanishCtx.getImageData(0, 0, w, h);
     const fd = frame.data, bd = vanishBgData.data;
-    const thresh    = vanishSens * 3;
-    const od        = vanishObjData ? vanishObjData.data : null;
-    const objThresh = vanishSens * 2;
-
+    const thresh = vanishSens * 3;
     for (let i = 0; i < fd.length; i += 4) {
         const dr = Math.abs(fd[i]   - bd[i]);
         const dg = Math.abs(fd[i+1] - bd[i+1]);
         const db = Math.abs(fd[i+2] - bd[i+2]);
-
         if (dr + dg + db > thresh) {
-            if (od) {
-                // Check whether this pixel was part of the captured object
-                const odr = Math.abs(od[i]   - bd[i]);
-                const odg = Math.abs(od[i+1] - bd[i+1]);
-                const odb = Math.abs(od[i+2] - bd[i+2]);
-                if (odr + odg + odb > objThresh) {
-                    // Object pixel — keep it visible (show the captured object frame)
-                    fd[i]   = od[i];
-                    fd[i+1] = od[i+1];
-                    fd[i+2] = od[i+2];
-                } else {
-                    // Person pixel — replace with background
-                    fd[i]   = bd[i];
-                    fd[i+1] = bd[i+1];
-                    fd[i+2] = bd[i+2];
-                }
-            } else {
-                fd[i]   = bd[i];
-                fd[i+1] = bd[i+1];
-                fd[i+2] = bd[i+2];
-            }
+            fd[i] = bd[i]; fd[i+1] = bd[i+1]; fd[i+2] = bd[i+2];
         }
     }
     vanishCtx.putImageData(frame, 0, 0);
-}
-
-function captureObjectFrame() {
-    if (!videoEl || videoEl.readyState < 2) return;
-    vanishCtx.drawImage(videoEl, 0, 0, vanishCanvas.width, vanishCanvas.height);
-    vanishObjData = vanishCtx.getImageData(0, 0, vanishCanvas.width, vanishCanvas.height);
-    const st = document.getElementById('vanish-obj-status');
-    st.textContent = '✓ Object captured';
-    st.className   = 'badge badge-green';
 }
 
 function captureBackground() {
     if (!videoEl || videoEl.readyState < 2) return;
     const w = vanishCanvas.width, h = vanishCanvas.height;
     vanishCtx.drawImage(videoEl, 0, 0, w, h);
-    vanishBgData  = vanishCtx.getImageData(0, 0, w, h);
-    vanishObjData = null;
+    vanishBgData = vanishCtx.getImageData(0, 0, w, h);
 
     const st = document.getElementById('vanish-bg-status');
     st.textContent = '✓ Background captured';
     st.className   = 'badge badge-green';
-
-    const objSt = document.getElementById('vanish-obj-status');
-    objSt.textContent = 'No object set';
-    objSt.className   = 'badge badge-gray';
-
-    document.getElementById('vanish-obj-controls').style.display = '';
-    document.getElementById('vanish-toggle-btn').style.display   = '';
-    document.getElementById('vanish-rec-btn').style.display      = '';
+    document.getElementById('vanish-toggle-btn').style.display = '';
+    document.getElementById('vanish-rec-btn').style.display    = '';
 }
 
 function toggleVanishView() {
@@ -996,5 +1011,6 @@ function renderClipList(listId, wrapId, clips, icon) {
         </div>`).join('');
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 </body>
 </html>
