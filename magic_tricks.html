@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Tricks — Davide's Workshop</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0d0f1a;
+            color: #e8e8e8;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .page-header {
+            background: #12152a;
+            border-bottom: 1px solid rgba(240,192,48,0.15);
+            padding: 0.7rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .back-btn {
+            color: #f0c030;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.88rem;
+            opacity: 0.8;
+            transition: opacity 0.15s;
+        }
+        .back-btn:hover { opacity: 1; }
+        .page-title { font-size: 1.15rem; font-weight: 800; color: #f0c030; }
+
+        /* ── Tabs ── */
+        .tab-bar {
+            display: flex;
+            background: #12152a;
+            border-bottom: 2px solid rgba(240,192,48,0.12);
+        }
+        .tab-btn {
+            padding: 13px 28px;
+            background: none;
+            border: none;
+            color: #9090b0;
+            font-size: 0.93rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .tab-btn:hover { color: #e8e8e8; }
+        .tab-btn.active { color: #f0c030; border-bottom-color: #f0c030; }
+
+        /* ── Content ── */
+        .content {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 5rem;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Canvas ── */
+        .canvas-wrap {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            border: 2px solid rgba(240,192,48,0.18);
+            aspect-ratio: 16/9;
+        }
+        .canvas-wrap canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 9px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.86rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.3px;
+        }
+        .btn-gold {
+            background: linear-gradient(135deg, #dca50c, #f0c030);
+            color: #0d0f1a;
+        }
+        .btn-gold:hover { filter: brightness(1.12); transform: translateY(-1px); }
+        .btn-gold:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+        .btn-red { background: #c0392b; color: #fff; }
+        .btn-red:hover { background: #e74c3c; }
+        .btn-outline {
+            background: transparent;
+            color: #9090b0;
+            border: 1px solid #3a3a5a;
+        }
+        .btn-outline:hover { color: #e8e8e8; border-color: #f0c030; }
+        .btn-outline.active {
+            color: #f0c030;
+            border-color: #f0c030;
+            background: rgba(240,192,48,0.08);
+        }
+
+        /* ── Controls ── */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 0.9rem;
+            justify-content: center;
+            align-items: center;
+        }
+        .effects-row {
+            display: flex;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 0.9rem;
+        }
+        .timer {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #e05050;
+            min-width: 52px;
+            text-align: center;
+        }
+
+        /* ── REC badge ── */
+        .rec-indicator {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: rgba(220,50,50,0.85);
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: none;
+            animation: blink-rec 1s step-end infinite;
+        }
+        .rec-indicator.on { display: block; }
+        @keyframes blink-rec { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── Countdown overlay ── */
+        .countdown-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 6rem;
+            font-weight: 900;
+            color: #f0c030;
+            text-shadow: 0 0 50px rgba(240,192,48,0.9);
+            background: rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+        .countdown-overlay.show { display: flex; }
+
+        /* ── Status badge ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-green { background: rgba(46,204,113,0.15); color: #2ecc71; }
+        .badge-gray  { background: rgba(144,144,176,0.12); color: #9090b0; }
+
+        /* ── Permission / loading state ── */
+        .permission-area {
+            text-align: center;
+            padding: 2.5rem 1rem;
+        }
+        .permission-area p { color: #9090b0; margin-bottom: 1.25rem; font-size: 0.9rem; }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #f0c030;
+            margin: 1.4rem 0 0.6rem;
+        }
+
+        /* ── Slider ── */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            margin: 0.8rem 0;
+        }
+        .slider-label { font-size: 0.82rem; color: #9090b0; min-width: 85px; }
+        input[type=range] { flex: 1; accent-color: #f0c030; max-width: 200px; }
+        .slider-val { font-size: 0.82rem; color: #f0c030; min-width: 28px; }
+
+        /* ── Steps ── */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 0.7rem;
+            margin: 0 0 1.4rem;
+        }
+        .step {
+            background: #161828;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            border-top: 3px solid #3498db;
+        }
+        .step-num {
+            font-size: 0.7rem;
+            color: #3498db;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.3rem;
+        }
+        .step-text { font-size: 0.8rem; color: #9090b0; line-height: 1.45; }
+
+        /* ── Info box ── */
+        .info-box {
+            background: #161828;
+            border-left: 3px solid #f0c030;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.83rem;
+            color: #9090b0;
+            line-height: 1.55;
+            margin: 0.75rem 0 1.2rem;
+        }
+
+        /* ── Sub-tabs (Vanish) ── */
+        .sub-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── Recordings list ── */
+        .recordings { margin-top: 1.4rem; }
+        .recordings h3 {
+            font-size: 0.8rem;
+            color: #9090b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.6rem;
+        }
+        .rec-item {
+            background: #161828;
+            border-radius: 8px;
+            padding: 0.65rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.45rem;
+        }
+        .rec-name { font-size: 0.85rem; }
+
+        /* ── Photo upload ── */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 0.5rem 0 1rem;
+        }
+        @media (max-width: 480px) { .photo-grid { grid-template-columns: 1fr; } }
+
+        .upload-area {
+            border: 2px dashed #3a3a5a;
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+        .upload-area:hover { border-color: #f0c030; }
+        .upload-area input[type=file] { display: none; }
+        .upload-icon { font-size: 2rem; }
+        .upload-text { font-size: 0.78rem; color: #9090b0; line-height: 1.4; }
+        .upload-preview {
+            width: 100%;
+            max-height: 130px;
+            object-fit: contain;
+            border-radius: 6px;
+            display: none;
+        }
+
+        /* ── Photo result ── */
+        #photo-result-wrap { margin-top: 1.5rem; }
+    </style>
+</head>
+<body>
+
+<div class="page-header">
+    <a class="back-btn" href="index.html">← Back</a>
+    <div class="page-title">✨ Magic Tricks</div>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('film')">🎩 Film Your Trick</button>
+    <button class="tab-btn" onclick="switchTab('vanish')">👻 Vanishing Act</button>
+</div>
+
+<div class="content">
+
+    <!-- ══════════════════ FILM TAB ══════════════════ -->
+    <div id="tab-film" class="tab-panel active">
+
+        <div id="film-permission" class="permission-area">
+            <div style="font-size:3rem;margin-bottom:0.75rem">🎩</div>
+            <p>Allow camera access to start filming your tricks</p>
+            <button class="btn btn-gold" onclick="startCamera('film')">Allow Camera</button>
+        </div>
+
+        <div id="film-main" style="display:none">
+            <div class="canvas-wrap" id="film-wrap">
+                <canvas id="film-canvas" width="1280" height="720"></canvas>
+                <div class="countdown-overlay" id="film-countdown"></div>
+                <div class="rec-indicator" id="film-rec-badge">● REC</div>
+            </div>
+
+            <div class="effects-row">
+                <button class="btn btn-outline active" id="fx-normal"   onclick="setEffect('normal')">📹 Normal</button>
+                <button class="btn btn-outline"        id="fx-sparkles" onclick="setEffect('sparkles')">✨ Sparkles</button>
+                <button class="btn btn-outline"        id="fx-mirror"   onclick="setEffect('mirror')">🪞 Mirror</button>
+                <button class="btn btn-outline"        id="fx-color"    onclick="setEffect('color')">🌈 Color</button>
+                <button class="btn btn-outline"        id="fx-trails"   onclick="setEffect('trails')">👻 Trails</button>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-gold" id="film-rec-btn" onclick="toggleFilmRec()">⏺ Record</button>
+                <span class="timer" id="film-timer"></span>
+            </div>
+
+            <div id="film-recordings" class="recordings" style="display:none">
+                <h3>Recordings</h3>
+                <div id="film-rec-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ VANISH TAB ══════════════════ -->
+    <div id="tab-vanish" class="tab-panel">
+
+        <div class="sub-tabs">
+            <button class="btn btn-outline active" id="vsub-live"  onclick="switchVanishMode('live')">📹 Live Camera</button>
+            <button class="btn btn-outline"        id="vsub-photo" onclick="switchVanishMode('photo')">🖼 Photo</button>
+        </div>
+
+        <!-- ── Live sub-mode ── -->
+        <div id="vanish-live">
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">Step 1</div>
+                    <div class="step-text">Leave the frame empty, then click "Capture Background"</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">Step 2</div>
+                    <div class="step-text">Walk into the frame — you will magically disappear!</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">Step 3</div>
+                    <div class="step-text">Record and download your vanishing clip.</div>
+                </div>
+            </div>
+
+            <div id="vanish-permission" class="permission-area">
+                <div style="font-size:3rem;margin-bottom:0.75rem">👻</div>
+                <p>Allow camera to start the vanishing act</p>
+                <button class="btn btn-gold" onclick="startCamera('vanish')">Allow Camera</button>
+            </div>
+
+            <div id="vanish-main" style="display:none">
+                <div class="canvas-wrap">
+                    <canvas id="vanish-canvas" width="1280" height="720"></canvas>
+                    <div class="rec-indicator" id="vanish-rec-badge">● REC</div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-gold" onclick="captureBackground()">📸 Capture Background</button>
+                    <span id="vanish-bg-status" class="badge badge-gray">No background set</span>
+                </div>
+
+                <div class="slider-row">
+                    <span class="slider-label">Sensitivity</span>
+                    <input type="range" id="vanish-sens" min="5" max="80" value="25"
+                           oninput="vanishSens=+this.value; document.getElementById('vanish-sens-val').textContent=this.value">
+                    <span class="slider-val" id="vanish-sens-val">25</span>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-outline" id="vanish-toggle-btn" onclick="toggleVanishView()" style="display:none">👁 Show Original</button>
+                    <button class="btn btn-gold"    id="vanish-rec-btn"    onclick="toggleVanishRec()"  style="display:none">⏺ Record</button>
+                    <span class="timer" id="vanish-timer"></span>
+                </div>
+
+                <div id="vanish-recordings" class="recordings" style="display:none">
+                    <h3>Recordings</h3>
+                    <div id="vanish-rec-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Photo sub-mode ── -->
+        <div id="vanish-photo" style="display:none">
+            <div class="info-box">
+                Upload two photos taken from the same spot — one with an empty background, and one with the person in frame. The tool will subtract the person out and leave just the background.
+            </div>
+
+            <div class="photo-grid">
+                <div>
+                    <div class="section-label">Background (empty scene)</div>
+                    <div class="upload-area" onclick="document.getElementById('up-bg').click()">
+                        <input type="file" id="up-bg" accept="image/*">
+                        <div id="up-bg-ph">
+                            <div class="upload-icon">🏠</div>
+                            <div class="upload-text">Click to upload<br>background photo</div>
+                        </div>
+                        <img id="up-bg-prev" class="upload-preview">
+                    </div>
+                </div>
+                <div>
+                    <div class="section-label">Scene (with person)</div>
+                    <div class="upload-area" onclick="document.getElementById('up-person').click()">
+                        <input type="file" id="up-person" accept="image/*">
+                        <div id="up-person-ph">
+                            <div class="upload-icon">🧙</div>
+                            <div class="upload-text">Click to upload<br>photo with person</div>
+                        </div>
+                        <img id="up-person-prev" class="upload-preview">
+                    </div>
+                </div>
+            </div>
+
+            <div class="slider-row">
+                <span class="slider-label">Sensitivity</span>
+                <input type="range" id="photo-sens" min="5" max="80" value="25"
+                       oninput="photoSens=+this.value; document.getElementById('photo-sens-val').textContent=this.value">
+                <span class="slider-val" id="photo-sens-val">25</span>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-gold" id="photo-remove-btn" onclick="removePersonPhoto()" disabled>✨ Remove Person</button>
+            </div>
+
+            <div id="photo-result-wrap" style="display:none">
+                <div class="section-label">Result</div>
+                <div class="canvas-wrap">
+                    <canvas id="photo-result"></canvas>
+                </div>
+                <div class="controls" style="margin-top:0.75rem">
+                    <button class="btn btn-outline" onclick="downloadPhoto()">⬇ Download</button>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tab-vanish -->
+</div><!-- /content -->
+
+<script>
+// ─────────────────────────────────────────────
+//  Shared state
+// ─────────────────────────────────────────────
+let camStream  = null;
+let videoEl    = null;
+let activeTab  = 'film';
+let vanishMode = 'live';
+
+// Film tab
+let filmEffect  = 'normal';
+let filmLoopId  = null;
+let filmRecording = false;
+let filmMR      = null;       // MediaRecorder
+let filmChunks  = [];
+let filmTimerIv = null;
+let filmSecs    = 0;
+let filmClips   = [];
+
+// Sparkles system
+let sparkles  = [];
+let colorPhase = 0;
+
+// Vanish live tab
+let vanishLoopId    = null;
+let vanishBgData    = null;
+let vanishSens      = 25;
+let vanishShowOrig  = false;
+let vanishRecording = false;
+let vanishMR        = null;
+let vanishChunks    = [];
+let vanishTimerIv   = null;
+let vanishSecs      = 0;
+let vanishClips     = [];
+
+// Photo tab
+let photoBg     = null;
+let photoPerson = null;
+let photoSens   = 25;
+
+// ─────────────────────────────────────────────
+//  Camera startup
+// ─────────────────────────────────────────────
+async function startCamera(caller) {
+    try {
+        camStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+            audio: true
+        });
+        videoEl = document.createElement('video');
+        videoEl.autoplay = true;
+        videoEl.playsInline = true;
+        videoEl.muted = true;
+        videoEl.srcObject = camStream;
+        await new Promise(r => videoEl.addEventListener('playing', r, { once: true }));
+
+        if (caller === 'film') {
+            document.getElementById('film-permission').style.display = 'none';
+            document.getElementById('film-main').style.display = '';
+            startFilmLoop();
+        } else {
+            document.getElementById('vanish-permission').style.display = 'none';
+            document.getElementById('vanish-main').style.display = '';
+            startVanishLoop();
+        }
+    } catch (err) {
+        alert('Camera not available: ' + err.message);
+    }
+}
+
+// ─────────────────────────────────────────────
+//  Tab / sub-tab switching
+// ─────────────────────────────────────────────
+function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (tab === 'film' && i === 0) || (tab === 'vanish' && i === 1));
+    });
+    document.getElementById('tab-film').classList.toggle('active', tab === 'film');
+    document.getElementById('tab-vanish').classList.toggle('active', tab === 'vanish');
+}
+
+function switchVanishMode(mode) {
+    vanishMode = mode;
+    document.getElementById('vsub-live').classList.toggle('active',  mode === 'live');
+    document.getElementById('vsub-photo').classList.toggle('active', mode === 'photo');
+    document.getElementById('vanish-live').style.display  = mode === 'live'  ? '' : 'none';
+    document.getElementById('vanish-photo').style.display = mode === 'photo' ? '' : 'none';
+}
+
+// ─────────────────────────────────────────────
+//  FILM TAB — render loop
+// ─────────────────────────────────────────────
+const filmCanvas = document.getElementById('film-canvas');
+const filmCtx    = filmCanvas.getContext('2d');
+
+function startFilmLoop() {
+    if (filmLoopId) cancelAnimationFrame(filmLoopId);
+    (function loop() {
+        filmLoopId = requestAnimationFrame(loop);
+        if (!videoEl || videoEl.readyState < 2) return;
+        renderFilmFrame();
+    })();
+}
+
+function renderFilmFrame() {
+    const w = filmCanvas.width, h = filmCanvas.height;
+
+    if (filmEffect === 'trails') {
+        // Fade old content then stamp new frame
+        filmCtx.save();
+        filmCtx.globalAlpha = 0.22;
+        filmCtx.fillStyle = '#000';
+        filmCtx.fillRect(0, 0, w, h);
+        filmCtx.globalAlpha = 0.88;
+        filmCtx.drawImage(videoEl, 0, 0, w, h);
+        filmCtx.restore();
+        return;
+    }
+
+    filmCtx.clearRect(0, 0, w, h);
+
+    if (filmEffect === 'mirror') {
+        filmCtx.save();
+        filmCtx.translate(w, 0);
+        filmCtx.scale(-1, 1);
+        filmCtx.drawImage(videoEl, 0, 0, w, h);
+        filmCtx.restore();
+    } else {
+        filmCtx.drawImage(videoEl, 0, 0, w, h);
+    }
+
+    if (filmEffect === 'sparkles') {
+        tickSparkles(w, h);
+        drawSparkles(filmCtx);
+    }
+
+    if (filmEffect === 'color') {
+        colorPhase = (colorPhase + 1.2) % 360;
+        filmCtx.save();
+        filmCtx.globalCompositeOperation = 'multiply';
+        filmCtx.fillStyle = `hsla(${colorPhase},100%,60%,0.38)`;
+        filmCtx.fillRect(0, 0, w, h);
+        filmCtx.restore();
+    }
+}
+
+// ─────────────────────────────────────────────
+//  Sparkles
+// ─────────────────────────────────────────────
+function tickSparkles(w, h) {
+    if (Math.random() < 0.35) {
+        sparkles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 3.5,
+            vy: -(Math.random() * 3.5 + 0.8),
+            life: 1,
+            size: Math.random() * 9 + 5,
+            gold: Math.random() < 0.6
+        });
+    }
+    for (let i = sparkles.length - 1; i >= 0; i--) {
+        const s = sparkles[i];
+        s.x  += s.vx;
+        s.y  += s.vy;
+        s.vy += 0.06;
+        s.life -= 0.022;
+        if (s.life <= 0) sparkles.splice(i, 1);
+    }
+}
+
+function drawSparkles(ctx) {
+    for (const s of sparkles) {
+        const color = s.gold ? '#f0c030' : '#ffffff';
+        ctx.save();
+        ctx.globalAlpha = s.life;
+        ctx.fillStyle   = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur  = 14;
+        ctx.translate(s.x, s.y);
+
+        // 4-pointed sparkle shape
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4;
+            const r = i % 2 === 0 ? s.size : s.size * 0.28;
+            i === 0
+                ? ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r)
+                : ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// ─────────────────────────────────────────────
+//  Effect selection
+// ─────────────────────────────────────────────
+function setEffect(name) {
+    filmEffect = name;
+    ['normal','sparkles','mirror','color','trails'].forEach(e =>
+        document.getElementById('fx-' + e).classList.toggle('active', e === name)
+    );
+    if (name !== 'sparkles') sparkles = [];
+    if (name !== 'trails')   filmCtx.clearRect(0, 0, filmCanvas.width, filmCanvas.height);
+}
+
+// ─────────────────────────────────────────────
+//  Film recording
+// ─────────────────────────────────────────────
+function toggleFilmRec() {
+    filmRecording ? stopFilmRec() : startFilmCountdown();
+}
+
+function startFilmCountdown() {
+    const btn = document.getElementById('film-rec-btn');
+    btn.disabled = true;
+    const cd = document.getElementById('film-countdown');
+    let count = 3;
+    cd.textContent = count;
+    cd.classList.add('show');
+    const iv = setInterval(() => {
+        count--;
+        if (count <= 0) {
+            clearInterval(iv);
+            cd.classList.remove('show');
+            btn.disabled = false;
+            startFilmRec();
+        } else {
+            cd.textContent = count;
+        }
+    }, 1000);
+}
+
+function startFilmRec() {
+    const cs = filmCanvas.captureStream(30);
+    camStream?.getAudioTracks().forEach(t => cs.addTrack(t));
+    const mime = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+        .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    filmMR = new MediaRecorder(cs, mime ? { mimeType: mime } : {});
+    filmChunks = [];
+    filmMR.ondataavailable = e => { if (e.data.size > 0) filmChunks.push(e.data); };
+    filmMR.onstop = () => {
+        const url  = URL.createObjectURL(new Blob(filmChunks, { type: 'video/webm' }));
+        const name = 'trick-' + (filmClips.length + 1) + '.webm';
+        filmClips.push({ url, name });
+        renderClipList('film-rec-list', 'film-recordings', filmClips, '🎬');
+    };
+    filmMR.start(100);
+    filmRecording = true;
+    filmSecs = 0;
+    setFilmRecUI(true);
+    filmTimerIv = setInterval(() => {
+        filmSecs++;
+        document.getElementById('film-timer').textContent = fmtTime(filmSecs);
+    }, 1000);
+}
+
+function stopFilmRec() {
+    filmMR?.stop();
+    filmRecording = false;
+    clearInterval(filmTimerIv);
+    document.getElementById('film-timer').textContent = '';
+    setFilmRecUI(false);
+}
+
+function setFilmRecUI(active) {
+    const btn = document.getElementById('film-rec-btn');
+    btn.textContent = active ? '⏹ Stop' : '⏺ Record';
+    btn.className   = 'btn ' + (active ? 'btn-red' : 'btn-gold');
+    document.getElementById('film-rec-badge').classList.toggle('on', active);
+}
+
+// ─────────────────────────────────────────────
+//  VANISH TAB — live loop
+// ─────────────────────────────────────────────
+const vanishCanvas = document.getElementById('vanish-canvas');
+const vanishCtx    = vanishCanvas.getContext('2d', { willReadFrequently: true });
+
+function startVanishLoop() {
+    if (vanishLoopId) cancelAnimationFrame(vanishLoopId);
+    (function loop() {
+        vanishLoopId = requestAnimationFrame(loop);
+        if (!videoEl || videoEl.readyState < 2) return;
+        vanishCtx.drawImage(videoEl, 0, 0, vanishCanvas.width, vanishCanvas.height);
+        if (vanishBgData && !vanishShowOrig) applyVanish();
+    })();
+}
+
+function applyVanish() {
+    const w = vanishCanvas.width, h = vanishCanvas.height;
+    const frame = vanishCtx.getImageData(0, 0, w, h);
+    const fd = frame.data, bd = vanishBgData.data;
+    const thresh = vanishSens * 3;
+
+    for (let i = 0; i < fd.length; i += 4) {
+        const dr = Math.abs(fd[i]   - bd[i]);
+        const dg = Math.abs(fd[i+1] - bd[i+1]);
+        const db = Math.abs(fd[i+2] - bd[i+2]);
+        if (dr + dg + db > thresh) {
+            fd[i]   = bd[i];
+            fd[i+1] = bd[i+1];
+            fd[i+2] = bd[i+2];
+        }
+    }
+    vanishCtx.putImageData(frame, 0, 0);
+}
+
+function captureBackground() {
+    if (!videoEl || videoEl.readyState < 2) return;
+    const w = vanishCanvas.width, h = vanishCanvas.height;
+    vanishCtx.drawImage(videoEl, 0, 0, w, h);
+    vanishBgData = vanishCtx.getImageData(0, 0, w, h);
+
+    const st = document.getElementById('vanish-bg-status');
+    st.textContent = '✓ Background captured';
+    st.className   = 'badge badge-green';
+    document.getElementById('vanish-toggle-btn').style.display = '';
+    document.getElementById('vanish-rec-btn').style.display    = '';
+}
+
+function toggleVanishView() {
+    vanishShowOrig = !vanishShowOrig;
+    document.getElementById('vanish-toggle-btn').textContent =
+        vanishShowOrig ? '✨ Show Magic' : '👁 Show Original';
+}
+
+// ─────────────────────────────────────────────
+//  Vanish recording
+// ─────────────────────────────────────────────
+function toggleVanishRec() {
+    vanishRecording ? stopVanishRec() : startVanishRec();
+}
+
+function startVanishRec() {
+    const cs = vanishCanvas.captureStream(30);
+    camStream?.getAudioTracks().forEach(t => cs.addTrack(t));
+    const mime = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+        .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    vanishMR = new MediaRecorder(cs, mime ? { mimeType: mime } : {});
+    vanishChunks = [];
+    vanishMR.ondataavailable = e => { if (e.data.size > 0) vanishChunks.push(e.data); };
+    vanishMR.onstop = () => {
+        const url  = URL.createObjectURL(new Blob(vanishChunks, { type: 'video/webm' }));
+        const name = 'vanish-' + (vanishClips.length + 1) + '.webm';
+        vanishClips.push({ url, name });
+        renderClipList('vanish-rec-list', 'vanish-recordings', vanishClips, '👻');
+    };
+    vanishMR.start(100);
+    vanishRecording = true;
+    vanishSecs = 0;
+    setVanishRecUI(true);
+    vanishTimerIv = setInterval(() => {
+        vanishSecs++;
+        document.getElementById('vanish-timer').textContent = fmtTime(vanishSecs);
+    }, 1000);
+}
+
+function stopVanishRec() {
+    vanishMR?.stop();
+    vanishRecording = false;
+    clearInterval(vanishTimerIv);
+    document.getElementById('vanish-timer').textContent = '';
+    setVanishRecUI(false);
+}
+
+function setVanishRecUI(active) {
+    const btn = document.getElementById('vanish-rec-btn');
+    btn.textContent = active ? '⏹ Stop' : '⏺ Record';
+    btn.className   = 'btn ' + (active ? 'btn-red' : 'btn-gold');
+    document.getElementById('vanish-rec-badge').classList.toggle('on', active);
+}
+
+// ─────────────────────────────────────────────
+//  Photo mode — remove person from still images
+// ─────────────────────────────────────────────
+document.getElementById('up-bg').onchange = function() { loadPhotoImg(this, 'bg'); };
+document.getElementById('up-person').onchange = function() { loadPhotoImg(this, 'person'); };
+
+function loadPhotoImg(input, which) {
+    if (!input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            if (which === 'bg') photoBg = img;
+            else                photoPerson = img;
+            const prevEl = document.getElementById('up-' + which + '-prev');
+            const phEl   = document.getElementById('up-' + which + '-ph');
+            prevEl.src = e.target.result;
+            prevEl.style.display = 'block';
+            phEl.style.display   = 'none';
+            if (photoBg && photoPerson)
+                document.getElementById('photo-remove-btn').disabled = false;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function removePersonPhoto() {
+    if (!photoBg || !photoPerson) return;
+
+    const maxDim = 1200;
+    const scale = Math.min(1, maxDim / Math.max(photoBg.naturalWidth, photoBg.naturalHeight));
+    const cw = Math.floor(photoBg.naturalWidth  * scale);
+    const ch = Math.floor(photoBg.naturalHeight * scale);
+
+    const mkCanvas = img => {
+        const c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        c.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        return c.getContext('2d').getImageData(0, 0, cw, ch);
+    };
+
+    const bd = mkCanvas(photoBg).data;
+    const pd = mkCanvas(photoPerson).data;
+
+    const resultCanvas = document.getElementById('photo-result');
+    resultCanvas.width = cw;
+    resultCanvas.height = ch;
+    const rCtx = resultCanvas.getContext('2d');
+    const res  = rCtx.createImageData(cw, ch);
+    const rd   = res.data;
+    const thresh = photoSens * 3;
+
+    for (let i = 0; i < rd.length; i += 4) {
+        const dr = Math.abs(pd[i]   - bd[i]);
+        const dg = Math.abs(pd[i+1] - bd[i+1]);
+        const db = Math.abs(pd[i+2] - bd[i+2]);
+        if (dr + dg + db > thresh) {
+            // Pixel differs → this is the person → show background
+            rd[i] = bd[i]; rd[i+1] = bd[i+1]; rd[i+2] = bd[i+2];
+        } else {
+            rd[i] = pd[i]; rd[i+1] = pd[i+1]; rd[i+2] = pd[i+2];
+        }
+        rd[i+3] = 255;
+    }
+    rCtx.putImageData(res, 0, 0);
+    document.getElementById('photo-result-wrap').style.display = '';
+}
+
+function downloadPhoto() {
+    const a = document.createElement('a');
+    a.href     = document.getElementById('photo-result').toDataURL('image/png');
+    a.download = 'magic-removal.png';
+    a.click();
+}
+
+// ─────────────────────────────────────────────
+//  Shared helpers
+// ─────────────────────────────────────────────
+function fmtTime(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function renderClipList(listId, wrapId, clips, icon) {
+    const wrap = document.getElementById(wrapId);
+    const list = document.getElementById(listId);
+    if (!clips.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    list.innerHTML = clips.map(c => `
+        <div class="rec-item">
+            <span class="rec-name">${icon} ${c.name}</span>
+            <a class="btn btn-outline" href="${c.url}" download="${c.name}">⬇ Download</a>
+        </div>`).join('');
+}
+</script>
+</body>
+</html>
