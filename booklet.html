@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Maker — Davide's Workshop</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0d0f1a; color: #e8e8e8; min-height: 100vh; }
+
+        .back-link {
+            position: fixed; top: 16px; left: 16px;
+            color: #f0c030; text-decoration: none; font-weight: 700;
+            font-size: 0.9rem; opacity: 0.7; transition: opacity 0.2s; z-index: 200;
+        }
+        .back-link:hover { opacity: 1; }
+
+        /* ── Setup ── */
+        #setup {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 100vh; gap: 1.8rem; padding: 2rem;
+        }
+        #setup h1 { font-size: 2.2rem; color: #f0c030; letter-spacing: -0.5px; }
+        #setup p { color: #9090b0; text-align: center; max-width: 420px; line-height: 1.6; font-size: 0.95rem; }
+        .field-group { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+        .field-group label { font-size: 0.88rem; color: #b0b0d0; font-weight: 600; }
+        input[type="number"] {
+            background: #161828; border: 1.5px solid #2e3148; color: #f0c030;
+            border-radius: 10px; padding: 0.65rem 1.2rem; font-size: 1.4rem;
+            width: 130px; text-align: center; font-weight: 700;
+        }
+        input[type="number"]:focus { outline: none; border-color: #f0c030; }
+        .hint { font-size: 0.78rem; color: #5a5e7a; }
+
+        .btn-gold {
+            background: #f0c030; color: #0d0f1a; border: none; border-radius: 10px;
+            padding: 0.7rem 2.2rem; font-size: 1rem; font-weight: 700;
+            cursor: pointer; transition: filter 0.15s, transform 0.1s;
+        }
+        .btn-gold:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* ── App shell ── */
+        #app { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+        #app.visible { display: flex; }
+
+        .topbar {
+            height: 52px; background: #12152a; border-bottom: 1px solid #2e3148;
+            display: flex; align-items: center; padding: 0 1rem 0 4.5rem; gap: 0.75rem; flex-shrink: 0;
+        }
+        .topbar-title { color: #f0c030; font-weight: 700; font-size: 0.95rem; }
+        .tab-group { display: flex; gap: 0.2rem; margin-left: 0.5rem; }
+        .tab-btn {
+            background: transparent; border: none; color: #9090b0; padding: 0.4rem 0.9rem;
+            border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+            transition: background 0.15s, color 0.15s;
+        }
+        .tab-btn:hover { background: #1e2040; color: #e8e8e8; }
+        .tab-btn.active { background: #2e3148; color: #f0c030; }
+        .topbar-spacer { flex: 1; }
+        .btn-sm {
+            border: 1.5px solid #2e3148; background: transparent; color: #b0b0d0;
+            border-radius: 8px; padding: 0.32rem 0.85rem; font-size: 0.82rem;
+            cursor: pointer; transition: border-color 0.15s, color 0.15s;
+        }
+        .btn-sm:hover { border-color: #9090b0; color: #e8e8e8; }
+        .btn-print {
+            background: #f0c030; color: #0d0f1a; border: none; border-radius: 8px;
+            padding: 0.35rem 1rem; font-size: 0.85rem; font-weight: 700;
+            cursor: pointer; transition: filter 0.15s;
+        }
+        .btn-print:hover { filter: brightness(1.1); }
+
+        /* ── Edit tab ── */
+        #edit-tab { flex: 1; display: flex; overflow: hidden; }
+
+        .sidebar {
+            width: 108px; background: #0d0f1a; border-right: 1px solid #2e3148;
+            overflow-y: auto; padding: 0.6rem 0.45rem; display: flex;
+            flex-direction: column; gap: 0.45rem; flex-shrink: 0;
+        }
+        .sidebar-label {
+            font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1.5px;
+            color: #4a4e6a; font-weight: 700; padding: 0 0.25rem; margin-bottom: 0.15rem;
+        }
+        .page-thumb {
+            width: 100%; aspect-ratio: 1 / 1.414; border-radius: 5px;
+            border: 2px solid #2e3148; cursor: pointer; overflow: hidden;
+            position: relative; transition: border-color 0.15s, transform 0.1s; flex-shrink: 0;
+        }
+        .page-thumb:hover { border-color: #5a5e7a; transform: scale(1.02); }
+        .page-thumb.active { border-color: #f0c030; }
+        .thumb-inner { width: 100%; height: 100%; padding: 3px 4px; display: flex; flex-direction: column; overflow: hidden; }
+        .thumb-text { font-size: 0.3rem; line-height: 1.3; flex: 1; overflow: hidden; word-break: break-word; white-space: pre-wrap; }
+        .thumb-num { font-size: 0.5rem; font-weight: 700; opacity: 0.45; text-align: right; }
+
+        .edit-main { flex: 1; display: flex; flex-direction: column; padding: 1rem 1.5rem; gap: 0.75rem; overflow: hidden; }
+
+        .toolbar {
+            display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap;
+            background: #12152a; border-radius: 10px; padding: 0.6rem 1rem;
+            border: 1px solid #2e3148; flex-shrink: 0;
+        }
+        .tool-group { display: flex; align-items: center; gap: 0.4rem; }
+        .tool-label { font-size: 0.75rem; color: #6a6e8a; font-weight: 600; }
+        input[type="color"] {
+            width: 30px; height: 26px; border: 1.5px solid #2e3148;
+            border-radius: 5px; cursor: pointer; background: transparent; padding: 2px;
+        }
+        input[type="range"] { width: 76px; accent-color: #f0c030; }
+        .size-val { font-size: 0.74rem; color: #9090b0; min-width: 26px; }
+        select.tool-select {
+            background: #0d0f1a; border: 1.5px solid #2e3148; color: #e8e8e8;
+            border-radius: 6px; padding: 0.22rem 0.5rem; font-size: 0.8rem;
+        }
+
+        .page-area {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            background: #0a0c1a; border-radius: 12px; overflow: hidden; min-height: 0;
+        }
+        .page-display {
+            aspect-ratio: 1 / 1.414; max-height: 92%; max-width: 55%;
+            border-radius: 4px; box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+        .page-display textarea {
+            flex: 1; border: none; resize: none; outline: none;
+            background: transparent; padding: 1.2rem; font-family: inherit; width: 100%;
+        }
+
+        .page-nav { display: flex; align-items: center; gap: 0.7rem; flex-shrink: 0; }
+        .btn-nav {
+            background: #12152a; border: 1px solid #2e3148; color: #9090b0;
+            border-radius: 6px; width: 28px; height: 28px; cursor: pointer;
+            font-size: 1rem; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-nav:hover { background: #1e2040; color: #e8e8e8; }
+        .page-indicator { font-size: 0.85rem; color: #6a6e8a; }
+
+        /* ── Preview tab ── */
+        #preview-tab { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        #preview-tab.visible { display: flex; }
+
+        .preview-info {
+            padding: 0.7rem 1.5rem; font-size: 0.8rem; color: #6a6e8a;
+            background: #12152a; border-bottom: 1px solid #2e3148; flex-shrink: 0; line-height: 1.5;
+        }
+        .preview-info strong { color: #f0c030; }
+
+        .sheets-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+
+        .sheet-card { background: #12152a; border-radius: 12px; overflow: hidden; border: 1px solid #2e3148; }
+        .sheet-label {
+            font-size: 0.7rem; color: #5a5e7a; padding: 0.45rem 1rem; font-weight: 700;
+            letter-spacing: 1px; text-transform: uppercase; background: #0d0f1a; border-bottom: 1px solid #2e3148;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .sheet-label span { color: #3a4060; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 0.68rem; }
+        .sheet-pages { display: flex; width: 100%; height: 160px; }
+        .sheet-half {
+            flex: 1; padding: 0.8rem 1rem; overflow: hidden; display: flex; flex-direction: column;
+        }
+        .sheet-half.left-half { border-right: 1px dashed #3a3e5a; }
+        .sheet-pg-num { font-size: 0.62rem; color: #5a5e7a; font-weight: 700; margin-bottom: 0.4rem; }
+        .sheet-pg-text { font-size: 0.68rem; line-height: 1.4; overflow: hidden; flex: 1; white-space: pre-wrap; word-break: break-word; }
+        .sheet-note { font-size: 0.65rem; color: #3a3e5a; padding: 0.3rem 1rem; text-align: center; font-style: italic; }
+
+        /* ── Print ── */
+        @media print {
+            @page { size: A4 landscape; margin: 0; }
+            html, body { margin: 0; padding: 0; background: white; }
+            .back-link, #setup, #app { display: none !important; }
+            #print-view { display: block !important; }
+
+            .print-sheet {
+                width: 100%; height: 100vh;
+                display: flex; flex-direction: row;
+                page-break-after: always; break-after: page; overflow: hidden;
+            }
+            .print-sheet:last-child { page-break-after: avoid; break-after: avoid; }
+
+            .print-half {
+                width: 50%; height: 100%; padding: 14mm 16mm;
+                box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column;
+            }
+            .print-half.print-left { border-right: 0.5pt dashed #bbb; }
+
+            .print-content { flex: 1; white-space: pre-wrap; word-break: break-word; overflow: hidden; }
+            .print-page-num { font-size: 7pt; color: #aaa; text-align: center; margin-top: 6mm; }
+
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+
+<a class="back-link" href="index.html">← Workshop</a>
+
+<!-- ── SETUP ── -->
+<div id="setup">
+    <h1>📖 Book Maker</h1>
+    <p>Design pages for a foldable booklet. Each landscape print sheet holds two pages in the correct order. Fold each sheet in half (right side over left), then nest them from innermost to outermost to assemble your book.</p>
+    <div class="field-group">
+        <label for="page-count">Number of pages</label>
+        <input type="number" id="page-count" value="8" min="4" max="64" step="2">
+        <span class="hint">Must be even — odd numbers will be rounded up</span>
+    </div>
+    <button class="btn-gold" onclick="startBook()">Create Book →</button>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+    <div class="topbar">
+        <span class="topbar-title">📖 Book Maker</span>
+        <div class="tab-group">
+            <button class="tab-btn active" id="tab-edit-btn" onclick="showTab('edit')">Edit Pages</button>
+            <button class="tab-btn" id="tab-preview-btn" onclick="showTab('preview')">Sheet Order</button>
+        </div>
+        <div class="topbar-spacer"></div>
+        <button class="btn-sm" onclick="newBook()">New Book</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print Booklet</button>
+    </div>
+
+    <!-- Edit tab -->
+    <div id="edit-tab">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-label">Pages</div>
+        </div>
+        <div class="edit-main">
+            <div class="toolbar">
+                <div class="tool-group">
+                    <span class="tool-label">BG</span>
+                    <input type="color" id="bg-color" value="#ffffff" oninput="applyTool()">
+                </div>
+                <div class="tool-group">
+                    <span class="tool-label">Text</span>
+                    <input type="color" id="text-color" value="#000000" oninput="applyTool()">
+                </div>
+                <div class="tool-group">
+                    <span class="tool-label">Size</span>
+                    <input type="range" id="font-size" min="10" max="60" value="18" oninput="applyTool()">
+                    <span class="size-val" id="size-val">18</span>
+                </div>
+                <div class="tool-group">
+                    <span class="tool-label">Align</span>
+                    <select class="tool-select" id="text-align" onchange="applyTool()">
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                    </select>
+                </div>
+                <div class="tool-group">
+                    <span class="tool-label">Font</span>
+                    <select class="tool-select" id="font-family" onchange="applyTool()">
+                        <option value="'Segoe UI',Arial,sans-serif">Sans</option>
+                        <option value="Georgia,serif">Serif</option>
+                        <option value="'Courier New',monospace">Mono</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="page-area">
+                <div class="page-display" id="page-display">
+                    <textarea id="page-text" placeholder="Write page content here…" oninput="applyTool()"></textarea>
+                </div>
+            </div>
+
+            <div class="page-nav">
+                <button class="btn-nav" onclick="goPage(-1)">‹</button>
+                <span class="page-indicator" id="page-indicator">Page 1 of 8</span>
+                <button class="btn-nav" onclick="goPage(1)">›</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview tab -->
+    <div id="preview-tab">
+        <div class="preview-info">
+            <strong>How to assemble:</strong> Print all sheets · Fold each sheet in half (bring right edge to left edge, printed side out) · Stack from innermost sheet outward · Staple or bind on the left edge.
+        </div>
+        <div class="sheets-scroll" id="sheets-scroll"></div>
+    </div>
+</div>
+
+<!-- Print-only view -->
+<div id="print-view" style="display:none;"></div>
+
+<script>
+let pages = [];
+let cur = 0;
+
+function startBook() {
+    let n = parseInt(document.getElementById('page-count').value) || 8;
+    n = Math.max(4, n);
+    if (n % 2 !== 0) n++;
+
+    pages = Array.from({ length: n }, () => ({
+        text: '', bg: '#ffffff', color: '#000000',
+        size: 18, align: 'left', font: "'Segoe UI',Arial,sans-serif"
+    }));
+    cur = 0;
+
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    renderSidebar();
+    loadPage(0);
+    rebuildPrintView();
+}
+
+function newBook() {
+    if (!confirm('Start a new book? All content will be lost.')) return;
+    pages = [];
+    cur = 0;
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('setup').style.display = '';
+    document.getElementById('print-view').innerHTML = '';
+    showTab('edit');
+}
+
+function showTab(tab) {
+    const isEdit = tab === 'edit';
+    document.getElementById('edit-tab').style.display = isEdit ? 'flex' : 'none';
+    document.getElementById('preview-tab').classList.toggle('visible', !isEdit);
+    document.getElementById('tab-edit-btn').classList.toggle('active', isEdit);
+    document.getElementById('tab-preview-btn').classList.toggle('active', !isEdit);
+    if (!isEdit) { savePage(); renderPreviewTab(); }
+}
+
+/* ── Sidebar ── */
+function renderSidebar() {
+    const sb = document.getElementById('sidebar');
+    sb.innerHTML = '<div class="sidebar-label">Pages</div>';
+    pages.forEach((p, i) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'page-thumb' + (i === cur ? ' active' : '');
+        thumb.style.background = p.bg;
+        const inner = document.createElement('div');
+        inner.className = 'thumb-inner';
+        inner.style.color = p.color;
+        const txt = document.createElement('div');
+        txt.className = 'thumb-text';
+        txt.style.fontFamily = p.font;
+        txt.textContent = p.text.substring(0, 100);
+        const num = document.createElement('div');
+        num.className = 'thumb-num';
+        num.textContent = i + 1;
+        num.style.color = p.color;
+        inner.append(txt, num);
+        thumb.appendChild(inner);
+        thumb.addEventListener('click', () => { savePage(); loadPage(i); });
+        sb.appendChild(thumb);
+    });
+}
+
+/* ── Page load / save ── */
+function loadPage(i) {
+    cur = i;
+    const p = pages[i];
+    document.getElementById('bg-color').value = p.bg;
+    document.getElementById('text-color').value = p.color;
+    document.getElementById('font-size').value = p.size;
+    document.getElementById('size-val').textContent = p.size;
+    document.getElementById('text-align').value = p.align;
+    document.getElementById('font-family').value = p.font;
+    document.getElementById('page-text').value = p.text;
+    document.getElementById('page-indicator').textContent = `Page ${i + 1} of ${pages.length}`;
+    applyDisplay();
+    document.querySelectorAll('.page-thumb').forEach((t, idx) => t.classList.toggle('active', idx === i));
+}
+
+function savePage() {
+    if (!pages.length) return;
+    const p = pages[cur];
+    p.text = document.getElementById('page-text').value;
+    p.bg   = document.getElementById('bg-color').value;
+    p.color = document.getElementById('text-color').value;
+    p.size = parseInt(document.getElementById('font-size').value);
+    p.align = document.getElementById('text-align').value;
+    p.font = document.getElementById('font-family').value;
+}
+
+function applyTool() {
+    savePage();
+    applyDisplay();
+    renderSidebar();
+    rebuildPrintView();
+    document.querySelectorAll('.page-thumb').forEach((t, idx) => t.classList.toggle('active', idx === cur));
+}
+
+function applyDisplay() {
+    const p = pages[cur];
+    document.getElementById('page-display').style.background = p.bg;
+    const ta = document.getElementById('page-text');
+    ta.style.color = p.color;
+    ta.style.fontSize = p.size + 'px';
+    ta.style.textAlign = p.align;
+    ta.style.fontFamily = p.font;
+    document.getElementById('size-val').textContent = p.size;
+}
+
+function goPage(delta) {
+    savePage();
+    loadPage(Math.max(0, Math.min(pages.length - 1, cur + delta)));
+    renderSidebar();
+}
+
+/* ── Booklet sheet order ──
+   Sheet i (0-indexed):
+     left  = pages[n-1-i]  →  page N, N-1, N-2 …  (back covers going in)
+     right = pages[i]      →  page 1, 2, 3 …       (front covers going in)
+   Fold right-over-left: right side becomes the visible front of each folded sheet.
+   Stack outermost (sheet 0) around innermost (sheet n/2-1).           */
+function getSheets() {
+    const n = pages.length;
+    return Array.from({ length: n / 2 }, (_, i) => ({
+        leftPage: pages[n - 1 - i], leftNum: n - i,
+        rightPage: pages[i],        rightNum: i + 1,
+        sheet: i + 1, total: n / 2
+    }));
+}
+
+/* ── Print view ── */
+function rebuildPrintView() {
+    const container = document.getElementById('print-view');
+    container.innerHTML = '';
+    getSheets().forEach(s => {
+        const sheet = document.createElement('div');
+        sheet.className = 'print-sheet';
+        sheet.appendChild(makePrintHalf(s.leftPage, s.leftNum, true));
+        sheet.appendChild(makePrintHalf(s.rightPage, s.rightNum, false));
+        container.appendChild(sheet);
+    });
+}
+
+function makePrintHalf(page, num, isLeft) {
+    const div = document.createElement('div');
+    div.className = 'print-half' + (isLeft ? ' print-left' : '');
+    div.style.background = page.bg;
+    div.style.color = page.color;
+    div.style.fontFamily = page.font;
+    const content = document.createElement('div');
+    content.className = 'print-content';
+    content.style.fontSize = page.size + 'pt';
+    content.style.textAlign = page.align;
+    content.textContent = page.text;
+    const numEl = document.createElement('div');
+    numEl.className = 'print-page-num';
+    numEl.textContent = num;
+    div.append(content, numEl);
+    return div;
+}
+
+/* ── Preview tab ── */
+function renderPreviewTab() {
+    const container = document.getElementById('sheets-scroll');
+    container.innerHTML = '';
+    getSheets().forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'sheet-card';
+
+        const label = document.createElement('div');
+        label.className = 'sheet-label';
+        label.innerHTML = `Sheet ${s.sheet} of ${s.total} <span>← fold here →</span>`;
+        card.appendChild(label);
+
+        const row = document.createElement('div');
+        row.className = 'sheet-pages';
+        row.appendChild(makePreviewHalf(s.leftPage, s.leftNum, true));
+        row.appendChild(makePreviewHalf(s.rightPage, s.rightNum, false));
+        card.appendChild(row);
+
+        const note = document.createElement('div');
+        note.className = 'sheet-note';
+        note.textContent = `Fold right over left → Page ${s.rightNum} faces front`;
+        card.appendChild(note);
+
+        container.appendChild(card);
+    });
+}
+
+function makePreviewHalf(page, num, isLeft) {
+    const div = document.createElement('div');
+    div.className = 'sheet-half' + (isLeft ? ' left-half' : '');
+    div.style.background = page.bg;
+    div.style.color = page.color;
+
+    const numEl = document.createElement('div');
+    numEl.className = 'sheet-pg-num';
+    numEl.style.color = 'rgba(150,150,170,0.7)';
+    numEl.textContent = `Page ${num} (${isLeft ? 'left' : 'right'})`;
+
+    const text = document.createElement('div');
+    text.className = 'sheet-pg-text';
+    text.style.fontFamily = page.font;
+    text.style.fontSize = Math.min(page.size * 0.42, 11) + 'px';
+    text.style.textAlign = page.align;
+    text.textContent = page.text.substring(0, 250) || '(empty)';
+
+    div.append(numEl, text);
+    return div;
+}
+</script>
+</body>
+</html>
