@@ -199,7 +199,7 @@
 <!-- ── SETUP ── -->
 <div id="setup">
     <h1>📖 Book Maker</h1>
-    <p>Design pages for a foldable booklet. Each landscape print sheet holds two pages in the correct order. Fold each sheet in half (right side over left), then nest them from innermost to outermost to assemble your book.</p>
+    <p>Design pages for a foldable booklet. Each landscape print sheet holds two pages in the correct order. Fold each sheet in half (left side over right), then nest them from innermost to outermost to assemble your book.</p>
     <div class="field-group">
         <label for="page-count">Number of pages</label>
         <input type="number" id="page-count" value="8" min="4" max="64" step="2">
@@ -413,8 +413,8 @@ function goPage(delta) {
 function getSheets() {
     const n = pages.length;
     return Array.from({ length: n / 2 }, (_, i) => ({
-        leftPage: pages[n - 1 - i], leftNum: n - i,
-        rightPage: pages[i],        rightNum: i + 1,
+        leftPage: pages[i],        leftNum: i + 1,
+        rightPage: pages[n - 1 - i], rightNum: n - i,
         sheet: i + 1, total: n / 2
     }));
 }
@@ -471,7 +471,7 @@ function renderPreviewTab() {
 
         const note = document.createElement('div');
         note.className = 'sheet-note';
-        note.textContent = `Fold right over left → Page ${s.rightNum} faces front`;
+        note.textContent = `Fold left over right → Page ${s.leftNum} faces front`;
         card.appendChild(note);
 
         container.appendChild(card);
