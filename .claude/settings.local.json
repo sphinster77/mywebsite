@@ -5,7 +5,9 @@
       "Bash(wc -l *.html)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ]
   }
 }

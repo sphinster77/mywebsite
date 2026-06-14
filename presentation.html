@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Presentation Maker — Workshop</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0d0f1a;
+            color: #e8e8e8;
+            min-height: 100vh;
+        }
+
+        a.back-link {
+            position: fixed;
+            top: 1rem; left: 1rem;
+            color: #f0c030;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.85rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+        a.back-link:hover { opacity: 1; }
+
+        /* ── Generator screen ── */
+        #screen-gen {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5rem 1.25rem 2.5rem;
+        }
+
+        .gen-header { text-align: center; margin-bottom: 1.75rem; }
+        .gen-header h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #f0c030;
+            letter-spacing: -0.03em;
+        }
+        .gen-header p { color: #6666aa; font-size: 0.9rem; margin-top: 0.35rem; }
+
+        .gen-form {
+            background: #12152a;
+            border: 1px solid #252844;
+            border-radius: 16px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 580px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        .field { display: flex; flex-direction: column; gap: 0.4rem; }
+        .field label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6666aa;
+        }
+
+        .api-row { display: flex; gap: 0.5rem; }
+        .api-row input { flex: 1; }
+        .btn-eye {
+            background: #1c1f38;
+            border: 1px solid #252844;
+            color: #6666aa;
+            border-radius: 8px;
+            padding: 0 0.8rem;
+            cursor: pointer;
+            font-size: 1rem;
+            flex-shrink: 0;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .btn-eye:hover { color: #f0c030; border-color: #f0c030; }
+
+        input, textarea, select {
+            background: #1c1f38;
+            border: 1px solid #252844;
+            border-radius: 8px;
+            color: #e8e8e8;
+            padding: 0.6rem 0.85rem;
+            font-size: 0.9rem;
+            font-family: inherit;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus { border-color: #f0c030; }
+        textarea { resize: vertical; min-height: 80px; }
+        select option { background: #1c1f38; }
+
+        .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+        .error-box {
+            background: #3a1212;
+            border: 1px solid #7a2020;
+            border-radius: 8px;
+            color: #ff9090;
+            padding: 0.7rem 1rem;
+            font-size: 0.82rem;
+            display: none;
+        }
+        .error-box.show { display: block; }
+
+        .btn-gen {
+            background: #f0c030;
+            color: #0d0f1a;
+            border: none;
+            border-radius: 10px;
+            padding: 0.85rem 2rem;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn-gen:hover:not(:disabled) { background: #e0b020; }
+        .btn-gen:active:not(:disabled) { transform: scale(0.98); }
+        .btn-gen:disabled { opacity: 0.55; cursor: not-allowed; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2.5px solid rgba(13,15,26,0.3);
+            border-top-color: #0d0f1a;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        /* ── Presentation screen ── */
+        #screen-pres {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #screen-pres.active { display: flex; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.55rem 0.85rem;
+            background: #0d0f1a;
+            border-bottom: 1px solid #1a1d36;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .tb-btn {
+            background: #1c1f38;
+            border: 1px solid #252844;
+            color: #b0b0cc;
+            border-radius: 7px;
+            padding: 0.38rem 0.75rem;
+            font-size: 0.78rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .tb-btn:hover { background: #252844; color: #f0c030; border-color: #f0c030; }
+        .tb-btn.on { background: #f0c030; color: #0d0f1a; border-color: #f0c030; font-weight: 700; }
+        .tb-sep { width: 1px; height: 20px; background: #252844; margin: 0 0.1rem; flex-shrink: 0; }
+        .tb-space { flex: 1; }
+        .tb-counter { color: #5050aa; font-size: 0.8rem; min-width: 64px; text-align: center; }
+
+        /* Slide area */
+        .slide-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.25rem;
+            overflow: hidden;
+        }
+        .nav-btn {
+            background: #1c1f38;
+            border: 1px solid #252844;
+            color: #5050aa;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .nav-btn:hover:not(:disabled) { background: #252844; color: #f0c030; border-color: #f0c030; }
+        .nav-btn:disabled { opacity: 0.18; cursor: default; }
+
+        /* Slide wrapper (16:9 aspect ratio) */
+        .slide-wrapper {
+            flex: 1;
+            max-width: 880px;
+            aspect-ratio: 16/9;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+            position: relative;
+        }
+
+        /* The slide itself */
+        .slide {
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 7%;
+            position: relative;
+            transition: background 0.3s;
+        }
+        .slide.center { align-items: center; text-align: center; }
+
+        .slide-accent {
+            position: absolute;
+            transition: background 0.3s;
+        }
+        .slide.center .slide-accent {
+            bottom: 0; left: 0; right: 0;
+            width: 100%; height: 4px;
+        }
+        .slide:not(.center) .slide-accent {
+            top: 0; left: 0; bottom: 0;
+            width: 5px; height: 100%;
+        }
+
+        .slide-title {
+            font-weight: 800;
+            line-height: 1.2;
+            transition: color 0.3s;
+        }
+        .slide.center .slide-title { font-size: clamp(1.4rem, 4.5vw, 3rem); margin-bottom: 0.9rem; }
+        .slide:not(.center) .slide-title { font-size: clamp(1.1rem, 3vw, 2rem); margin-bottom: 1.2rem; }
+
+        .slide-sub {
+            opacity: 0.65;
+            max-width: 76%;
+            font-size: clamp(0.85rem, 2vw, 1.15rem);
+            line-height: 1.55;
+            transition: color 0.3s;
+        }
+        .slide.center .slide-sub { margin: 0 auto; }
+
+        .slide-bullets {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+        .slide-bullets li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            font-size: clamp(0.75rem, 1.8vw, 0.97rem);
+            line-height: 1.55;
+            transition: color 0.3s;
+        }
+        .bullet-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 0.55em;
+            transition: background 0.3s;
+        }
+
+        .slide-num {
+            position: absolute;
+            bottom: 1.2rem; right: 1.8rem;
+            font-size: 0.7rem;
+            opacity: 0.22;
+        }
+
+        /* Dot nav */
+        .dot-nav {
+            display: flex;
+            justify-content: center;
+            gap: 0.45rem;
+            padding: 0.6rem;
+            flex-shrink: 0;
+        }
+        .dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #252844;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .dot.on { width: 22px; border-radius: 4px; background: #f0c030; }
+
+        /* Edit mode */
+        [contenteditable="true"] { cursor: text; outline: none; }
+        [contenteditable="true"]:focus {
+            outline: 2px solid rgba(240,192,48,0.45);
+            border-radius: 3px;
+            outline-offset: 2px;
+        }
+        .edit-hint {
+            position: fixed;
+            bottom: 3.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(240,192,48,0.12);
+            border: 1px solid rgba(240,192,48,0.3);
+            color: #f0c030;
+            font-size: 0.75rem;
+            padding: 0.35rem 0.85rem;
+            border-radius: 20px;
+            pointer-events: none;
+            display: none;
+        }
+        .edit-mode .edit-hint { display: block; }
+
+        /* ── Fullscreen overlay ── */
+        #fs {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: none;
+        }
+        #fs.active { display: flex; }
+        #fs:hover { cursor: default; }
+
+        .fs-slide {
+            width: 100vw; height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 8%;
+            position: relative;
+        }
+        .fs-slide.center { align-items: center; text-align: center; }
+
+        .fs-title {
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .fs-slide.center .fs-title { font-size: clamp(2rem, 6vw, 4.5rem); margin-bottom: 1.2rem; }
+        .fs-slide:not(.center) .fs-title { font-size: clamp(1.5rem, 4vw, 3rem); margin-bottom: 1.5rem; }
+
+        .fs-sub {
+            opacity: 0.65;
+            max-width: 70%;
+            font-size: clamp(1rem, 2.5vw, 1.6rem);
+            line-height: 1.5;
+        }
+        .fs-slide.center .fs-sub { margin: 0 auto; }
+
+        .fs-bullets {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .fs-bullets li {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            font-size: clamp(1rem, 2.2vw, 1.4rem);
+            line-height: 1.5;
+        }
+        .fs-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 0.55em;
+        }
+        .fs-accent {
+            position: absolute;
+        }
+        .fs-slide.center .fs-accent {
+            bottom: 0; left: 0; right: 0;
+            width: 100%; height: 5px;
+        }
+        .fs-slide:not(.center) .fs-accent {
+            top: 0; left: 0; bottom: 0;
+            width: 7px; height: 100%;
+        }
+        .fs-num {
+            position: absolute;
+            bottom: 1.5rem; right: 2.5rem;
+            font-size: 0.85rem;
+            opacity: 0.2;
+        }
+
+        .fs-controls {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.6rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #fs:hover .fs-controls { opacity: 1; }
+
+        .fs-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.8);
+            border-radius: 8px;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .fs-btn:hover { background: rgba(255,255,255,0.18); }
+
+        /* ── Print view ── */
+        #print-view { display: none; }
+
+        @media print {
+            a.back-link, #screen-gen, #screen-pres, #fs, .edit-hint { display: none !important; }
+            #print-view { display: block !important; }
+            body { background: white !important; }
+            .p-slide {
+                width: 100%;
+                height: 100vh;
+                page-break-after: always;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 10%;
+                position: relative;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .p-slide.center { align-items: center; text-align: center; }
+            .p-title { font-weight: 800; line-height: 1.2; }
+            .p-slide.center .p-title { font-size: 48pt; margin-bottom: 18pt; }
+            .p-slide:not(.center) .p-title { font-size: 32pt; margin-bottom: 24pt; }
+            .p-sub { opacity: 0.65; max-width: 76%; font-size: 16pt; line-height: 1.5; }
+            .p-slide.center .p-sub { margin: 0 auto; }
+            .p-bullets { list-style: none; display: flex; flex-direction: column; gap: 12pt; }
+            .p-bullets li { display: flex; align-items: flex-start; gap: 10pt; font-size: 14pt; line-height: 1.5; }
+            .p-bdot { width: 8pt; height: 8pt; border-radius: 50%; flex-shrink: 0; margin-top: 5pt; }
+            .p-accent { position: absolute; }
+            .p-slide.center .p-accent { bottom: 0; left: 0; right: 0; width: 100%; height: 5pt; }
+            .p-slide:not(.center) .p-accent { top: 0; left: 0; bottom: 0; width: 6pt; height: 100%; }
+            .p-num { position: absolute; bottom: 20pt; right: 30pt; font-size: 9pt; opacity: 0.25; }
+        }
+    </style>
+</head>
+<body>
+
+<a class="back-link" href="index.html">← Back</a>
+
+<!-- ── Generator screen ── -->
+<div id="screen-gen">
+    <div class="gen-header">
+        <h1>AI Presentation Maker</h1>
+        <p>Describe your topic and Claude will build the slides.</p>
+    </div>
+    <form class="gen-form" onsubmit="generate(event)">
+        <div class="field">
+            <label>Anthropic API Key</label>
+            <div class="api-row">
+                <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off">
+                <button type="button" class="btn-eye" onclick="toggleKey()" title="Show/hide">👁</button>
+            </div>
+        </div>
+        <div class="field">
+            <label>Topic / Prompt</label>
+            <textarea id="topic" placeholder="e.g. The history of the Roman Empire, Benefits of daily exercise, How neural networks work…" rows="3"></textarea>
+        </div>
+        <div class="row3">
+            <div class="field">
+                <label>Slides</label>
+                <input id="num-slides" type="number" value="8" min="4" max="20">
+            </div>
+            <div class="field">
+                <label>Tone</label>
+                <select id="tone">
+                    <option>Professional</option>
+                    <option>Educational</option>
+                    <option>Casual</option>
+                    <option>Creative</option>
+                    <option>Inspiring</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Theme</label>
+                <select id="theme-gen">
+                    <option value="dark">Dark (Gold)</option>
+                    <option value="ocean">Ocean</option>
+                    <option value="forest">Forest</option>
+                    <option value="sunset">Sunset</option>
+                    <option value="light">Light</option>
+                </select>
+            </div>
+        </div>
+        <div class="error-box" id="err"></div>
+        <button class="btn-gen" id="btn-gen">
+            <span id="btn-label">✨ Generate Presentation</span>
+            <div class="spinner" id="spinner" style="display:none"></div>
+        </button>
+    </form>
+</div>
+
+<!-- ── Presentation screen ── -->
+<div id="screen-pres">
+    <div class="toolbar">
+        <button class="tb-btn" onclick="goBack()">← New</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="tb-edit" onclick="toggleEdit()">✏️ Edit</button>
+        <button class="tb-btn" onclick="present()">▶ Present</button>
+        <button class="tb-btn" onclick="printSlides()">🖨 Print</button>
+        <div class="tb-sep"></div>
+        <select class="tb-btn" id="theme-pres" onchange="applyTheme(this.value)" style="padding:0.38rem 0.5rem;">
+            <option value="dark">Dark</option>
+            <option value="ocean">Ocean</option>
+            <option value="forest">Forest</option>
+            <option value="sunset">Sunset</option>
+            <option value="light">Light</option>
+        </select>
+        <div class="tb-space"></div>
+        <span class="tb-counter" id="tb-counter">1 / 1</span>
+    </div>
+
+    <div class="slide-area">
+        <button class="nav-btn" id="btn-prev" onclick="nav(-1)" disabled>‹</button>
+        <div class="slide-wrapper">
+            <div class="slide" id="main-slide">
+                <div class="slide-accent" id="main-accent"></div>
+            </div>
+        </div>
+        <button class="nav-btn" id="btn-next" onclick="nav(1)">›</button>
+    </div>
+
+    <div class="dot-nav" id="dots"></div>
+</div>
+<div class="edit-hint" id="edit-hint">Click any text to edit it</div>
+
+<!-- ── Fullscreen overlay ── -->
+<div id="fs">
+    <div class="fs-slide" id="fs-slide">
+        <div class="fs-accent" id="fs-accent"></div>
+    </div>
+    <div class="fs-controls">
+        <button class="fs-btn" onclick="fsNav(-1)">‹ Prev</button>
+        <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;line-height:2.2" id="fs-counter"></span>
+        <button class="fs-btn" onclick="fsNav(1)">Next ›</button>
+        <button class="fs-btn" onclick="exitFs()">✕ Exit</button>
+    </div>
+</div>
+
+<!-- ── Print view (hidden; shown only in @media print) ── -->
+<div id="print-view"></div>
+
+<script>
+// ── Themes ──────────────────────────────────────────────────────────────────
+const themes = {
+    dark:   { bg:'#0d0f1a', slide:'#161828', accent:'#f0c030', title:'#f0c030', text:'#dde0f0', sub:'#8888c0', num:'#888' },
+    ocean:  { bg:'#040d1c', slide:'#071a38', accent:'#22d3ee', title:'#7de8f8', text:'#c0dff0', sub:'#6090b0', num:'#336' },
+    forest: { bg:'#050e07', slide:'#091a0d', accent:'#4ade80', title:'#7cf0a0', text:'#c0e8d0', sub:'#508060', num:'#363' },
+    sunset: { bg:'#160905', slide:'#26100a', accent:'#fb923c', title:'#fdb070', text:'#f0d0c0', sub:'#a06040', num:'#864' },
+    light:  { bg:'#e8ecf4', slide:'#ffffff', accent:'#2563eb', title:'#1e293b', text:'#334155', sub:'#64748b', num:'#aaa' },
+};
+
+// ── State ────────────────────────────────────────────────────────────────────
+let slides = [];
+let idx = 0;
+let theme = 'dark';
+let editMode = false;
+
+// ── Persist API key ──────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('pres_api_key');
+    if (saved) document.getElementById('api-key').value = saved;
+
+    // keyboard nav in presentation screen
+    document.addEventListener('keydown', e => {
+        if (document.getElementById('fs').classList.contains('active')) {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') fsNav(1);
+            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') fsNav(-1);
+            else if (e.key === 'Escape') exitFs();
+        } else if (document.getElementById('screen-pres').classList.contains('active')) {
+            if (!editMode) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nav(1);
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nav(-1);
+                else if (e.key === 'f' || e.key === 'F') present();
+            }
+        }
+    });
+});
+
+function toggleKey() {
+    const inp = document.getElementById('api-key');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ── Generate ─────────────────────────────────────────────────────────────────
+async function generate(e) {
+    e.preventDefault();
+    const apiKey = document.getElementById('api-key').value.trim();
+    const topic  = document.getElementById('topic').value.trim();
+    const n      = parseInt(document.getElementById('num-slides').value) || 8;
+    const tone   = document.getElementById('tone').value;
+    theme        = document.getElementById('theme-gen').value;
+
+    if (!apiKey) return showErr('Please enter your Anthropic API key.');
+    if (!topic)  return showErr('Please describe your presentation topic.');
+
+    localStorage.setItem('pres_api_key', apiKey);
+    hideErr();
+    setLoading(true);
+
+    const prompt = `Create a ${n}-slide presentation about: "${topic}"
+Tone: ${tone}
+
+Return ONLY a JSON object — no markdown, no code fences, no explanation. Use this exact shape:
+{"slides":[{"type":"title","title":"...","subtitle":"..."},{"type":"content","title":"...","bullets":["...","...","..."]},{"type":"conclusion","title":"...","subtitle":"..."}]}
+
+Requirements:
+- Slide 1: type "title" — title and subtitle fields
+- Slides 2 to ${n-1}: type "content" — title and bullets (3-5 concise points, max 12 words each)
+- Slide ${n}: type "conclusion" — title and subtitle fields
+- Exactly ${n} slides total
+- Be engaging and well-structured for a ${tone.toLowerCase()} tone`;
+
+    try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({
+                model: 'claude-opus-4-8',
+                max_tokens: 4096,
+                messages: [{ role: 'user', content: prompt }],
+            }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `API error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const raw  = data.content?.[0]?.text || '';
+        const json = extractJSON(raw);
+        if (!json?.slides?.length) throw new Error('Could not parse slide data from response. Try again.');
+
+        slides = json.slides;
+        idx = 0;
+        launchPresentation();
+
+    } catch (err) {
+        showErr(err.message);
+    } finally {
+        setLoading(false);
+    }
+}
+
+function extractJSON(text) {
+    // strip markdown code fences if present
+    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    try { return JSON.parse(cleaned); } catch {}
+    // try to find first { … } block
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) try { return JSON.parse(m[0]); } catch {}
+    return null;
+}
+
+// ── Launch presentation ───────────────────────────────────────────────────────
+function launchPresentation() {
+    document.getElementById('screen-gen').style.display = 'none';
+    const sp = document.getElementById('screen-pres');
+    sp.classList.add('active');
+    document.getElementById('theme-pres').value = theme;
+    buildDots();
+    renderSlide();
+}
+
+function goBack() {
+    document.getElementById('screen-pres').classList.remove('active');
+    document.getElementById('screen-gen').style.display = '';
+    exitEditMode();
+}
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+function applyTheme(t) {
+    theme = t;
+    renderSlide();
+    document.getElementById('theme-pres').value = t;
+}
+
+// ── Render slide ─────────────────────────────────────────────────────────────
+function renderSlide() {
+    const s  = slides[idx];
+    const th = themes[theme];
+    const el = document.getElementById('main-slide');
+    const ac = document.getElementById('main-accent');
+
+    // background
+    el.style.background = th.slide;
+    document.getElementById('screen-pres').style.background = th.bg;
+
+    // type class
+    const isCenter = (s.type === 'title' || s.type === 'conclusion');
+    el.className = 'slide' + (isCenter ? ' center' : '');
+    if (editMode) el.className += ' edit-on';
+
+    // accent
+    ac.style.background = th.accent;
+    // reset accent positioning based on type
+    if (isCenter) {
+        Object.assign(ac.style, { bottom:'0', left:'0', right:'0', top:'auto', width:'100%', height:'4px' });
+    } else {
+        Object.assign(ac.style, { top:'0', left:'0', bottom:'0', right:'auto', width:'5px', height:'100%' });
+    }
+
+    // content
+    if (isCenter) {
+        el.innerHTML = `
+            <div class="slide-accent" id="main-accent" style="background:${th.accent};${isCenter?'bottom:0;left:0;right:0;width:100%;height:4px':'top:0;left:0;bottom:0;width:5px;height:100%'}"></div>
+            <h1 class="slide-title" style="color:${th.title}" ${editMode?'contenteditable="true"':''}>${esc(s.title)}</h1>
+            <p class="slide-sub" style="color:${th.sub}" ${editMode?'contenteditable="true"':''}>${esc(s.subtitle||'')}</p>
+            <span class="slide-num" style="color:${th.num}">${idx+1} / ${slides.length}</span>
+        `;
+    } else {
+        const bullets = (s.bullets||[]).map(b =>
+            `<li><span class="bullet-dot" style="background:${th.accent}"></span><span ${editMode?'contenteditable="true"':''}>${esc(b)}</span></li>`
+        ).join('');
+        el.innerHTML = `
+            <div class="slide-accent" id="main-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:5px;height:100%"></div>
+            <h2 class="slide-title" style="color:${th.title}" ${editMode?'contenteditable="true"':''}>${esc(s.title)}</h2>
+            <ul class="slide-bullets" style="color:${th.text}">${bullets}</ul>
+            <span class="slide-num" style="color:${th.num}">${idx+1} / ${slides.length}</span>
+        `;
+    }
+
+    // wire up edit listeners after render
+    if (editMode) wireEditListeners();
+
+    updateNav();
+}
+
+function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Edit mode ─────────────────────────────────────────────────────────────────
+function toggleEdit() {
+    editMode = !editMode;
+    const btn = document.getElementById('tb-edit');
+    const hint = document.getElementById('edit-hint');
+    const sp = document.getElementById('screen-pres');
+    if (editMode) {
+        btn.classList.add('on');
+        hint.style.display = 'block';
+        sp.classList.add('edit-mode');
+    } else {
+        saveEditedSlide();
+        btn.classList.remove('on');
+        hint.style.display = 'none';
+        sp.classList.remove('edit-mode');
+    }
+    renderSlide();
+}
+
+function exitEditMode() {
+    if (editMode) {
+        editMode = false;
+        document.getElementById('tb-edit').classList.remove('on');
+        document.getElementById('edit-hint').style.display = 'none';
+        document.getElementById('screen-pres').classList.remove('edit-mode');
+    }
+}
+
+function wireEditListeners() {
+    const el = document.getElementById('main-slide');
+    // no-op — we read content on blur/save
+}
+
+function saveEditedSlide() {
+    const s  = slides[idx];
+    const el = document.getElementById('main-slide');
+    const title = el.querySelector('.slide-title');
+    if (title) s.title = title.innerText;
+
+    if (s.type === 'title' || s.type === 'conclusion') {
+        const sub = el.querySelector('.slide-sub');
+        if (sub) s.subtitle = sub.innerText;
+    } else {
+        const spans = el.querySelectorAll('.slide-bullets li > span:last-child');
+        s.bullets = Array.from(spans).map(sp => sp.innerText);
+    }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function nav(d) {
+    if (editMode) saveEditedSlide();
+    const next = idx + d;
+    if (next < 0 || next >= slides.length) return;
+    idx = next;
+    renderSlide();
+    highlightDot();
+}
+
+function updateNav() {
+    document.getElementById('btn-prev').disabled = idx === 0;
+    document.getElementById('btn-next').disabled = idx === slides.length - 1;
+    document.getElementById('tb-counter').textContent = `${idx+1} / ${slides.length}`;
+}
+
+// ── Dots ──────────────────────────────────────────────────────────────────────
+function buildDots() {
+    const cont = document.getElementById('dots');
+    cont.innerHTML = slides.map((_, i) =>
+        `<span class="dot${i===0?' on':''}" onclick="jumpTo(${i})"></span>`
+    ).join('');
+}
+
+function jumpTo(i) {
+    if (editMode) saveEditedSlide();
+    idx = i;
+    renderSlide();
+    highlightDot();
+}
+
+function highlightDot() {
+    document.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('on', i===idx));
+}
+
+// ── Fullscreen present ────────────────────────────────────────────────────────
+function present() {
+    if (editMode) { saveEditedSlide(); exitEditMode(); renderSlide(); }
+    renderFsSlide();
+    document.getElementById('fs').classList.add('active');
+}
+
+function exitFs() { document.getElementById('fs').classList.remove('active'); }
+
+function fsNav(d) {
+    const next = idx + d;
+    if (next < 0 || next >= slides.length) return;
+    idx = next;
+    renderFsSlide();
+    highlightDot();
+    updateNav();
+}
+
+function renderFsSlide() {
+    const s  = slides[idx];
+    const th = themes[theme];
+    const el = document.getElementById('fs-slide');
+    const ac = document.getElementById('fs-accent');
+
+    el.style.background = th.slide;
+    document.getElementById('fs').style.background = th.bg;
+
+    const isCenter = (s.type === 'title' || s.type === 'conclusion');
+    el.className = 'fs-slide' + (isCenter ? ' center' : '');
+
+    if (isCenter) {
+        el.innerHTML = `
+            <div class="fs-accent" style="background:${th.accent};bottom:0;left:0;right:0;width:100%;height:5px"></div>
+            <h1 class="fs-title" style="color:${th.title}">${esc(s.title)}</h1>
+            <p class="fs-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
+            <span class="fs-num" style="color:${th.num}">${idx+1} / ${slides.length}</span>
+        `;
+    } else {
+        const bullets = (s.bullets||[]).map(b =>
+            `<li><span class="fs-dot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`
+        ).join('');
+        el.innerHTML = `
+            <div class="fs-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:7px;height:100%"></div>
+            <h2 class="fs-title" style="color:${th.title}">${esc(s.title)}</h2>
+            <ul class="fs-bullets">${bullets}</ul>
+            <span class="fs-num" style="color:${th.num}">${idx+1} / ${slides.length}</span>
+        `;
+    }
+
+    document.getElementById('fs-counter').textContent = `${idx+1} / ${slides.length}`;
+}
+
+// ── Print ─────────────────────────────────────────────────────────────────────
+function printSlides() {
+    if (editMode) { saveEditedSlide(); exitEditMode(); renderSlide(); }
+    const th = themes[theme];
+    const pv = document.getElementById('print-view');
+    pv.innerHTML = slides.map((s, i) => {
+        const isCenter = (s.type === 'title' || s.type === 'conclusion');
+        let inner = '';
+        if (isCenter) {
+            inner = `
+                <div class="p-accent" style="background:${th.accent};bottom:0;left:0;right:0;width:100%;height:5pt"></div>
+                <h1 class="p-title" style="color:${th.title}">${esc(s.title)}</h1>
+                <p class="p-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
+            `;
+        } else {
+            const bullets = (s.bullets||[]).map(b =>
+                `<li><span class="p-bdot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`
+            ).join('');
+            inner = `
+                <div class="p-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:6pt;height:100%"></div>
+                <h2 class="p-title" style="color:${th.title}">${esc(s.title)}</h2>
+                <ul class="p-bullets">${bullets}</ul>
+            `;
+        }
+        return `<div class="p-slide${isCenter?' center':''}" style="background:${th.slide}">
+            ${inner}
+            <span class="p-num" style="color:${th.num}">${i+1} / ${slides.length}</span>
+        </div>`;
+    }).join('');
+    window.print();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showErr(msg) {
+    const el = document.getElementById('err');
+    el.textContent = msg;
+    el.classList.add('show');
+}
+function hideErr() {
+    document.getElementById('err').classList.remove('show');
+}
+function setLoading(on) {
+    const btn = document.getElementById('btn-gen');
+    const lbl = document.getElementById('btn-label');
+    const sp  = document.getElementById('spinner');
+    btn.disabled = on;
+    lbl.textContent = on ? 'Generating…' : '✨ Generate Presentation';
+    sp.style.display = on ? 'block' : 'none';
+}
+</script>
+</body>
+</html>
