@@ -438,175 +438,635 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Template engine ───────────────────────────────────────────────────────────
-const toneSubtitles = {
-    Professional: 'A structured overview for professionals',
-    Educational:  'An educational guide for learners',
-    Casual:       'A friendly look at the topic',
-    Inspiring:    'Ideas and insights to inspire action',
-};
-
-const toneConclusions = {
-    Professional: 'Applying these insights drives measurable results',
-    Educational:  'Understanding this topic opens new possibilities',
-    Casual:       'There you have it — hope this was useful!',
-    Inspiring:    'The time to act on this knowledge is now',
-};
-
-const slidePool = [
-    {
-        title: t => `What is ${cap(t)}?`,
-        bullets: t => [
-            `${cap(t)} is a broad and important concept with real-world impact`,
-            `It encompasses a range of ideas, methods, and practices`,
-            `Understanding it starts with exploring its core definition`,
-            `It affects people, systems, and industries in meaningful ways`,
-        ],
-    },
-    {
-        title: () => 'Background & Origins',
-        bullets: t => [
-            `The roots of ${t} stretch back further than most people realise`,
-            `Early developments laid the groundwork for what we see today`,
-            `Key milestones shaped how we think about and use ${t}`,
-            `Historical context helps explain its current state and direction`,
-        ],
-    },
-    {
-        title: t => `Core Principles of ${cap(t)}`,
-        bullets: t => [
-            `A clear framework helps organise how ${t} is understood`,
-            `The first principle focuses on foundations and fundamentals`,
-            `Building on that, structure and process play central roles`,
-            `Consistency and clarity tie the whole system together`,
-        ],
-    },
-    {
-        title: () => 'How It Works',
-        bullets: t => [
-            `The process begins with identifying the key inputs and goals`,
-            `Each stage of ${t} builds on the previous one`,
-            `Core mechanisms drive outcomes in a predictable, repeatable way`,
-            `The result is a reliable system that delivers consistent value`,
-        ],
-    },
-    {
-        title: () => 'Key Benefits',
-        bullets: t => [
-            `${cap(t)} offers significant advantages when applied correctly`,
-            `It saves time, reduces effort, and improves outcomes`,
-            `Real-world results demonstrate clear and measurable value`,
-            `Both individuals and organisations stand to gain from it`,
-        ],
-    },
-    {
-        title: () => 'Real-World Applications',
-        bullets: t => [
-            `${cap(t)} appears across industries including education, business, and science`,
-            `Everyday examples show how it solves genuine problems`,
-            `Case studies highlight successful outcomes at scale`,
-            `The range of applications continues to expand over time`,
-        ],
-    },
-    {
-        title: () => 'Challenges to Consider',
-        bullets: t => [
-            `Like any topic, ${t} comes with its own set of challenges`,
-            `Common obstacles include complexity, cost, and resistance to change`,
-            `Awareness of these challenges leads to better planning`,
-            `With the right approach, most hurdles can be overcome`,
-        ],
-    },
-    {
-        title: t => `The Future of ${cap(t)}`,
-        bullets: t => [
-            `Trends suggest ${t} will continue to evolve rapidly`,
-            `Emerging technologies are opening new possibilities`,
-            `The next decade promises significant developments in this space`,
-            `Staying informed positions you ahead of the curve`,
-        ],
-    },
-    {
-        title: () => 'Best Practices',
-        bullets: t => [
-            `Start with a clear understanding of your goals around ${t}`,
-            `Apply proven methods rather than reinventing the wheel`,
-            `Consistency and iteration are key to long-term success`,
-            `Learn from others who have already navigated this path`,
-        ],
-    },
-    {
-        title: () => 'Common Misconceptions',
-        bullets: t => [
-            `Many people misunderstand what ${t} actually involves`,
-            `It is not as complicated — or as simple — as often assumed`,
-            `Separating fact from fiction leads to better decisions`,
-            `Addressing these myths builds a stronger foundation`,
-        ],
-    },
-    {
-        title: () => 'Why It Matters',
-        bullets: t => [
-            `${cap(t)} plays a vital role in our daily lives and wider society`,
-            `Its influence extends far beyond the obvious surface level`,
-            `Ignoring it can lead to missed opportunities and avoidable problems`,
-            `Embracing it with understanding makes a genuine difference`,
-        ],
-    },
-    {
-        title: () => 'Key Facts & Figures',
-        bullets: t => [
-            `Research consistently highlights the importance of ${t}`,
-            `Studies show significant growth and interest in recent years`,
-            `Data reveals patterns that inform smarter strategies`,
-            `Numbers tell a compelling story about impact and scale`,
-        ],
-    },
-];
-
-function cap(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
+function cap(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
 function titleCase(str) {
     return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
 
+// Detect context flags from the topic string
+function detectContext(raw) {
+    const t = raw.toLowerCase();
+    return {
+        kids:           /\b(\d+)\s*year[s]?\s*old\b|kid|kids|child|children|young learner|primary|elementary|junior|ks\d/i.test(t),
+        age:            (t.match(/\b(\d+)\s*year/i) || [])[1] ? parseInt(t.match(/\b(\d+)\s*year/i)[1]) : null,
+        isDivision:     /divis/i.test(t),
+        isMultiply:     /multipl/i.test(t),
+        isAddition:     /\badd(ition)?\b/i.test(t),
+        isSubtraction:  /subtract/i.test(t),
+        isFractions:    /fraction/i.test(t),
+        isShapes:       /shape|geometry|2d|3d|polygon|circle|triangle|square/i.test(t),
+        isPlants:       /plant|photosynthesis|flower|tree|seed|grow/i.test(t),
+        isAnimals:      /animal|mammal|reptile|insect|bird|fish|amphibian/i.test(t),
+        isWeather:      /weather|season|rain|snow|cloud|temperature|climate/i.test(t),
+        isSpace:        /space|planet|solar system|star|moon|sun|galaxy|universe|astronaut/i.test(t),
+        isWaterCycle:   /water cycle|evaporation|precipitation|condensation/i.test(t),
+        isElectricity:  /electric|circuit|battery|current|volt|conductor/i.test(t),
+        isForces:       /\bforce|gravity|friction|push|pull|motion|newton/i.test(t),
+        isHistory:      /history|histor|ancient|empire|war|century|civilisation|revolution|king|queen|medieval|roman|greek|egyptian/i.test(t),
+        isGeography:    /country|continent|capital|map|mountain|river|ocean|geography/i.test(t),
+        isFood:         /food|nutrition|vitamin|protein|healthy eating|diet|meal/i.test(t),
+        isBody:         /body|heart|brain|lungs|bone|muscle|organ|blood|skeleton/i.test(t),
+    };
+}
+
+// Topic-specific slide pools
+const topicPools = {
+    division: {
+        kids: [
+            { title: 'What is Division?', bullets: [
+                'Division means sharing equally — splitting things into equal groups',
+                'If you have 12 sweets and share them with 3 friends, you use division!',
+                'We use the ÷ sign to show division: 12 ÷ 3 = 4',
+                'Division answers the question "how many in each group?"',
+            ]},
+            { title: 'Division Words to Know', bullets: [
+                'DIVIDEND — the big number you are splitting up (e.g. 12)',
+                'DIVISOR — the number of groups you split into (e.g. 3)',
+                'QUOTIENT — the answer you get (e.g. 4)',
+                'Example: 12 ÷ 3 = 4 — you share 12 things into 3 equal groups',
+            ]},
+            { title: 'How to Divide — Step by Step', bullets: [
+                'Step 1: Look at the big number (the dividend)',
+                'Step 2: Ask — how many times does the divisor fit?',
+                'Step 3: Write the answer above the line',
+                'Step 4: Check by multiplying back — 4 × 3 = 12 ✓',
+            ]},
+            { title: 'Division in Everyday Life', bullets: [
+                'Sharing a pizza equally between friends at a party',
+                'Putting 20 crayons into 4 pencil cases equally',
+                'Splitting pocket money fairly between brothers and sisters',
+                'Arranging 16 chairs into 4 equal rows',
+            ]},
+            { title: 'Cool Division Facts', bullets: [
+                'Any number ÷ 1 stays the same — 9 ÷ 1 = 9',
+                'Any number ÷ itself = 1 — 7 ÷ 7 = 1',
+                'You can NEVER divide by zero — it is not allowed!',
+                'Division is the opposite of multiplication',
+            ]},
+            { title: 'Let\'s Practise!', bullets: [
+                'Try this: 10 ÷ 2 = ? (how many 2s fit into 10?)',
+                'Try this: 15 ÷ 3 = ? (count up in 3s until you reach 15)',
+                'Try this: 20 ÷ 4 = ? (share 20 things into 4 groups)',
+                'Use counters, sweets, or drawings to help you!',
+            ]},
+            { title: 'Division and Times Tables', bullets: [
+                'Knowing your times tables makes division much easier!',
+                'If you know 3 × 5 = 15, then you know 15 ÷ 3 = 5',
+                'Practise times tables every day and division will feel easy',
+                'They are two sides of the same coin — they go together!',
+            ]},
+            { title: 'What About Remainders?', bullets: [
+                'Sometimes numbers do not split up perfectly equally',
+                'The leftover amount is called the REMAINDER',
+                'Example: 13 ÷ 4 = 3 remainder 1',
+                'Think of it as 3 groups of 4 with 1 left over',
+            ]},
+        ],
+        adult: [
+            { title: 'What is Division?', bullets: [
+                'Division is the mathematical operation of splitting a number into equal parts',
+                'It is the inverse operation of multiplication',
+                'Written as a ÷ b or a/b, where b ≠ 0',
+                'Core to arithmetic, algebra, and virtually every area of mathematics',
+            ]},
+            { title: 'Key Terminology', bullets: [
+                'Dividend — the number being divided',
+                'Divisor — the number you divide by',
+                'Quotient — the result of the division',
+                'Remainder — what is left over when division is not exact',
+            ]},
+            { title: 'Methods of Division', bullets: [
+                'Short division — efficient for single-digit divisors',
+                'Long division — handles multi-digit divisors step by step',
+                'Chunking — repeated subtraction approach useful for learners',
+                'Mental strategies — using known multiplication facts',
+            ]},
+            { title: 'Division Properties', bullets: [
+                'Any number ÷ 1 = itself',
+                'Any non-zero number ÷ itself = 1',
+                'Division by zero is undefined',
+                'Division is not commutative: a ÷ b ≠ b ÷ a in general',
+            ]},
+            { title: 'Real-World Applications', bullets: [
+                'Splitting costs equally among a group',
+                'Calculating unit prices from bulk quantities',
+                'Converting units of measurement',
+                'Distributing resources in planning and logistics',
+            ]},
+            { title: 'Common Errors to Avoid', bullets: [
+                'Confusing the dividend and divisor positions',
+                'Forgetting to account for remainders when context demands whole answers',
+                'Dividing by zero — always check the divisor is non-zero',
+                'Misaligning digits when using the long division algorithm',
+            ]},
+        ],
+    },
+
+    multiplication: {
+        kids: [
+            { title: 'What is Multiplication?', bullets: [
+                'Multiplication is a quick way of adding the same number lots of times',
+                '3 × 4 means "three groups of four" — that is 4 + 4 + 4 = 12',
+                'We use the × sign to show multiplication',
+                'It helps us count big amounts really quickly!',
+            ]},
+            { title: 'Multiplication Words to Know', bullets: [
+                'FACTOR — the numbers you multiply together (e.g. 3 and 4)',
+                'PRODUCT — the answer you get (e.g. 12)',
+                'ARRAY — objects arranged in rows and columns to show multiplication',
+                'Times table — a list of a number multiplied by 1, 2, 3 and so on',
+            ]},
+            { title: 'How to Multiply', bullets: [
+                'Learn your times tables — they are the foundation!',
+                'Use repeated addition: 5 × 3 = 5 + 5 + 5 = 15',
+                'Draw arrays to visualise: 3 rows of 4 dots = 12',
+                'The order does not matter: 3 × 4 = 4 × 3 = 12',
+            ]},
+            { title: 'Multiplication in Real Life', bullets: [
+                'If there are 6 egg boxes with 6 eggs each — 6 × 6 = 36 eggs!',
+                'A classroom has 5 rows of 6 desks — that is 30 desks',
+                'You buy 4 packets of stickers with 10 in each — 40 stickers!',
+                'Multiplication helps us count quickly without counting one by one',
+            ]},
+            { title: 'Times Table Tips', bullets: [
+                'The 2 times table — just double the number!',
+                'The 10 times table — add a zero to the end',
+                'The 5 times table — always ends in 0 or 5',
+                'The 11 times table (up to 9) — just write the digit twice: 11 × 7 = 77',
+            ]},
+            { title: 'Let\'s Practise!', bullets: [
+                'Try: 3 × 5 = ? (three groups of five)',
+                'Try: 4 × 6 = ? (four groups of six)',
+                'Try: 7 × 2 = ? (seven groups of two)',
+                'Use your fingers, counters, or draw dots to help!',
+            ]},
+        ],
+        adult: [
+            { title: 'What is Multiplication?', bullets: [
+                'Multiplication is repeated addition of the same value',
+                'Written as a × b, the result is called the product',
+                'Commutative: a × b = b × a — order does not matter',
+                'Foundational to algebra, calculus, and computational mathematics',
+            ]},
+            { title: 'Key Properties', bullets: [
+                'Commutative: 3 × 4 = 4 × 3',
+                'Associative: (2 × 3) × 4 = 2 × (3 × 4)',
+                'Distributive: 3 × (4 + 5) = (3 × 4) + (3 × 5)',
+                'Identity: any number × 1 = itself',
+            ]},
+            { title: 'Multiplication Methods', bullets: [
+                'Short multiplication — single digit multiplier, compact layout',
+                'Long multiplication — multi-digit multipliers, column method',
+                'Grid method — partitions numbers into tens and units',
+                'Mental strategies — rounding, doubling, using known facts',
+            ]},
+            { title: 'Real-World Applications', bullets: [
+                'Calculating area: length × width',
+                'Scaling recipes or quantities proportionally',
+                'Financial calculations — price per unit × quantity',
+                'Speed, distance, and time calculations',
+            ]},
+        ],
+    },
+
+    addition: {
+        kids: [
+            { title: 'What is Addition?', bullets: [
+                'Addition means putting numbers together to find a total',
+                'We use the + sign to show addition',
+                'Example: 3 + 5 = 8 — we combined 3 and 5 to get 8',
+                'The answer in addition is called the SUM',
+            ]},
+            { title: 'Ways to Add', bullets: [
+                'Count on from the bigger number using your fingers',
+                'Draw dots or use counters to combine groups',
+                'Use a number line — jump to the right to add',
+                'For big numbers, line them up in columns',
+            ]},
+            { title: 'Addition in Real Life', bullets: [
+                'Counting up the total price when shopping',
+                'Adding up your scores in a game',
+                'Finding out how many sweets you have altogether',
+                'Adding up goals scored by your favourite team!',
+            ]},
+            { title: 'Addition Tips & Tricks', bullets: [
+                'The order does not matter: 4 + 6 = 6 + 4 = 10',
+                'Adding 0 to any number keeps it the same: 7 + 0 = 7',
+                'Number bonds to 10 are super useful — learn them all!',
+                'Doubling is a special type of addition: 6 + 6 = 12',
+            ]},
+            { title: 'Let\'s Practise!', bullets: [
+                'Try: 5 + 3 = ? (count on 3 from 5)',
+                'Try: 12 + 7 = ? (start at 12, jump 7 forward)',
+                'Try: 24 + 15 = ? (add the tens first, then the units)',
+                'Challenge: what two numbers add up to 20?',
+            ]},
+        ],
+    },
+
+    subtraction: {
+        kids: [
+            { title: 'What is Subtraction?', bullets: [
+                'Subtraction means taking away — finding the difference',
+                'We use the − sign to show subtraction',
+                'Example: 9 − 4 = 5 — we took 4 away from 9',
+                'The answer in subtraction is called the DIFFERENCE',
+            ]},
+            { title: 'Ways to Subtract', bullets: [
+                'Count back from the bigger number on a number line',
+                'Cross out objects in a drawing to show taking away',
+                'Use counters — remove the amount you are subtracting',
+                'Column subtraction — line up digits and work right to left',
+            ]},
+            { title: 'Subtraction in Real Life', bullets: [
+                'Spending money and working out how much you have left',
+                'Eating some sweets and counting how many remain',
+                'Finding the difference in scores between two teams',
+                'Counting down how many days until a birthday!',
+            ]},
+            { title: 'Subtraction Tips', bullets: [
+                'Subtraction is the opposite of addition — they undo each other',
+                'Check your answer by adding back: 9 − 4 = 5, and 5 + 4 = 9 ✓',
+                'Number bonds help: if 6 + 4 = 10, then 10 − 6 = 4',
+                'You cannot subtract a bigger number from a smaller one (yet!)',
+            ]},
+            { title: 'Let\'s Practise!', bullets: [
+                'Try: 10 − 3 = ? (count back 3 from 10)',
+                'Try: 15 − 7 = ? (start at 15, jump 7 back)',
+                'Try: 20 − 8 = ? (use a number line to help)',
+                'Challenge: if you have 12 and give away 5, how many left?',
+            ]},
+        ],
+    },
+
+    fractions: {
+        kids: [
+            { title: 'What is a Fraction?', bullets: [
+                'A fraction shows a part of a whole thing',
+                'If you cut a pizza into 4 equal slices and eat 1, you ate ¼ of the pizza',
+                'A fraction has two numbers: the TOP (numerator) and BOTTOM (denominator)',
+                'The bottom number tells you how many equal parts; the top says how many you have',
+            ]},
+            { title: 'Fraction Words to Know', bullets: [
+                'NUMERATOR — the top number (how many parts you have)',
+                'DENOMINATOR — the bottom number (how many equal parts in total)',
+                'HALF (½) — one out of two equal parts',
+                'QUARTER (¼) — one out of four equal parts',
+            ]},
+            { title: 'Fractions in Real Life', bullets: [
+                'Sharing a chocolate bar equally — each piece is a fraction',
+                'Half time in football — you are ½ of the way through!',
+                'A quarter of an hour is 15 minutes',
+                'Recipes use fractions — "½ cup of sugar"',
+            ]},
+            { title: 'Equivalent Fractions', bullets: [
+                'Some fractions look different but mean the same amount',
+                '½ = 2/4 = 4/8 — they all represent the same share',
+                'Imagine folding paper — more folds, more pieces, same amount shaded',
+                'Multiply or divide top and bottom by the same number to find equivalents',
+            ]},
+            { title: 'Let\'s Practise!', bullets: [
+                'Draw a circle and shade ½ of it — how many parts did you draw?',
+                'What is ¼ of 12? (split 12 into 4 equal groups)',
+                'Are ½ and 2/4 the same? (yes — they are equivalent!)',
+                'Which is bigger — ½ or ¼? (think about a pizza slice!)',
+            ]},
+        ],
+    },
+
+    shapes: {
+        kids: [
+            { title: '2D Shapes Around Us', bullets: [
+                'A CIRCLE has no corners and no straight sides — it is perfectly round',
+                'A SQUARE has 4 equal sides and 4 right-angle corners',
+                'A RECTANGLE has 4 sides — opposite sides are equal in length',
+                'A TRIANGLE has 3 sides and 3 corners',
+            ]},
+            { title: 'More 2D Shapes', bullets: [
+                'A PENTAGON has 5 sides — think of the Pentagon building in America!',
+                'A HEXAGON has 6 sides — like a honeycomb cell made by bees',
+                'An OCTAGON has 8 sides — like a stop sign',
+                'A POLYGON is any flat shape with straight sides',
+            ]},
+            { title: '3D Shapes', bullets: [
+                'A CUBE has 6 square faces — like a dice',
+                'A SPHERE is perfectly round like a ball',
+                'A CYLINDER has two circular ends and one curved side — like a tin can',
+                'A CONE has a circular base and comes to a point — like an ice cream cone!',
+            ]},
+            { title: 'Shape Properties', bullets: [
+                'SIDES — straight edges around a 2D shape',
+                'CORNERS (VERTICES) — points where sides meet',
+                'FACES — flat surfaces on a 3D shape',
+                'EDGES — where two faces of a 3D shape meet',
+            ]},
+            { title: 'Shapes in Real Life', bullets: [
+                'Windows are often rectangles; wheels are circles',
+                'Pyramids in Egypt are 3D pyramid shapes',
+                'A slice of pizza is a triangle!',
+                'Look around the classroom — how many shapes can you spot?',
+            ]},
+        ],
+    },
+
+    plants: {
+        kids: [
+            { title: 'Parts of a Plant', bullets: [
+                'ROOTS — anchor the plant in soil and absorb water and nutrients',
+                'STEM — carries water from the roots up to the leaves',
+                'LEAVES — make food for the plant using sunlight',
+                'FLOWER — attracts insects to help the plant make seeds',
+            ]},
+            { title: 'How Plants Make Food', bullets: [
+                'Plants make their own food in a process called PHOTOSYNTHESIS',
+                'They use sunlight, water, and carbon dioxide from the air',
+                'The green colour in leaves (chlorophyll) captures the sunlight',
+                'Plants produce oxygen as a by-product — the air we breathe!',
+            ]},
+            { title: 'What Plants Need to Grow', bullets: [
+                'Sunlight — energy to make food',
+                'Water — absorbed through the roots',
+                'Nutrients from the soil — like a plant\'s vitamins',
+                'Carbon dioxide from the air — an ingredient for food making',
+            ]},
+            { title: 'How Seeds Grow', bullets: [
+                'A seed contains a tiny plant just waiting to sprout',
+                'Warmth and water trigger the seed to GERMINATE (start growing)',
+                'The root grows down into the soil first',
+                'Then a shoot pushes up through the soil towards the light',
+            ]},
+            { title: 'Plants and Us', bullets: [
+                'Plants give us food — fruit, vegetables, grains, and nuts',
+                'Trees produce the oxygen we breathe every day',
+                'Wood from trees is used to make furniture, paper, and buildings',
+                'Many medicines come from plants too!',
+            ]},
+        ],
+    },
+
+    animals: {
+        kids: [
+            { title: 'Animal Groups', bullets: [
+                'MAMMALS — have fur or hair and feed babies milk (dogs, cats, humans!)',
+                'BIRDS — have feathers and wings; most can fly',
+                'REPTILES — have scaly skin and are cold-blooded (snakes, lizards, crocodiles)',
+                'AMPHIBIANS — live in water AND on land (frogs, toads, newts)',
+            ]},
+            { title: 'More Animal Groups', bullets: [
+                'FISH — live in water, breathe through gills, have scales',
+                'INSECTS — have 6 legs and 3 body parts (ants, bees, butterflies)',
+                'ARACHNIDS — have 8 legs (spiders, scorpions)',
+                'There are over 8 million different animal species on Earth!',
+            ]},
+            { title: 'What Animals Eat', bullets: [
+                'HERBIVORES eat only plants — like rabbits and cows',
+                'CARNIVORES eat only meat — like lions and sharks',
+                'OMNIVORES eat both plants and meat — like bears and humans!',
+                'What an animal eats determines its role in the food chain',
+            ]},
+            { title: 'Animal Habitats', bullets: [
+                'A HABITAT is the natural home where an animal lives',
+                'Polar bears live in the icy Arctic — thick fur keeps them warm',
+                'Camels live in hot deserts — they store water in their humps',
+                'Fish live underwater; eagles live high in mountains',
+            ]},
+            { title: 'Amazing Animal Facts', bullets: [
+                'A cheetah is the fastest land animal — up to 120 km/h!',
+                'Blue whales are the largest animals on Earth — ever!',
+                'Octopuses have three hearts and blue blood',
+                'Butterflies taste with their feet!',
+            ]},
+        ],
+    },
+
+    space: {
+        kids: [
+            { title: 'Our Solar System', bullets: [
+                'The Solar System has 8 planets orbiting the Sun',
+                'In order from the Sun: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune',
+                'Earth is the only planet known to have life on it',
+                'Jupiter is the biggest planet — over 1000 Earths could fit inside!',
+            ]},
+            { title: 'The Sun', bullets: [
+                'The Sun is a giant ball of hot gas — a star at the centre of our Solar System',
+                'It is about 150 million kilometres from Earth',
+                'The Sun gives us light and heat — without it there would be no life on Earth',
+                'It takes light from the Sun about 8 minutes to reach us',
+            ]},
+            { title: 'The Moon', bullets: [
+                'The Moon is Earth\'s only natural satellite — it orbits us',
+                'It takes about 27 days for the Moon to go all the way around Earth',
+                'The Moon has no atmosphere — there is no air or wind there',
+                'Neil Armstrong was the first human to walk on the Moon in 1969',
+            ]},
+            { title: 'Stars and Galaxies', bullets: [
+                'Stars are massive balls of gas that produce light and heat',
+                'Our Sun is a medium-sized star — some are much bigger!',
+                'A galaxy is a huge collection of billions of stars',
+                'Our galaxy is called the Milky Way — and there are billions more galaxies!',
+            ]},
+            { title: 'Exploring Space', bullets: [
+                'Astronauts travel to space in rockets and spacecraft',
+                'The International Space Station orbits Earth where astronauts live and work',
+                'Telescopes help us see distant stars and planets',
+                'Robots called rovers have explored the surface of Mars',
+            ]},
+        ],
+    },
+
+    weather: {
+        kids: [
+            { title: 'Types of Weather', bullets: [
+                'SUNNY — the sun shines and the sky is clear and blue',
+                'CLOUDY — water droplets in the air form clouds',
+                'RAINY — water falls from clouds as rain',
+                'SNOWY — when it is very cold, water freezes and falls as snow',
+            ]},
+            { title: 'The Water Cycle', bullets: [
+                'Water EVAPORATES from seas and lakes when the Sun heats it',
+                'Water vapour rises and cools to form clouds — this is CONDENSATION',
+                'Water falls from clouds as rain or snow — this is PRECIPITATION',
+                'The water flows back to the sea and the cycle begins again!',
+            ]},
+            { title: 'The Four Seasons', bullets: [
+                'SPRING — warmer, flowers bloom, baby animals are born',
+                'SUMMER — hottest, long sunny days, school holidays!',
+                'AUTUMN — leaves turn golden and fall from trees',
+                'WINTER — coldest, shorter days, sometimes frost and snow',
+            ]},
+            { title: 'How We Measure Weather', bullets: [
+                'THERMOMETER — measures how hot or cold it is (temperature)',
+                'RAIN GAUGE — measures how much rain has fallen',
+                'WIND VANE — shows which direction the wind is blowing',
+                'WEATHER FORECASTERS use computers to predict tomorrow\'s weather',
+            ]},
+            { title: 'Extreme Weather', bullets: [
+                'HURRICANES are huge spinning storms with very strong winds',
+                'TORNADOES are fast spinning columns of air that touch the ground',
+                'BLIZZARDS are heavy snowstorms with strong winds',
+                'Knowing about extreme weather helps keep people safe',
+            ]},
+        ],
+    },
+
+    body: {
+        kids: [
+            { title: 'The Skeleton', bullets: [
+                'We have 206 bones in our body — they make up the skeleton',
+                'Bones support our body and protect our organs',
+                'The skull protects the brain; the ribs protect the heart and lungs',
+                'Bones join together at JOINTS — like your knee and elbow',
+            ]},
+            { title: 'The Heart and Blood', bullets: [
+                'The heart is a muscle that pumps blood around the body',
+                'It beats about 70 times per minute — every minute of every day!',
+                'Blood carries oxygen and nutrients to every part of the body',
+                'Blood vessels called arteries carry blood away from the heart',
+            ]},
+            { title: 'The Lungs and Breathing', bullets: [
+                'We have two lungs in our chest that help us breathe',
+                'When we breathe IN, we take in oxygen from the air',
+                'When we breathe OUT, we release carbon dioxide',
+                'We breathe about 20,000 times every single day!',
+            ]},
+            { title: 'The Brain', bullets: [
+                'The brain controls everything our body does',
+                'It receives messages from our five senses (see, hear, smell, taste, touch)',
+                'The brain helps us think, remember, feel emotions, and dream',
+                'It is protected by our skull and weighs about 1.4 kg',
+            ]},
+            { title: 'Keeping Our Body Healthy', bullets: [
+                'Eat a balanced diet with fruit, vegetables, protein, and carbohydrates',
+                'Exercise regularly — it strengthens your heart and muscles',
+                'Sleep for 9–11 hours a night to let your body rest and repair',
+                'Drink plenty of water — about 6–8 glasses a day',
+            ]},
+        ],
+    },
+};
+
+// Generic pool for topics not specifically covered
+const genericPool = [
+    { title: t => `What is ${cap(t)}?`, bullets: t => [
+        `${cap(t)} is an important topic worth understanding in depth`,
+        `At its core, it involves key ideas that build on each other`,
+        `A clear starting point helps make sense of everything that follows`,
+        `Let us break it down into its most essential parts`,
+    ]},
+    { title: () => 'Background & Context', bullets: t => [
+        `Understanding where ${t} comes from helps explain what it is today`,
+        `Key developments shaped how we think about and use it`,
+        `Early ideas laid the groundwork for modern understanding`,
+        `Context makes the topic easier to connect with`,
+    ]},
+    { title: t => `How ${cap(t)} Works`, bullets: t => [
+        `The process starts with the most fundamental building blocks`,
+        `Each part plays a specific role in the overall system`,
+        `When the pieces work together, the result is clear and consistent`,
+        `Understanding the mechanism makes everything else click into place`,
+    ]},
+    { title: () => 'Key Ideas to Know', bullets: t => [
+        `A small number of central ideas underpin everything about ${t}`,
+        `The first principle focuses on how things are defined and organised`,
+        `The second principle looks at how the parts relate to each other`,
+        `Together they explain both what ${t} is and how it behaves`,
+    ]},
+    { title: () => 'Why It Matters', bullets: t => [
+        `${cap(t)} has a real impact on everyday life`,
+        `Understanding it opens up new ways of thinking and doing things`,
+        `Its effects reach further than they might first appear`,
+        `People who understand it are better prepared to make good decisions`,
+    ]},
+    { title: () => 'Real Examples', bullets: t => [
+        `Looking at concrete examples makes ${t} much easier to understand`,
+        `Everyday situations often involve it without us realising`,
+        `Seeing it in action is the best way to truly grasp it`,
+        `Examples also show the range and variety of how it appears`,
+    ]},
+    { title: () => 'Common Questions', bullets: t => [
+        `Many people wonder how ${t} fits into what they already know`,
+        `A common misconception is that it is harder than it really is`,
+        `Once the basics are clear, more complex ideas follow naturally`,
+        `There is no such thing as a silly question when learning something new`,
+    ]},
+    { title: () => 'Challenges and Tips', bullets: t => [
+        `Every topic has tricky parts — ${t} is no different`,
+        `The most common difficulty is getting the fundamentals solid`,
+        `Breaking things into smaller steps makes it much more manageable`,
+        `Practice and patience are the most reliable tools for mastering it`,
+    ]},
+    { title: t => `${cap(t)} in the Real World`, bullets: t => [
+        `${cap(t)} appears in more places than you might expect`,
+        `Industries, schools, and everyday life all make use of it`,
+        `Real-world connections help make abstract ideas feel concrete`,
+        `Spotting it around you is a great sign that it is sinking in`,
+    ]},
+    { title: () => 'Tips for Success', bullets: t => [
+        `Start with what you already know and build from there`,
+        `Review regularly — a little often is better than a lot at once`,
+        `Ask questions whenever something is not clear`,
+        `Connect new ideas about ${t} to things you already understand`,
+    ]},
+];
+
 function buildSlides(topic, numSlides, tone) {
-    const t = topic.toLowerCase().trim();
+    const t    = topic.toLowerCase().trim();
+    const ctx  = detectContext(topic);
+    const isK  = ctx.kids;
     const result = [];
 
     // Title slide
-    result.push({
-        type: 'title',
-        title: titleCase(topic),
-        subtitle: toneSubtitles[tone] || toneSubtitles.Professional,
-    });
+    const titleText = titleCase(topic);
+    const subtitle = isK
+        ? `A fun lesson for young learners`
+        : tone === 'Professional' ? 'A structured overview'
+        : tone === 'Casual'       ? 'A friendly look at the topic'
+        : tone === 'Inspiring'    ? 'Ideas and insights to inspire you'
+        : 'An educational guide';
 
-    // Pick content slides from pool (shuffle deterministically based on topic length)
-    const contentCount = numSlides - 2;
-    const pool = [...slidePool];
-    // Simple deterministic shuffle seeded by topic string
-    const seed = [...topic].reduce((a, c) => a + c.charCodeAt(0), 0);
-    for (let i = pool.length - 1; i > 0; i--) {
-        const j = (seed * (i + 1)) % (i + 1);
-        [pool[i], pool[j]] = [pool[j], pool[i]];
+    result.push({ type: 'title', title: titleText, subtitle });
+
+    // Pick the right pool
+    let pool = null;
+    if (ctx.isDivision)    pool = topicPools.division?.[isK ? 'kids' : 'adult'];
+    if (ctx.isMultiply)    pool = topicPools.multiplication?.[isK ? 'kids' : 'adult'];
+    if (ctx.isAddition)    pool = topicPools.addition?.kids;
+    if (ctx.isSubtraction) pool = topicPools.subtraction?.kids;
+    if (ctx.isFractions)   pool = topicPools.fractions?.kids;
+    if (ctx.isShapes)      pool = topicPools.shapes?.kids;
+    if (ctx.isPlants)      pool = topicPools.plants?.kids;
+    if (ctx.isAnimals)     pool = topicPools.animals?.kids;
+    if (ctx.isSpace)       pool = topicPools.space?.kids;
+    if (ctx.isWeather)     pool = topicPools.weather?.kids;
+    if (ctx.isBody)        pool = topicPools.body?.kids;
+
+    // Fall back to generic if no specific pool
+    if (!pool || pool.length === 0) {
+        pool = genericPool.map(tpl => ({
+            title: tpl.title(t),
+            bullets: tpl.bullets(t),
+        }));
     }
 
+    // Pick slides from pool
+    const contentCount = numSlides - 2;
     for (let i = 0; i < contentCount; i++) {
         const tpl = pool[i % pool.length];
         result.push({
             type: 'content',
-            title: tpl.title(t),
-            bullets: tpl.bullets(t),
+            title: typeof tpl.title === 'function' ? tpl.title(t) : tpl.title,
+            bullets: typeof tpl.bullets === 'function' ? tpl.bullets(t) : tpl.bullets,
         });
     }
 
-    // Conclusion slide
-    result.push({
-        type: 'conclusion',
-        title: 'Key Takeaways',
-        subtitle: toneConclusions[tone] || toneConclusions.Professional,
-    });
+    // Conclusion
+    const conclusionSub = isK
+        ? `Great work — you are doing brilliantly! 🌟`
+        : tone === 'Inspiring' ? 'The time to apply this knowledge is now'
+        : tone === 'Casual'    ? 'Hope that was helpful!'
+        : 'Apply these insights to make a real difference';
+
+    result.push({ type: 'conclusion', title: 'What We Learned', subtitle: conclusionSub });
 
     return result;
 }
