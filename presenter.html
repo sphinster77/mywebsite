@@ -100,6 +100,32 @@
         .dot { width: 7px; height: 7px; border-radius: 50%; background: #252844; cursor: pointer; transition: all 0.2s; }
         .dot.on { width: 22px; border-radius: 4px; background: #f0c030; }
 
+        /* Task slide */
+        .task-list { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; }
+        .task-row { display: flex; align-items: center; gap: 0.75rem; }
+        .task-q { font-size: clamp(0.72rem, 1.7vw, 0.95rem); flex: 1; line-height: 1.4; }
+        .task-btn {
+            background: transparent; border: 1.5px solid; border-radius: 6px;
+            padding: 0.18rem 0.55rem; font-size: clamp(0.6rem, 1.3vw, 0.75rem);
+            cursor: pointer; flex-shrink: 0; font-weight: 700; transition: opacity 0.15s;
+        }
+        .task-btn:hover { opacity: 0.75; }
+        .task-a { font-weight: 800; font-size: clamp(0.72rem, 1.7vw, 0.95rem); min-width: 2.5rem; visibility: hidden; transition: visibility 0s; }
+        .task-a.shown { visibility: visible; }
+
+        /* Fullscreen task */
+        .fs-task-list { display: flex; flex-direction: column; gap: 1.1rem; width: 100%; }
+        .fs-task-row { display: flex; align-items: center; gap: 1.2rem; }
+        .fs-task-q { font-size: clamp(1rem, 2.2vw, 1.4rem); flex: 1; line-height: 1.4; }
+        .fs-task-btn {
+            background: transparent; border: 2px solid; border-radius: 8px;
+            padding: 0.3rem 0.9rem; font-size: clamp(0.8rem, 1.5vw, 1rem);
+            cursor: pointer; flex-shrink: 0; font-weight: 700; transition: opacity 0.15s;
+        }
+        .fs-task-btn:hover { opacity: 0.75; }
+        .fs-task-a { font-weight: 800; font-size: clamp(1rem, 2.2vw, 1.4rem); min-width: 3.5rem; visibility: hidden; }
+        .fs-task-a.shown { visibility: visible; }
+
         /* Fullscreen */
         #fs { display: none; position: fixed; inset: 0; z-index: 9000; flex-direction: column; align-items: center; justify-content: center; }
         #fs.active { display: flex; }
@@ -211,83 +237,176 @@
 const SLIDES = [
     {
         type: 'title',
-        title: 'Let\'s Learn Division! ➗',
-        subtitle: 'A fun lesson for Year 2',
+        title: 'Division — Going Deeper ➗',
+        subtitle: 'A longer lesson for Year 2 / Year 3',
     },
     {
         type: 'content',
-        title: 'What is Division?',
+        title: 'What is Division? (Recap)',
         bullets: [
-            'Division means sharing equally — splitting things into equal groups',
-            'If you have 12 sweets and share them with 3 friends, you use division!',
-            'We use the ➗ sign to show division',
-            'Example: 12 ➗ 3 = 4 — everyone gets 4 sweets each',
+            'Division means splitting a number into equal groups',
+            'We use the ➗ sign:  12 ➗ 3 = 4',
+            'DIVIDEND ➗ DIVISOR = QUOTIENT',
+            'Think of it as asking: "how many groups of ___ fit into ___?"',
         ],
     },
     {
         type: 'content',
-        title: 'Division Words to Know',
+        title: 'Two Ways to Think About Division',
         bullets: [
-            'DIVIDEND — the big number you are splitting up  (e.g. 12)',
-            'DIVISOR — how many groups you split it into  (e.g. 3)',
-            'QUOTIENT — the answer you get  (e.g. 4)',
-            'So:  12 ➗ 3 = 4',
+            'SHARING — split 12 sweets equally between 3 friends → 4 each',
+            'GROUPING — put 12 sweets into bags of 3 → how many bags? → 4 bags',
+            'Both give the same answer but think about it differently',
+            'Try both ways and use whichever makes more sense to you!',
         ],
     },
     {
         type: 'content',
-        title: 'How to Divide — Step by Step',
+        title: 'Division and Multiplication Are Linked',
         bullets: [
-            'Step 1: Look at the big number (the dividend)',
-            'Step 2: Ask — how many times does the divisor fit in?',
-            'Step 3: Write down the answer (the quotient)',
-            'Step 4: Check it by multiplying back — 4 × 3 = 12 ✓',
+            'Multiplication and division are opposites — they undo each other',
+            'If  4 × 3 = 12,  then  12 ➗ 3 = 4  and  12 ➗ 4 = 3',
+            'This is called a FACT FAMILY — three numbers that work together',
+            'Fact family for 3, 4 and 12:  3×4=12 · 4×3=12 · 12➗3=4 · 12➗4=3',
         ],
     },
     {
         type: 'content',
-        title: 'Division in Real Life',
+        title: 'Using Times Tables to Divide',
         bullets: [
-            '🍕  Sharing a pizza equally between friends',
-            '🖍️  Putting 20 crayons into 4 pencil cases equally',
-            '🍬  Splitting sweets fairly between brothers and sisters',
-            '🪑  Arranging 16 chairs into 4 equal rows',
+            '2 times table → helps divide by 2:  16 ➗ 2 = 8  (because 2×8=16)',
+            '5 times table → helps divide by 5:  35 ➗ 5 = 7  (because 5×7=35)',
+            '10 times table → helps divide by 10:  70 ➗ 10 = 7',
+            '3 times table → helps divide by 3:  24 ➗ 3 = 8  (because 3×8=24)',
         ],
     },
     {
         type: 'content',
-        title: 'Cool Division Facts',
+        title: 'Dividing by 2',
         bullets: [
-            'Any number ➗ 1 stays the same — 9 ➗ 1 = 9',
-            'Any number ➗ itself = 1 — 7 ➗ 7 = 1',
-            'You can NEVER divide by zero — it is not allowed!',
-            'Division is the opposite of multiplication',
+            'Dividing by 2 is the same as finding HALF of a number',
+            '½ of 10 = 5  →  10 ➗ 2 = 5',
+            '½ of 18 = 9  →  18 ➗ 2 = 9',
+            'Even numbers always divide exactly by 2 with no leftovers',
         ],
     },
     {
         type: 'content',
-        title: 'Division and Times Tables',
+        title: 'Dividing by 5 and 10',
         bullets: [
-            'Knowing your times tables makes division much easier!',
-            'If you know 3 × 5 = 15, then you know 15 ➗ 3 = 5',
-            'They work together — they are two sides of the same coin',
-            'Practise times tables every day and division will feel easy!',
+            'Dividing by 10: just remove the zero!  60 ➗ 10 = 6',
+            'Dividing by 5: think of your 5 times table  →  45 ➗ 5 = 9',
+            'A number divisible by 5 always ends in 0 or 5',
+            'A number divisible by 10 always ends in 0',
         ],
     },
     {
         type: 'content',
-        title: 'Let\'s Practise! 🌟',
+        title: 'What is a Remainder?',
         bullets: [
-            '10 ➗ 2 = ?   (how many 2s fit into 10?)',
-            '15 ➗ 3 = ?   (count up in 3s until you reach 15)',
-            '20 ➗ 4 = ?   (share 20 things into 4 equal groups)',
-            'Use counters, drawings, or your fingers to help!',
+            'Sometimes a number does NOT split up perfectly equally',
+            'The amount LEFT OVER is called the REMAINDER',
+            'Example:  13 ➗ 4 = 3  remainder 1  (3 groups of 4 with 1 left over)',
+            'We write it as:  13 ➗ 4 = 3 r 1',
+        ],
+    },
+    {
+        type: 'content',
+        title: 'Remainders — More Examples',
+        bullets: [
+            '11 ➗ 3 = 3 r 2  →  3 groups of 3 = 9, with 2 left over',
+            '17 ➗ 5 = 3 r 2  →  3 groups of 5 = 15, with 2 left over',
+            '19 ➗ 4 = 4 r 3  →  4 groups of 4 = 16, with 3 left over',
+            'The remainder is always SMALLER than the divisor',
+        ],
+    },
+    {
+        type: 'content',
+        title: 'Remainders in Real Life',
+        bullets: [
+            '13 children need to sit in groups of 4 — how many full groups?',
+            '13 ➗ 4 = 3 remainder 1 → 3 full groups and 1 child left over',
+            'You have 22 eggs and each box holds 6 — how many full boxes?',
+            '22 ➗ 6 = 3 remainder 4 → 3 full boxes and 4 eggs left over',
+        ],
+    },
+    {
+        type: 'content',
+        title: 'Division Rules to Remember',
+        bullets: [
+            'Any number ➗ 1 = itself  →  15 ➗ 1 = 15',
+            'Any number ➗ itself = 1  →  9 ➗ 9 = 1',
+            'Zero divided by anything = 0  →  0 ➗ 5 = 0',
+            'You can NEVER divide by zero — it is impossible!',
+        ],
+    },
+    {
+        type: 'content',
+        title: 'Word Problems — Read Carefully!',
+        bullets: [
+            '28 children split into 4 equal teams — how many in each team?  →  28 ➗ 4 = 7',
+            'A baker makes 30 biscuits and puts 5 in each bag — how many bags?  →  30 ➗ 5 = 6',
+            '24 apples shared equally between 8 children — how many each?  →  24 ➗ 8 = 3',
+            'Key words: shared equally, split into, how many each, how many groups',
+        ],
+    },
+    {
+        type: 'content',
+        title: 'How to Check Your Answer',
+        bullets: [
+            'Always multiply your answer back to check!',
+            '20 ➗ 4 = 5  →  check:  5 × 4 = 20 ✓',
+            'With a remainder:  13 ➗ 3 = 4 r 1  →  check:  4 × 3 = 12,  12 + 1 = 13 ✓',
+            'If your check works out, your answer is correct!',
+        ],
+    },
+    {
+        type: 'task',
+        title: '✏️ Task 1 — Basic Division',
+        questions: [
+            { q: '16 ➗ 2 = ?', a: '8' },
+            { q: '30 ➗ 5 = ?', a: '6' },
+            { q: '40 ➗ 10 = ?', a: '4' },
+            { q: '21 ➗ 3 = ?', a: '7' },
+            { q: '32 ➗ 4 = ?', a: '8' },
+        ],
+    },
+    {
+        type: 'task',
+        title: '✏️ Task 2 — Division with Remainders',
+        questions: [
+            { q: '17 ➗ 3 = ?', a: '5 r 2' },
+            { q: '22 ➗ 5 = ?', a: '4 r 2' },
+            { q: '19 ➗ 4 = ?', a: '4 r 3' },
+            { q: '23 ➗ 6 = ?', a: '3 r 5' },
+            { q: '29 ➗ 8 = ?', a: '3 r 5' },
+        ],
+    },
+    {
+        type: 'task',
+        title: '✏️ Task 3 — Mixed Division',
+        questions: [
+            { q: '18 ➗ 2 = ?', a: '9' },
+            { q: '35 ➗ 5 = ?', a: '7' },
+            { q: '24 ➗ 3 = ?', a: '8' },
+            { q: '25 ➗ 4 = ?', a: '6 r 1' },
+            { q: '23 ➗ 6 = ?', a: '3 r 5' },
+        ],
+    },
+    {
+        type: 'task',
+        title: '✏️ Task 4 — Word Problems',
+        questions: [
+            { q: '36 children sit in rows of 4 — how many rows?', a: '9 rows' },
+            { q: '45 pencils shared between 9 children — how many each?', a: '5 each' },
+            { q: '23 books split into groups of 5 — full groups and remainder?', a: '4 r 3' },
+            { q: '32 eggs packed in boxes of 6 — how many full boxes?', a: '5 r 2' },
         ],
     },
     {
         type: 'conclusion',
-        title: 'Great Work! 🎉',
-        subtitle: 'You now know what division is, the key words, and how to do it!',
+        title: 'Brilliant Work! 🎉',
+        subtitle: 'You can divide, find remainders, use fact families, and solve word problems!',
     },
 ];
 
@@ -361,6 +480,18 @@ function renderSlide() {
             <h1 class="slide-title" style="color:${th.title}">${esc(s.title)}</h1>
             <p class="slide-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
             <span class="slide-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
+    } else if (s.type === 'task') {
+        const rows = (s.questions||[]).map(qa => `
+            <div class="task-row">
+                <span class="task-q" style="color:${th.text}">${esc(qa.q)}</span>
+                <button class="task-btn" style="color:${th.accent};border-color:${th.accent}" onclick="reveal(this)">Show</button>
+                <span class="task-a" style="color:${th.accent}">${esc(qa.a)}</span>
+            </div>`).join('');
+        el.innerHTML = `
+            <div style="position:absolute;background:${th.accent};${acS}"></div>
+            <h2 class="slide-title" style="color:${th.title};margin-bottom:0.8rem">${esc(s.title)}</h2>
+            <div class="task-list">${rows}</div>
+            <span class="slide-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else {
         const bHTML = (s.bullets||[]).map(b =>
             `<li><span class="bullet-dot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`
@@ -433,6 +564,18 @@ function renderFsSlide() {
             <h1 class="fs-title" style="color:${th.title}">${esc(s.title)}</h1>
             <p class="fs-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
             <span class="fs-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
+    } else if (s.type === 'task') {
+        const rows = (s.questions||[]).map(qa => `
+            <div class="fs-task-row">
+                <span class="fs-task-q" style="color:${th.text}">${esc(qa.q)}</span>
+                <button class="fs-task-btn" style="color:${th.accent};border-color:${th.accent}" onclick="reveal(this)">Show</button>
+                <span class="fs-task-a" style="color:${th.accent}">${esc(qa.a)}</span>
+            </div>`).join('');
+        el.innerHTML = `
+            <div style="position:absolute;background:${th.accent};${acS}"></div>
+            <h2 class="fs-title" style="color:${th.title};margin-bottom:1.2rem">${esc(s.title)}</h2>
+            <div class="fs-task-list">${rows}</div>
+            <span class="fs-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else {
         const bHTML = (s.bullets||[]).map(b =>
             `<li><span class="fs-dot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`
@@ -447,18 +590,37 @@ function renderFsSlide() {
     document.getElementById('fs-counter').textContent = `${idx+1} / ${SLIDES.length}`;
 }
 
+function reveal(btn) {
+    const ans = btn.nextElementSibling;
+    const hiding = !ans.classList.contains('shown');
+    ans.classList.toggle('shown', hiding);
+    btn.textContent = hiding ? 'Hide' : 'Show';
+}
+
 function printSlides() {
     const th = themes[theme];
     const pv = document.getElementById('print-view');
     pv.innerHTML = SLIDES.map((s, i) => {
         const isCenter = (s.type === 'title' || s.type === 'conclusion');
-        let inner = isCenter
-            ? `<div class="p-accent" style="background:${th.accent};bottom:0;left:0;right:0;width:100%;height:5pt"></div>
-               <h1 class="p-title" style="color:${th.title}">${esc(s.title)}</h1>
-               <p class="p-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>`
-            : `<div class="p-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:6pt;height:100%"></div>
-               <h2 class="p-title" style="color:${th.title}">${esc(s.title)}</h2>
-               <ul class="p-bullets">${(s.bullets||[]).map(b=>`<li><span class="p-bdot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`).join('')}</ul>`;
+        let inner = '';
+        if (isCenter) {
+            inner = `<div class="p-accent" style="background:${th.accent};bottom:0;left:0;right:0;width:100%;height:5pt"></div>
+                     <h1 class="p-title" style="color:${th.title}">${esc(s.title)}</h1>
+                     <p class="p-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>`;
+        } else if (s.type === 'task') {
+            const rows = (s.questions||[]).map(qa =>
+                `<li style="display:flex;gap:12pt;align-items:baseline;font-size:13pt;margin-bottom:8pt">
+                    <span style="flex:1;color:${th.text}">${esc(qa.q)}</span>
+                    <span style="font-weight:800;color:${th.accent}">${esc(qa.a)}</span>
+                 </li>`).join('');
+            inner = `<div class="p-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:6pt;height:100%"></div>
+                     <h2 class="p-title" style="color:${th.title}">${esc(s.title)}</h2>
+                     <ul style="list-style:none;margin-top:16pt">${rows}</ul>`;
+        } else {
+            inner = `<div class="p-accent" style="background:${th.accent};top:0;left:0;bottom:0;width:6pt;height:100%"></div>
+                     <h2 class="p-title" style="color:${th.title}">${esc(s.title)}</h2>
+                     <ul class="p-bullets">${(s.bullets||[]).map(b=>`<li><span class="p-bdot" style="background:${th.accent}"></span><span style="color:${th.text}">${esc(b)}</span></li>`).join('')}</ul>`;
+        }
         return `<div class="p-slide${isCenter?' center':''}" style="background:${th.slide}">${inner}<span class="p-num" style="color:${th.num}">${i+1} / ${SLIDES.length}</span></div>`;
     }).join('');
     window.print();
