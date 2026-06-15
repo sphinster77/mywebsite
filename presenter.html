@@ -104,27 +104,17 @@
         .task-list { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; }
         .task-row { display: flex; align-items: center; gap: 0.75rem; }
         .task-q { font-size: clamp(0.72rem, 1.7vw, 0.95rem); flex: 1; line-height: 1.4; }
-        .task-btn {
-            background: transparent; border: 1.5px solid; border-radius: 6px;
-            padding: 0.18rem 0.55rem; font-size: clamp(0.6rem, 1.3vw, 0.75rem);
-            cursor: pointer; flex-shrink: 0; font-weight: 700; transition: opacity 0.15s;
-        }
-        .task-btn:hover { opacity: 0.75; }
-        .task-a { font-weight: 800; font-size: clamp(0.72rem, 1.7vw, 0.95rem); min-width: 2.5rem; visibility: hidden; transition: visibility 0s; }
-        .task-a.shown { visibility: visible; }
+        .task-a { font-weight: 800; font-size: clamp(0.72rem, 1.7vw, 0.95rem); min-width: 2.5rem; opacity: 0; transition: opacity 0.25s; }
+        .task-a.shown { opacity: 1; }
+        .task-hint { font-size: clamp(0.6rem, 1.2vw, 0.72rem); opacity: 0.4; margin-top: 0.6rem; }
 
         /* Fullscreen task */
         .fs-task-list { display: flex; flex-direction: column; gap: 1.1rem; width: 100%; }
         .fs-task-row { display: flex; align-items: center; gap: 1.2rem; }
         .fs-task-q { font-size: clamp(1rem, 2.2vw, 1.4rem); flex: 1; line-height: 1.4; }
-        .fs-task-btn {
-            background: transparent; border: 2px solid; border-radius: 8px;
-            padding: 0.3rem 0.9rem; font-size: clamp(0.8rem, 1.5vw, 1rem);
-            cursor: pointer; flex-shrink: 0; font-weight: 700; transition: opacity 0.15s;
-        }
-        .fs-task-btn:hover { opacity: 0.75; }
-        .fs-task-a { font-weight: 800; font-size: clamp(1rem, 2.2vw, 1.4rem); min-width: 3.5rem; visibility: hidden; }
-        .fs-task-a.shown { visibility: visible; }
+        .fs-task-a { font-weight: 800; font-size: clamp(1rem, 2.2vw, 1.4rem); min-width: 3.5rem; opacity: 0; transition: opacity 0.25s; }
+        .fs-task-a.shown { opacity: 1; }
+        .fs-task-hint { font-size: clamp(0.75rem, 1.4vw, 0.95rem); opacity: 0.35; margin-top: 1rem; }
 
         /* Fullscreen */
         #fs { display: none; position: fixed; inset: 0; z-index: 9000; flex-direction: column; align-items: center; justify-content: center; }
@@ -437,6 +427,7 @@ const themes = {
 
 let idx = 0;
 let theme = 'dark';
+let revealCount = 0;
 
 document.addEventListener('keydown', e => {
     if (document.getElementById('fs').classList.contains('active')) {
@@ -481,16 +472,20 @@ function renderSlide() {
             <p class="slide-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
             <span class="slide-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else if (s.type === 'task') {
-        const rows = (s.questions||[]).map(qa => `
+        const qs = s.questions || [];
+        const rows = qs.map((qa, qi) => `
             <div class="task-row">
                 <span class="task-q" style="color:${th.text}">${esc(qa.q)}</span>
-                <button class="task-btn" style="color:${th.accent};border-color:${th.accent}" onclick="reveal(this)">Show</button>
-                <span class="task-a" style="color:${th.accent}">${esc(qa.a)}</span>
+                <span class="task-a${qi < revealCount ? ' shown' : ''}" style="color:${th.accent}">${esc(qa.a)}</span>
             </div>`).join('');
+        const hint = revealCount < qs.length
+            ? `<p class="task-hint" style="color:${th.sub}">Press → to reveal answers one by one</p>`
+            : `<p class="task-hint" style="color:${th.sub}">All answers shown — press → to continue</p>`;
         el.innerHTML = `
             <div style="position:absolute;background:${th.accent};${acS}"></div>
             <h2 class="slide-title" style="color:${th.title};margin-bottom:0.8rem">${esc(s.title)}</h2>
             <div class="task-list">${rows}</div>
+            ${hint}
             <span class="slide-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else {
         const bHTML = (s.bullets||[]).map(b =>
@@ -512,10 +507,18 @@ function renderSlide() {
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function nav(d) {
+    const s = SLIDES[idx];
+    if (d > 0 && s.type === 'task' && revealCount < (s.questions||[]).length) {
+        revealCount++;
+        renderSlide();
+        return;
+    }
+    revealCount = 0;
     const next = idx + d;
     if (next < 0 || next >= SLIDES.length) return;
     idx = next;
     renderSlide();
+    highlightDot();
 }
 
 function buildDots() {
@@ -524,7 +527,7 @@ function buildDots() {
     ).join('');
 }
 
-function jumpTo(i) { idx = i; renderSlide(); }
+function jumpTo(i) { idx = i; revealCount = 0; renderSlide(); }
 
 function present() {
     renderFsSlide();
@@ -534,6 +537,13 @@ function present() {
 function exitFs() { document.getElementById('fs').classList.remove('active'); }
 
 function fsNav(d) {
+    const s = SLIDES[idx];
+    if (d > 0 && s.type === 'task' && revealCount < (s.questions||[]).length) {
+        revealCount++;
+        renderFsSlide();
+        return;
+    }
+    revealCount = 0;
     const next = idx + d;
     if (next < 0 || next >= SLIDES.length) return;
     idx = next;
@@ -565,16 +575,20 @@ function renderFsSlide() {
             <p class="fs-sub" style="color:${th.sub}">${esc(s.subtitle||'')}</p>
             <span class="fs-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else if (s.type === 'task') {
-        const rows = (s.questions||[]).map(qa => `
+        const qs = s.questions || [];
+        const rows = qs.map((qa, qi) => `
             <div class="fs-task-row">
                 <span class="fs-task-q" style="color:${th.text}">${esc(qa.q)}</span>
-                <button class="fs-task-btn" style="color:${th.accent};border-color:${th.accent}" onclick="reveal(this)">Show</button>
-                <span class="fs-task-a" style="color:${th.accent}">${esc(qa.a)}</span>
+                <span class="fs-task-a${qi < revealCount ? ' shown' : ''}" style="color:${th.accent}">${esc(qa.a)}</span>
             </div>`).join('');
+        const hint = revealCount < qs.length
+            ? `<p class="fs-task-hint" style="color:${th.sub}">Press → to reveal answers one by one</p>`
+            : `<p class="fs-task-hint" style="color:${th.sub}">All answers shown — press → to continue</p>`;
         el.innerHTML = `
             <div style="position:absolute;background:${th.accent};${acS}"></div>
             <h2 class="fs-title" style="color:${th.title};margin-bottom:1.2rem">${esc(s.title)}</h2>
             <div class="fs-task-list">${rows}</div>
+            ${hint}
             <span class="fs-num" style="color:${th.num}">${idx+1} / ${SLIDES.length}</span>`;
     } else {
         const bHTML = (s.bullets||[]).map(b =>
@@ -588,13 +602,6 @@ function renderFsSlide() {
     }
 
     document.getElementById('fs-counter').textContent = `${idx+1} / ${SLIDES.length}`;
-}
-
-function reveal(btn) {
-    const ans = btn.nextElementSibling;
-    const hiding = !ans.classList.contains('shown');
-    ans.classList.toggle('shown', hiding);
-    btn.textContent = hiding ? 'Hide' : 'Show';
 }
 
 function printSlides() {
