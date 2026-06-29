@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Video Rec</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .login-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-box h1 {
+      color: #333;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .main-screen {
+      display: none;
+    }
+
+    .main-screen.active {
+      display: block;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h2 {
+      color: #333;
+    }
+
+    .room-info {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .video-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .main-video {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .main-video video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      min-height: 400px;
+    }
+
+    .side-videos {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .side-videos h3 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .video-item {
+      margin-bottom: 15px;
+      cursor: pointer;
+      border: 3px solid transparent;
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .video-item:hover {
+      border-color: #667eea;
+    }
+
+    .video-item.is-main {
+      border-color: #4facfe;
+    }
+
+    .video-item video {
+      width: 100%;
+      border-radius: 7px;
+      background: #000;
+    }
+
+    .video-item .user-name {
+      padding: 8px;
+      background: #f5f5f5;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .controls button {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .pending-users {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+
+    .pending-users h3 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .pending-user {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+
+    .pending-user button {
+      padding: 8px 16px;
+      margin-left: 10px;
+      font-size: 14px;
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .camera-preview {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 200px;
+      border-radius: 10px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+      display: none;
+    }
+
+    .camera-preview.active {
+      display: block;
+    }
+
+    .camera-preview video {
+      width: 100%;
+      border-radius: 10px;
+    }
+
+    .recording-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #f5576c;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 25px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      animation: pulse 1.5s infinite;
+    }
+
+    .recording-indicator.active {
+      display: flex;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .recording-indicator::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: white;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-box">
+      <h1>Admin Login</h1>
+      <div class="error-message" id="errorMessage"></div>
+      <div class="form-group">
+        <label>Room Code</label>
+        <input type="text" id="roomCode" placeholder="Enter room code (e.g., 1800)">
+      </div>
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="adminName" placeholder="Enter your name">
+      </div>
+      <button class="btn" onclick="createRoom()">Create Room</button>
+    </div>
+  </div>
+
+  <div class="container main-screen" id="mainScreen">
+    <div class="header">
+      <div>
+        <h2>Admin Dashboard</h2>
+        <div class="room-info">Room: <span id="displayRoomCode"></span> | Admin: <span id="displayAdminName"></span></div>
+      </div>
+      <div class="room-info">Connected Users; <span id="userCount">0</span></div>
+    </div>
+
+    <div class="video-container">
+      <div class="main-video">
+        <video id="mainVideo" autoplay playsinline></video>
+      </div>
+      <div class="side-videos">
+        <h3>Other Screens</h3>
+        <div id="sideVideos"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-success" id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+      <button class="btn" id="cameraBtn" onclick="toggleCamera()">Enable Camera</button>
+    </div>
+
+    <div class="pending-users">
+      <h3>Pending Users</h3>
+      <div id="pendingUsers"></div>
+    </div>
+  </div>
+
+  <div class="camera-preview" id="cameraPreview">
+    <video id="cameraVideo" autoplay playsinline muted></video>
+  </div>
+
+  <div class="recording-indicator" id="recordingIndicator">
+    Recording
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let roomCode = '';
+    let adminName = '';
+    let peerConnections = {};
+    let localStream = null;
+    let cameraStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+    let isCameraEnabled = false;
+
+    function createRoom() {
+      roomCode = document.getElementById('roomCode').value.trim();
+      adminName = document.getElementById('adminName').value.trim();
+
+      if (!roomCode || !adminName) {
+        showError('Please fill in all fields');
+        return;
+      }
+
+      socket.emit('createRoom', { roomCode, adminName });
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    socket.on('roomCreated', ({ roomCode: code, adminName: name }) => {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('mainScreen').classList.add('active');
+      document.getElementById('displayRoomCode').textContent = code;
+      document.getElementById('displayAdminName').textContent = name;
+    });
+
+    socket.on('roomError', (error) => {
+      showError(error);
+    });
+
+    socket.on('userPending', ({ socketId, userName }) => {
+      const pendingDiv = document.getElementById('pendingUsers');
+      const userDiv = document.createElement('div');
+      userDiv.className = 'pending-user';
+      userDiv.innerHTML = `
+        <span>${userName}</span>
+        <div>
+          <button class="btn btn-success" onclick="approveUser('${socketId}')">Approve</button>
+          <button class="btn btn-danger" onclick="rejectUser('${socketId}')">Reject</button>
+        </div>
+      `;
+      userDiv.dataset.socketId = socketId;
+      pendingDiv.appendChild(userDiv);
+    });
+
+    function approveUser(socketId) {
+      socket.emit('approveUser', { roomCode, socketId });
+      const userDiv = document.querySelector(`[data-socket-id="${socketId}"]`);
+      if (userDiv) userDiv.remove();
+    }
+
+    function rejectUser(socketId) {
+      socket.emit('rejectUser', { socketId });
+      const userDiv = document.querySelector(`[data-socket-id="${socketId}"]`);
+      if (userDiv) userDiv.remove();
+    }
+
+    socket.on('userJoined', ({ userName }) => {
+      updateUserCount();
+    });
+
+    socket.on('userStartedSharing', async ({ socketId }) => {
+      // Admin initiates WebRTC connection to user
+      if (!peerConnections[socketId]) {
+        const pc = createPeerConnection(socketId);
+        peerConnections[socketId] = pc;
+
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('offer', { roomCode, offer, targetSocketId: socketId });
+      }
+    });
+
+    socket.on('userLeft', ({ socketId }) => {
+      if (peerConnections[socketId]) {
+        peerConnections[socketId].close();
+        delete peerConnections[socketId];
+      }
+      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
+      if (videoItem) videoItem.remove();
+    });
+
+    socket.on('offer', async ({ offer, fromSocketId }) => {
+      if (!peerConnections[fromSocketId]) {
+        const pc = createPeerConnection(fromSocketId);
+        peerConnections[fromSocketId] = pc;
+      }
+
+      await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnections[fromSocketId].createAnswer();
+      await peerConnections[fromSocketId].setLocalDescription(answer);
+      socket.emit('answer', { answer, targetSocketId: fromSocketId });
+    });
+
+    socket.on('answer', async ({ answer, fromSocketId }) => {
+      if (peerConnections[fromSocketId]) {
+        await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    socket.on('iceCandidate', async ({ candidate, fromSocketId }) => {
+      if (peerConnections[fromSocketId]) {
+        await peerConnections[fromSocketId].addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    function createPeerConnection(socketId) {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('iceCandidate', { candidate: event.candidate, targetSocketId: socketId });
+        }
+      };
+
+      pc.ontrack = (event) => {
+        const mainVideo = document.getElementById('mainVideo');
+        const sideVideos = document.getElementById('sideVideos');
+
+        if (event.streams[0]) {
+          // Create side video element
+          const videoItem = document.createElement('div');
+          videoItem.className = 'video-item';
+          videoItem.dataset.videoSocketId = socketId;
+          videoItem.onclick = () => setMainScreen(socketId);
+
+          const video = document.createElement('video');
+          video.srcObject = event.streams[0];
+          video.autoplay = true;
+          video.playsInline = true;
+
+          const userName = document.createElement('div');
+          userName.className = 'user-name';
+          userName.textContent = `User ${socketId.slice(0, 4)}`;
+
+          videoItem.appendChild(video);
+          videoItem.appendChild(userName);
+          sideVideos.appendChild(videoItem);
+
+          // If this is the first stream, set it as main
+          if (!mainVideo.srcObject) {
+            setMainScreen(socketId);
+          }
+        }
+      };
+
+      return pc;
+    }
+
+    function setMainScreen(socketId) {
+      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
+      const mainVideo = document.getElementById('mainVideo');
+
+      document.querySelectorAll('.video-item').forEach(item => item.classList.remove('is-main'));
+      if (videoItem) {
+        videoItem.classList.add('is-main');
+        const video = videoItem.querySelector('video');
+        mainVideo.srcObject = video.srcObject;
+      }
+
+      socket.emit('setMainScreen', { roomCode, socketId });
+    }
+
+    socket.on('mainScreenChanged', ({ socketId }) => {
+      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
+      const mainVideo = document.getElementById('mainVideo');
+
+      document.querySelectorAll('.video-item').forEach(item => item.classList.remove('is-main'));
+      if (videoItem) {
+        videoItem.classList.add('is-main');
+        const video = videoItem.querySelector('video');
+        mainVideo.srcObject = video.srcObject;
+      }
+    });
+
+    async function toggleRecording() {
+      const mainVideo = document.getElementById('mainVideo');
+      const recordBtn = document.getElementById('recordBtn');
+      const recordingIndicator = document.getElementById('recordingIndicator');
+
+      if (!isRecording) {
+        if (!mainVideo.srcObject) {
+          alert('No screen to record');
+          return;
+        }
+
+        const stream = mainVideo.srcObject;
+        
+        // Add audio if available
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audioTrack = audioStream.getAudioTracks()[0];
+          stream.addTrack(audioTrack);
+        } catch (err) {
+          console.log('Could not get audio:', err);
+        }
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `recording-${Date.now()}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.textContent = 'Stop Recording';
+        recordBtn.classList.remove('btn-success');
+        recordBtn.classList.add('btn-danger');
+        recordingIndicator.classList.add('active');
+        socket.emit('startRecording', { roomCode });
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.textContent = 'Start Recording';
+        recordBtn.classList.remove('btn-danger');
+        recordBtn.classList.add('btn-success');
+        recordingIndicator.classList.remove('active');
+        socket.emit('stopRecording', { roomCode });
+      }
+    }
+
+    async function toggleCamera() {
+      const cameraBtn = document.getElementById('cameraBtn');
+      const cameraPreview = document.getElementById('cameraPreview');
+      const cameraVideo = document.getElementById('cameraVideo');
+
+      if (!isCameraEnabled) {
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          cameraVideo.srcObject = cameraStream;
+          cameraPreview.classList.add('active');
+          isCameraEnabled = true;
+          cameraBtn.textContent = 'Disable Camera';
+        } catch (err) {
+          alert('Could not access camera');
+        }
+      } else {
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+        }
+        cameraVideo.srcObject = null;
+        cameraPreview.classList.remove('active');
+        isCameraEnabled = false;
+        cameraBtn.textContent = 'Enable Camera';
+      }
+    }
+
+    socket.on('roomClosed', () => {
+      alert('Room has been closed');
+      location.reload();
+    });
+  </script>
+</body>
+</html>

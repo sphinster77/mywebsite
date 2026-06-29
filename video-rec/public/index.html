@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Rec - Screen Sharing & Recording</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 48px;
+      color: white;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      color: white;
+      margin-bottom: 10px;
+      font-size: 36px;
+    }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 50px;
+      font-size: 18px;
+    }
+
+    .cards {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 300px;
+      cursor: pointer;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-icon {
+      font-size: 60px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .card p {
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .admin-card {
+      border-top: 5px solid #667eea;
+    }
+
+    .user-card {
+      border-top: 5px solid #4facfe;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🎥</div>
+    <h1>Video Rec</h1>
+    <p class="subtitle">Screen Sharing & Recording Platform</p>
+
+    <div class="cards">
+      <div class="card admin-card" onclick="goToAdmin()">
+        <div class="card-icon">👑</div>
+        <h2>Admin</h2>
+        <p>Create a room, manage users, view screens, and record with microphone and camera support.</p>
+      </div>
+
+      <div class="card user-card" onclick="goToUser()">
+        <div class="card-icon">👤</div>
+        <h2>User</h2>
+        <p>Join a room, wait for approval, and share your screen with the admin.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function goToAdmin() {
+      window.location.href = '/admin';
+    }
+
+    function goToUser() {
+      window.location.href = '/user';
+    }
+  </script>
+</body>
+</html>

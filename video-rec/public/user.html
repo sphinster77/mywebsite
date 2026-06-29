@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User - Video Rec</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .login-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-box h1 {
+      color: #333;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .waiting-screen {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .waiting-screen.active {
+      display: flex;
+    }
+
+    .waiting-box {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .main-screen {
+      display: none;
+    }
+
+    .main-screen.active {
+      display: block;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h2 {
+      color: #333;
+    }
+
+    .room-info {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .screen-share-container {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .screen-share-container h3 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .preview-video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      min-height: 400px;
+    }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .controls button {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .recording-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #f5576c;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 25px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      animation: pulse 1.5s infinite;
+    }
+
+    .recording-indicator.active {
+      display: flex;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .recording-indicator::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: white;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-box">
+      <h1>Join Room</h1>
+      <div class="error-message" id="errorMessage"></div>
+      <div class="form-group">
+        <label>Room Code</label>
+        <input type="text" id="roomCode" placeholder="Enter room code">
+      </div>
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="userName" placeholder="Enter your name">
+      </div>
+      <button class="btn" onclick="joinRoom()">Join Room</button>
+    </div>
+  </div>
+
+  <div class="waiting-screen" id="waitingScreen">
+    <div class="waiting-box">
+      <h2>Waiting for Approval</h2>
+      <div class="spinner"></div>
+      <p>Please wait for the admin to approve your request</p>
+    </div>
+  </div>
+
+  <div class="container main-screen" id="mainScreen">
+    <div class="header">
+      <div>
+        <h2>Screen Sharing</h2>
+        <div class="room-info">Room: <span id="displayRoomCode"></span> | User: <span id="displayUserName"></span></div>
+      </div>
+    </div>
+
+    <div class="screen-share-container">
+      <h3>Your Screen Preview</h3>
+      <video id="previewVideo" class="preview-video" autoplay playsinline muted></video>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-success" id="shareBtn" onclick="toggleScreenShare()">Share Screen</button>
+      <button class="btn btn-danger" onclick="leaveRoom()">Leave Room</button>
+    </div>
+  </div>
+
+  <div class="recording-indicator" id="recordingIndicator">
+    Recording
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let roomCode = '';
+    let userName = '';
+    let localStream = null;
+    let peerConnections = {};
+    let isSharing = false;
+
+    function joinRoom() {
+      roomCode = document.getElementById('roomCode').value.trim();
+      userName = document.getElementById('userName').value.trim();
+
+      if (!roomCode || !userName) {
+        showError('Please fill in all fields');
+        return;
+      }
+
+      socket.emit('joinRoom', { roomCode, userName });
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    socket.on('waitingForApproval', () => {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('waitingScreen').classList.add('active');
+    });
+
+    socket.on('approved', ({ roomCode: code, adminName }) => {
+      document.getElementById('waitingScreen').classList.remove('active');
+      document.getElementById('mainScreen').classList.add('active');
+      document.getElementById('displayRoomCode').textContent = code;
+      document.getElementById('displayUserName').textContent = userName;
+    });
+
+    socket.on('rejected', () => {
+      alert('Your request was rejected by the admin');
+      location.reload();
+    });
+
+    socket.on('roomError', (error) => {
+      showError(error);
+    });
+
+    async function toggleScreenShare() {
+      const shareBtn = document.getElementById('shareBtn');
+      const previewVideo = document.getElementById('previewVideo');
+
+      if (!isSharing) {
+        try {
+          localStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: 'always' },
+            audio: true
+          });
+
+          previewVideo.srcObject = localStream;
+          isSharing = true;
+          shareBtn.textContent = 'Stop Sharing';
+          shareBtn.classList.remove('btn-success');
+          shareBtn.classList.add('btn-danger');
+
+          socket.emit('startSharing', { roomCode });
+
+          // Create peer connections with admin
+          createPeerConnectionForAdmin();
+
+          // Handle user stopping screen share via browser UI
+          localStream.getVideoTracks()[0].onended = () => {
+            stopScreenShare();
+          };
+        } catch (err) {
+          console.error('Error sharing screen:', err);
+          alert('Could not share screen');
+        }
+      } else {
+        stopScreenShare();
+      }
+    }
+
+    function stopScreenShare() {
+      const shareBtn = document.getElementById('shareBtn');
+      const previewVideo = document.getElementById('previewVideo');
+
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+
+      previewVideo.srcObject = null;
+      isSharing = false;
+      shareBtn.textContent = 'Share Screen';
+      shareBtn.classList.remove('btn-danger');
+      shareBtn.classList.add('btn-success');
+
+      socket.emit('stopSharing', { roomCode });
+
+      // Close all peer connections
+      Object.values(peerConnections).forEach(pc => pc.close());
+      peerConnections = {};
+    }
+
+    async function createPeerConnectionForAdmin() {
+      // We'll create peer connection when we receive the admin's socket ID
+      // For now, we'll wait for the admin to initiate
+    }
+
+    socket.on('offer', async ({ offer, fromSocketId }) => {
+      if (!peerConnections[fromSocketId]) {
+        const pc = createPeerConnection(fromSocketId);
+        peerConnections[fromSocketId] = pc;
+
+        // Add local stream tracks to peer connection
+        if (localStream) {
+          localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+          });
+        }
+      }
+
+      await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnections[fromSocketId].createAnswer();
+      await peerConnections[fromSocketId].setLocalDescription(answer);
+      socket.emit('answer', { answer, targetSocketId: fromSocketId });
+    });
+
+    socket.on('answer', async ({ answer, fromSocketId }) => {
+      if (peerConnections[fromSocketId]) {
+        await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    socket.on('iceCandidate', async ({ candidate, fromSocketId }) => {
+      if (peerConnections[fromSocketId]) {
+        await peerConnections[fromSocketId].addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    function createPeerConnection(socketId) {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('iceCandidate', { candidate: event.candidate, targetSocketId: socketId });
+        }
+      };
+
+      return pc;
+    }
+
+    function leaveRoom() {
+      stopScreenShare();
+      socket.disconnect();
+      location.reload();
+    }
+
+    socket.on('recordingStarted', () => {
+      document.getElementById('recordingIndicator').classList.add('active');
+    });
+
+    socket.on('recordingStopped', () => {
+      document.getElementById('recordingIndicator').classList.remove('active');
+    });
+
+    socket.on('roomClosed', () => {
+      alert('Room has been closed by the admin');
+      location.reload();
+    });
+  </script>
+</body>
+</html>
