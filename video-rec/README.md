@@ -23,34 +23,26 @@ A real-time screen sharing and video recording application with admin/user roles
 ## Setup Instructions
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm (comes with Node.js)
+- None! This app runs entirely in the browser using PeerJS cloud signaling
 
 ### Installation
 
-1. Navigate to the project directory:
-```bash
-cd video-rec
-```
+Simply open the HTML files in your browser. No installation required.
 
-2. Install dependencies:
-```bash
-npm install
-```
+**Option 1: Direct file access**
+- Open `public/index.html` in your browser
 
-3. Start the server:
-```bash
-npm start
-```
-
-The server will start on `http://localhost:3000`
+**Option 2: Local server (for testing)**
+- Use any local server like Live Server in VS Code, or Python's simple HTTP server
+- Example with Python: `python -m http.server 8000` in the video-rec directory
+- Then open `http://localhost:8000` in your browser
 
 ## Usage
 
 ### Starting the Application
 
-1. Run `npm start` in the `video-rec` directory
-2. Open your browser and go to `http://localhost:3000`
+1. Open `index.html` in your browser (or via local server)
+2. Choose Admin or User mode
 
 ### As an Admin
 
@@ -79,12 +71,12 @@ The server will start on `http://localhost:3000`
 
 ## Technical Details
 
-- **Backend**: Node.js with Express and Socket.io for real-time signaling
+- **Signaling**: PeerJS cloud service (no server required)
 - **Frontend**: HTML, CSS, and vanilla JavaScript
-- **WebRTC**: Peer-to-peer video streaming using the WebRTC API
+- **WebRTC**: Peer-to-peer video streaming using PeerJS library
 - **Screen Capture**: Uses the Screen Capture API (`getDisplayMedia`)
 - **Recording**: Uses the MediaRecorder API to record video streams
-- **STUN Server**: Uses Google's public STUN server for NAT traversal
+- **STUN Server**: Uses PeerJS's built-in STUN servers for NAT traversal
 
 ## Browser Requirements
 
@@ -96,7 +88,7 @@ The application requires modern browser APIs including:
 - WebRTC
 - Screen Capture API
 - MediaRecorder API
-- Socket.io client
+- PeerJS library (loaded from CDN)
 
 ## Troubleshooting
 
@@ -111,9 +103,10 @@ The application requires modern browser APIs including:
 - Try refreshing the page
 
 **Users can't connect:**
-- Ensure the server is running
+- Make sure the admin has created the room first
 - Check that users are entering the correct room code
 - Make sure the admin has approved the user
+- Check that PeerJS cloud service is accessible (no firewall blocking)
 
 **Video not appearing:**
 - Check WebRTC connection status
@@ -124,8 +117,6 @@ The application requires modern browser APIs including:
 
 ```
 video-rec/
-├── package.json          # Project dependencies
-├── server.js             # Node.js server with Socket.io
 ├── public/
 │   ├── index.html        # Landing page
 │   ├── admin.html        # Admin interface

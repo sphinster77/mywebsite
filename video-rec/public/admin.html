@@ -330,7 +330,8 @@
     </div>
 
     <div class="controls">
-      <button class="btn btn-success" id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+      <button class="btn btn-success" id="shareScreenBtn" onclick="toggleScreenShare()">Share Screen</button>
+      <button class="btn" id="recordBtn" onclick="toggleRecording()">Start Recording</button>
       <button class="btn" id="cameraBtn" onclick="toggleCamera()">Enable Camera</button>
     </div>
 
@@ -348,18 +349,21 @@
     Recording
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const socket = io();
+    let peer = null;
     let roomCode = '';
     let adminName = '';
-    let peerConnections = {};
-    let localStream = null;
+    let connections = {};
+    let calls = {};
     let cameraStream = null;
+    let screenStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
     let isCameraEnabled = false;
+    let isSharingScreen = false;
+    let pendingUsers = {};
 
     function createRoom() {
       roomCode = document.getElementById('roomCode').value.trim();
@@ -370,7 +374,25 @@
         return;
       }
 
-      socket.emit('createRoom', { roomCode, adminName });
+      // Create peer with room code as ID
+      peer = new Peer(`admin-${roomCode}`);
+
+      peer.on('open', (id) => {
+        console.log('Admin peer ID:', id);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('mainScreen').classList.add('active');
+        document.getElementById('displayRoomCode').textContent = roomCode;
+        document.getElementById('displayAdminName').textContent = adminName;
+      });
+
+      peer.on('connection', (conn) => {
+        handleUserConnection(conn);
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        showError('Connection error: ' + err.type);
+      });
     }
 
     function showError(message) {
@@ -379,164 +401,126 @@
       errorDiv.style.display = 'block';
     }
 
-    socket.on('roomCreated', ({ roomCode: code, adminName: name }) => {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('mainScreen').classList.add('active');
-      document.getElementById('displayRoomCode').textContent = code;
-      document.getElementById('displayAdminName').textContent = name;
-    });
+    function handleUserConnection(conn) {
+      conn.on('open', () => {
+        conn.on('data', (data) => {
+          if (data.type === 'join-request') {
+            pendingUsers[conn.peer] = { conn, name: data.name };
+            showPendingUser(conn.peer, data.name);
+          } else if (data.type === 'screen-stream') {
+            // User is sharing screen via PeerJS call
+          }
+        });
+      });
 
-    socket.on('roomError', (error) => {
-      showError(error);
-    });
+      conn.on('close', () => {
+        if (connections[conn.peer]) {
+          connections[conn.peer].close();
+          delete connections[conn.peer];
+        }
+        const videoItem = document.querySelector(`[data-video-peer-id="${conn.peer}"]`);
+        if (videoItem) videoItem.remove();
+        delete pendingUsers[conn.peer];
+      });
+    }
 
-    socket.on('userPending', ({ socketId, userName }) => {
+    function showPendingUser(peerId, name) {
       const pendingDiv = document.getElementById('pendingUsers');
       const userDiv = document.createElement('div');
       userDiv.className = 'pending-user';
       userDiv.innerHTML = `
-        <span>${userName}</span>
+        <span>${name}</span>
         <div>
-          <button class="btn btn-success" onclick="approveUser('${socketId}')">Approve</button>
-          <button class="btn btn-danger" onclick="rejectUser('${socketId}')">Reject</button>
+          <button class="btn btn-success" onclick="approveUser('${peerId}')">Approve</button>
+          <button class="btn btn-danger" onclick="rejectUser('${peerId}')">Reject</button>
         </div>
       `;
-      userDiv.dataset.socketId = socketId;
+      userDiv.dataset.peerId = peerId;
       pendingDiv.appendChild(userDiv);
-    });
+    }
 
-    function approveUser(socketId) {
-      socket.emit('approveUser', { roomCode, socketId });
-      const userDiv = document.querySelector(`[data-socket-id="${socketId}"]`);
+    function approveUser(peerId) {
+      const user = pendingUsers[peerId];
+      if (user) {
+        user.conn.send({ type: 'approved', roomCode, adminName });
+        delete pendingUsers[peerId];
+        
+        // If admin is sharing screen, call the user
+        if (isSharingScreen && screenStream) {
+          const call = peer.call(peerId, screenStream);
+          calls[peerId] = call;
+          call.on('close', () => {
+            delete calls[peerId];
+          });
+        }
+      }
+      const userDiv = document.querySelector(`[data-peer-id="${peerId}"]`);
       if (userDiv) userDiv.remove();
     }
 
-    function rejectUser(socketId) {
-      socket.emit('rejectUser', { socketId });
-      const userDiv = document.querySelector(`[data-socket-id="${socketId}"]`);
+    function rejectUser(peerId) {
+      const user = pendingUsers[peerId];
+      if (user) {
+        user.conn.send({ type: 'rejected' });
+        delete pendingUsers[peerId];
+      }
+      const userDiv = document.querySelector(`[data-peer-id="${peerId}"]`);
       if (userDiv) userDiv.remove();
     }
 
-    socket.on('userJoined', ({ userName }) => {
-      updateUserCount();
-    });
-
-    socket.on('userStartedSharing', async ({ socketId }) => {
-      // Admin initiates WebRTC connection to user
-      if (!peerConnections[socketId]) {
-        const pc = createPeerConnection(socketId);
-        peerConnections[socketId] = pc;
-
-        // Create offer
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('offer', { roomCode, offer, targetSocketId: socketId });
-      }
-    });
-
-    socket.on('userLeft', ({ socketId }) => {
-      if (peerConnections[socketId]) {
-        peerConnections[socketId].close();
-        delete peerConnections[socketId];
-      }
-      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
-      if (videoItem) videoItem.remove();
-    });
-
-    socket.on('offer', async ({ offer, fromSocketId }) => {
-      if (!peerConnections[fromSocketId]) {
-        const pc = createPeerConnection(fromSocketId);
-        peerConnections[fromSocketId] = pc;
-      }
-
-      await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnections[fromSocketId].createAnswer();
-      await peerConnections[fromSocketId].setLocalDescription(answer);
-      socket.emit('answer', { answer, targetSocketId: fromSocketId });
-    });
-
-    socket.on('answer', async ({ answer, fromSocketId }) => {
-      if (peerConnections[fromSocketId]) {
-        await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(answer));
-      }
-    });
-
-    socket.on('iceCandidate', async ({ candidate, fromSocketId }) => {
-      if (peerConnections[fromSocketId]) {
-        await peerConnections[fromSocketId].addIceCandidate(new RTCIceCandidate(candidate));
-      }
-    });
-
-    function createPeerConnection(socketId) {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    // Handle incoming call from user sharing screen
+    peer.on('call', (call) => {
+      console.log('Incoming call from:', call.peer);
+      call.answer();
+      call.on('stream', (stream) => {
+        console.log('Received stream from:', call.peer);
+        addVideoStream(call.peer, stream);
       });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('iceCandidate', { candidate: event.candidate, targetSocketId: socketId });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        const mainVideo = document.getElementById('mainVideo');
-        const sideVideos = document.getElementById('sideVideos');
-
-        if (event.streams[0]) {
-          // Create side video element
-          const videoItem = document.createElement('div');
-          videoItem.className = 'video-item';
-          videoItem.dataset.videoSocketId = socketId;
-          videoItem.onclick = () => setMainScreen(socketId);
-
-          const video = document.createElement('video');
-          video.srcObject = event.streams[0];
-          video.autoplay = true;
-          video.playsInline = true;
-
-          const userName = document.createElement('div');
-          userName.className = 'user-name';
-          userName.textContent = `User ${socketId.slice(0, 4)}`;
-
-          videoItem.appendChild(video);
-          videoItem.appendChild(userName);
-          sideVideos.appendChild(videoItem);
-
-          // If this is the first stream, set it as main
-          if (!mainVideo.srcObject) {
-            setMainScreen(socketId);
-          }
-        }
-      };
-
-      return pc;
-    }
-
-    function setMainScreen(socketId) {
-      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
-      const mainVideo = document.getElementById('mainVideo');
-
-      document.querySelectorAll('.video-item').forEach(item => item.classList.remove('is-main'));
-      if (videoItem) {
-        videoItem.classList.add('is-main');
-        const video = videoItem.querySelector('video');
-        mainVideo.srcObject = video.srcObject;
-      }
-
-      socket.emit('setMainScreen', { roomCode, socketId });
-    }
-
-    socket.on('mainScreenChanged', ({ socketId }) => {
-      const videoItem = document.querySelector(`[data-video-socket-id="${socketId}"]`);
-      const mainVideo = document.getElementById('mainVideo');
-
-      document.querySelectorAll('.video-item').forEach(item => item.classList.remove('is-main'));
-      if (videoItem) {
-        videoItem.classList.add('is-main');
-        const video = videoItem.querySelector('video');
-        mainVideo.srcObject = video.srcObject;
-      }
+      call.on('error', (err) => {
+        console.error('Call error:', err);
+      });
+      connections[call.peer] = call;
     });
+
+    function addVideoStream(peerId, stream) {
+      const mainVideo = document.getElementById('mainVideo');
+      const sideVideos = document.getElementById('sideVideos');
+
+      const videoItem = document.createElement('div');
+      videoItem.className = 'video-item';
+      videoItem.dataset.videoPeerId = peerId;
+      videoItem.onclick = () => setMainScreen(peerId);
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.playsInline = true;
+
+      const userName = document.createElement('div');
+      userName.className = 'user-name';
+      userName.textContent = `User ${peerId.slice(-8)}`;
+
+      videoItem.appendChild(video);
+      videoItem.appendChild(userName);
+      sideVideos.appendChild(videoItem);
+
+      // If this is the first stream, set it as main
+      if (!mainVideo.srcObject) {
+        setMainScreen(peerId);
+      }
+    }
+
+    function setMainScreen(peerId) {
+      const videoItem = document.querySelector(`[data-video-peer-id="${peerId}"]`);
+      const mainVideo = document.getElementById('mainVideo');
+
+      document.querySelectorAll('.video-item').forEach(item => item.classList.remove('is-main'));
+      if (videoItem) {
+        videoItem.classList.add('is-main');
+        const video = videoItem.querySelector('video');
+        mainVideo.srcObject = video.srcObject;
+      }
+    }
 
     async function toggleRecording() {
       const mainVideo = document.getElementById('mainVideo');
@@ -585,7 +569,12 @@
         recordBtn.classList.remove('btn-success');
         recordBtn.classList.add('btn-danger');
         recordingIndicator.classList.add('active');
-        socket.emit('startRecording', { roomCode });
+        // Notify users
+        Object.values(connections).forEach(conn => {
+          if (conn.send) {
+            conn.send({ type: 'recording-started' });
+          }
+        });
       } else {
         mediaRecorder.stop();
         isRecording = false;
@@ -593,8 +582,86 @@
         recordBtn.classList.remove('btn-danger');
         recordBtn.classList.add('btn-success');
         recordingIndicator.classList.remove('active');
-        socket.emit('stopRecording', { roomCode });
+        Object.values(connections).forEach(conn => {
+          if (conn.send) {
+            conn.send({ type: 'recording-stopped' });
+          }
+        });
       }
+    }
+
+    async function toggleScreenShare() {
+      const shareBtn = document.getElementById('shareScreenBtn');
+      const mainVideo = document.getElementById('mainVideo');
+
+      if (!isSharingScreen) {
+        try {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: 'always' },
+            audio: true
+          });
+
+          mainVideo.srcObject = screenStream;
+          isSharingScreen = true;
+          shareBtn.textContent = 'Stop Sharing';
+          shareBtn.classList.remove('btn-success');
+          shareBtn.classList.add('btn-danger');
+
+          // Call all connected users with screen stream
+          Object.keys(connections).forEach(peerId => {
+            const call = peer.call(peerId, screenStream);
+            calls[peerId] = call;
+            call.on('close', () => {
+              delete calls[peerId];
+            });
+          });
+
+          // Notify users
+          Object.values(connections).forEach(conn => {
+            if (conn.send) {
+              conn.send({ type: 'admin-sharing-started' });
+            }
+          });
+
+          // Handle user stopping screen share via browser UI
+          screenStream.getVideoTracks()[0].onended = () => {
+            stopScreenShare();
+          };
+        } catch (err) {
+          console.error('Error sharing screen:', err);
+          alert('Could not share screen');
+        }
+      } else {
+        stopScreenShare();
+      }
+    }
+
+    function stopScreenShare() {
+      const shareBtn = document.getElementById('shareScreenBtn');
+      const mainVideo = document.getElementById('mainVideo');
+
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+      }
+
+      mainVideo.srcObject = null;
+      isSharingScreen = false;
+      shareBtn.textContent = 'Share Screen';
+      shareBtn.classList.remove('btn-danger');
+      shareBtn.classList.add('btn-success');
+
+      // Close all calls
+      Object.values(calls).forEach(call => {
+        call.close();
+      });
+      calls = {};
+
+      // Notify users
+      Object.values(connections).forEach(conn => {
+        if (conn.send) {
+          conn.send({ type: 'admin-sharing-stopped' });
+        }
+      });
     }
 
     async function toggleCamera() {
@@ -623,10 +690,6 @@
       }
     }
 
-    socket.on('roomClosed', () => {
-      alert('Room has been closed');
-      location.reload();
-    });
   </script>
 </body>
 </html>

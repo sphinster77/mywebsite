@@ -268,6 +268,11 @@
     </div>
 
     <div class="screen-share-container">
+      <h3>Admin's Screen</h3>
+      <video id="adminVideo" class="preview-video" autoplay playsinline></video>
+    </div>
+
+    <div class="screen-share-container">
       <h3>Your Screen Preview</h3>
       <video id="previewVideo" class="preview-video" autoplay playsinline muted></video>
     </div>
@@ -282,13 +287,15 @@
     Recording
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const socket = io();
+    let peer = null;
+    let adminConnection = null;
+    let adminCall = null;
     let roomCode = '';
     let userName = '';
     let localStream = null;
-    let peerConnections = {};
+    let call = null;
     let isSharing = false;
 
     function joinRoom() {
@@ -300,7 +307,70 @@
         return;
       }
 
-      socket.emit('joinRoom', { roomCode, userName });
+      // Create peer with random ID
+      peer = new Peer();
+
+      peer.on('open', (id) => {
+        console.log('User peer ID:', id);
+        // Connect to admin
+        const adminId = `admin-${roomCode}`;
+        adminConnection = peer.connect(adminId);
+
+        adminConnection.on('open', () => {
+          console.log('Connected to admin');
+          adminConnection.send({ type: 'join-request', name: userName });
+        });
+
+        adminConnection.on('data', (data) => {
+          if (data.type === 'approved') {
+            document.getElementById('waitingScreen').classList.remove('active');
+            document.getElementById('mainScreen').classList.add('active');
+            document.getElementById('displayRoomCode').textContent = roomCode;
+            document.getElementById('displayUserName').textContent = userName;
+          } else if (data.type === 'rejected') {
+            alert('Your request was rejected by the admin');
+            location.reload();
+          } else if (data.type === 'recording-started') {
+            document.getElementById('recordingIndicator').classList.add('active');
+          } else if (data.type === 'recording-stopped') {
+            document.getElementById('recordingIndicator').classList.remove('active');
+          } else if (data.type === 'admin-sharing-stopped') {
+            if (adminCall) {
+              document.getElementById('adminVideo').srcObject = null;
+            }
+          }
+        });
+
+        adminConnection.on('close', () => {
+          alert('Admin disconnected');
+          location.reload();
+        });
+
+        adminConnection.on('error', (err) => {
+          console.error('Connection error:', err);
+          showError('Could not connect to admin. Make sure the room exists.');
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        showError('Connection error: ' + err.type);
+      });
+
+      // Handle incoming call from admin sharing screen
+      peer.on('call', (call) => {
+        call.answer();
+        call.on('stream', (stream) => {
+          document.getElementById('adminVideo').srcObject = stream;
+        });
+        call.on('close', () => {
+          document.getElementById('adminVideo').srcObject = null;
+        });
+        adminCall = call;
+      });
+
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('waitingScreen').classList.add('active');
     }
 
     function showError(message) {
@@ -308,27 +378,6 @@
       errorDiv.textContent = message;
       errorDiv.style.display = 'block';
     }
-
-    socket.on('waitingForApproval', () => {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('waitingScreen').classList.add('active');
-    });
-
-    socket.on('approved', ({ roomCode: code, adminName }) => {
-      document.getElementById('waitingScreen').classList.remove('active');
-      document.getElementById('mainScreen').classList.add('active');
-      document.getElementById('displayRoomCode').textContent = code;
-      document.getElementById('displayUserName').textContent = userName;
-    });
-
-    socket.on('rejected', () => {
-      alert('Your request was rejected by the admin');
-      location.reload();
-    });
-
-    socket.on('roomError', (error) => {
-      showError(error);
-    });
 
     async function toggleScreenShare() {
       const shareBtn = document.getElementById('shareBtn');
@@ -347,10 +396,20 @@
           shareBtn.classList.remove('btn-success');
           shareBtn.classList.add('btn-danger');
 
-          socket.emit('startSharing', { roomCode });
+          // Call admin with screen stream
+          const adminId = `admin-${roomCode}`;
+          console.log('Calling admin:', adminId);
+          call = peer.call(adminId, localStream);
 
-          // Create peer connections with admin
-          createPeerConnectionForAdmin();
+          call.on('close', () => {
+            console.log('Call closed');
+            stopScreenShare();
+          });
+
+          call.on('error', (err) => {
+            console.error('Call error:', err);
+            alert('Could not connect to admin: ' + err);
+          });
 
           // Handle user stopping screen share via browser UI
           localStream.getVideoTracks()[0].onended = () => {
@@ -379,81 +438,22 @@
       shareBtn.classList.remove('btn-danger');
       shareBtn.classList.add('btn-success');
 
-      socket.emit('stopSharing', { roomCode });
-
-      // Close all peer connections
-      Object.values(peerConnections).forEach(pc => pc.close());
-      peerConnections = {};
-    }
-
-    async function createPeerConnectionForAdmin() {
-      // We'll create peer connection when we receive the admin's socket ID
-      // For now, we'll wait for the admin to initiate
-    }
-
-    socket.on('offer', async ({ offer, fromSocketId }) => {
-      if (!peerConnections[fromSocketId]) {
-        const pc = createPeerConnection(fromSocketId);
-        peerConnections[fromSocketId] = pc;
-
-        // Add local stream tracks to peer connection
-        if (localStream) {
-          localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
-          });
-        }
+      if (call) {
+        call.close();
+        call = null;
       }
-
-      await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnections[fromSocketId].createAnswer();
-      await peerConnections[fromSocketId].setLocalDescription(answer);
-      socket.emit('answer', { answer, targetSocketId: fromSocketId });
-    });
-
-    socket.on('answer', async ({ answer, fromSocketId }) => {
-      if (peerConnections[fromSocketId]) {
-        await peerConnections[fromSocketId].setRemoteDescription(new RTCSessionDescription(answer));
-      }
-    });
-
-    socket.on('iceCandidate', async ({ candidate, fromSocketId }) => {
-      if (peerConnections[fromSocketId]) {
-        await peerConnections[fromSocketId].addIceCandidate(new RTCIceCandidate(candidate));
-      }
-    });
-
-    function createPeerConnection(socketId) {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('iceCandidate', { candidate: event.candidate, targetSocketId: socketId });
-        }
-      };
-
-      return pc;
     }
 
     function leaveRoom() {
       stopScreenShare();
-      socket.disconnect();
+      if (adminConnection) {
+        adminConnection.close();
+      }
+      if (peer) {
+        peer.destroy();
+      }
       location.reload();
     }
-
-    socket.on('recordingStarted', () => {
-      document.getElementById('recordingIndicator').classList.add('active');
-    });
-
-    socket.on('recordingStopped', () => {
-      document.getElementById('recordingIndicator').classList.remove('active');
-    });
-
-    socket.on('roomClosed', () => {
-      alert('Room has been closed by the admin');
-      location.reload();
-    });
   </script>
 </body>
 </html>
