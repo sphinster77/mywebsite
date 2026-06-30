@@ -402,6 +402,7 @@
     let roomCode = '';
     let adminName = '';
     let connections = {};
+    let approvedUsers = {};
     let calls = {};
     let cameraStream = null;
     let screenStream = null;
@@ -450,6 +451,7 @@
 
     function handleUserConnection(conn) {
       conn.on('open', () => {
+        updateUserCount();
         conn.on('data', (data) => {
           if (data.type === 'join-request') {
             pendingUsers[conn.peer] = { conn, name: data.name };
@@ -468,7 +470,14 @@
         const videoItem = document.querySelector(`[data-video-peer-id="${conn.peer}"]`);
         if (videoItem) videoItem.remove();
         delete pendingUsers[conn.peer];
+        delete approvedUsers[conn.peer];
+        updateUserCount();
       });
+    }
+
+    function updateUserCount() {
+      const count = Object.keys(approvedUsers).length;
+      document.getElementById('userCount').textContent = count;
     }
 
     function showPendingUser(peerId, name) {
@@ -490,7 +499,9 @@
       const user = pendingUsers[peerId];
       if (user) {
         user.conn.send({ type: 'approved', roomCode, adminName });
+        approvedUsers[peerId] = user;
         delete pendingUsers[peerId];
+        updateUserCount();
         
         // If admin is sharing screen, call the user
         if (isSharingScreen && screenStream) {
@@ -640,6 +651,12 @@
     async function toggleScreenShare() {
       const shareBtn = document.getElementById('shareScreenBtn');
       const mainVideo = document.getElementById('mainVideo');
+
+      // Check if screen sharing is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert('Screen sharing is not supported on this device/browser.\n\nFor iPad: Requires iOS 15+ and Safari\nFor desktop: Use Chrome, Firefox, or Edge');
+        return;
+      }
 
       if (!isSharingScreen) {
         try {

@@ -426,6 +426,12 @@
       const shareBtn = document.getElementById('shareBtn');
       const previewVideo = document.getElementById('previewVideo');
 
+      // Check if screen sharing is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert('Screen sharing is not supported on this device/browser.\n\nFor iPad: Requires iOS 15+ and Safari\nFor desktop: Use Chrome, Firefox, or Edge');
+        return;
+      }
+
       if (!isSharing) {
         try {
           // iOS/iPad friendly screen sharing
