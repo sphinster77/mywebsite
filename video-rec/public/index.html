@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Video Rec - Screen Sharing & Recording</title>
   <style>
     * {
@@ -57,11 +57,16 @@
       width: 300px;
       cursor: pointer;
       transition: transform 0.3s, box-shadow 0.3s;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .card:hover {
       transform: translateY(-10px);
       box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .card:active {
+      transform: scale(0.98);
     }
 
     .card-icon {
@@ -85,6 +90,41 @@
 
     .user-card {
       border-top: 5px solid #4facfe;
+    }
+
+    /* iPad responsive */
+    @media (max-width: 1024px) {
+      .cards {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 350px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .logo {
+        font-size: 36px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .subtitle {
+        font-size: 16px;
+      }
+
+      .card {
+        padding: 30px;
+      }
+
+      .card-icon {
+        font-size: 48px;
+      }
     }
   </style>
 </head>

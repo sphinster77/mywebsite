@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Admin - Video Rec</title>
   <style>
     * {
@@ -202,6 +202,9 @@
     .controls button {
       flex: 1;
       min-width: 150px;
+      padding: 16px;
+      font-size: 16px;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .pending-users {
@@ -290,6 +293,50 @@
       height: 10px;
       background: white;
       border-radius: 50%;
+    }
+
+    /* iPad responsive */
+    @media (max-width: 1024px) {
+      .video-container {
+        grid-template-columns: 1fr;
+      }
+
+      .main-video video {
+        min-height: 300px;
+      }
+
+      .side-videos {
+        max-height: 300px;
+      }
+
+      .container {
+        padding: 15px;
+      }
+
+      .login-box {
+        padding: 30px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .controls button {
+        width: 100%;
+        min-width: auto;
+      }
+
+      .main-video video {
+        min-height: 250px;
+      }
     }
   </style>
 </head>
@@ -596,10 +643,28 @@
 
       if (!isSharingScreen) {
         try {
-          screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { cursor: 'always' },
+          // iOS/iPad friendly screen sharing
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+          
+          let constraints = {
+            video: {
+              cursor: 'always',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            },
             audio: true
-          });
+          };
+
+          // iOS may have different constraints
+          if (isIOS) {
+            constraints.video = {
+              cursor: 'always',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            };
+          }
+
+          screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
 
           mainVideo.srcObject = screenStream;
           isSharingScreen = true;
@@ -629,7 +694,13 @@
           };
         } catch (err) {
           console.error('Error sharing screen:', err);
-          alert('Could not share screen');
+          if (err.name === 'NotAllowedError') {
+            alert('Screen sharing permission denied. Please allow screen sharing in your browser settings.');
+          } else if (err.name === 'NotFoundError') {
+            alert('No screen source found. Make sure you have a screen to share.');
+          } else {
+            alert('Could not share screen: ' + err.message + '\n\nNote: Screen sharing on iOS requires iOS 15+ and Safari.');
+          }
         }
       } else {
         stopScreenShare();
