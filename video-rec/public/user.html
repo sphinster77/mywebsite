@@ -178,6 +178,69 @@
       min-height: 400px;
     }
 
+    /* AirPlay modal */
+    .airplay-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .airplay-modal.active {
+      display: flex;
+    }
+
+    .airplay-content {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .airplay-content h3 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .airplay-steps {
+      text-align: left;
+      margin: 20px 0;
+      color: #666;
+      line-height: 1.8;
+    }
+
+    .airplay-steps ol {
+      padding-left: 20px;
+    }
+
+    .airplay-steps li {
+      margin-bottom: 12px;
+    }
+
+    .airplay-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .close-airplay {
+      margin-top: 20px;
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     .controls {
       background: white;
       padding: 20px;
@@ -322,7 +385,28 @@
 
     <div class="controls">
       <button class="btn btn-success" id="shareBtn" onclick="toggleScreenShare()">Share Screen</button>
+      <button class="btn" onclick="showAirPlayHelp()">AirPlay Help</button>
       <button class="btn btn-danger" onclick="leaveRoom()">Leave Room</button>
+    </div>
+  </div>
+
+  <!-- AirPlay Help Modal -->
+  <div class="airplay-modal" id="airplayModal" onclick="if(event.target===this)closeAirPlayModal()">
+    <div class="airplay-content">
+      <div class="airplay-icon">📺</div>
+      <h3>How to Use AirPlay</h3>
+      <div class="airplay-steps">
+        <ol>
+          <li>Make sure your iPad and Apple TV (or AirPlay receiver) are on the same Wi-Fi network</li>
+          <li>Open Control Center on your iPad (swipe down from top-right corner)</li>
+          <li>Tap the <strong>Screen Mirroring</strong> button</li>
+          <li>Select your Apple TV or AirPlay device</li>
+          <li>Enter the AirPlay code if prompted</li>
+          <li>Your iPad screen will now mirror to your TV</li>
+          <li>Use "Share Screen" button in this app to share with the admin</li>
+        </ol>
+      </div>
+      <button class="close-airplay" onclick="closeAirPlayModal()">Got it!</button>
     </div>
   </div>
 
@@ -526,6 +610,14 @@
         peer.destroy();
       }
       location.reload();
+    }
+
+    function showAirPlayHelp() {
+      document.getElementById('airplayModal').classList.add('active');
+    }
+
+    function closeAirPlayModal() {
+      document.getElementById('airplayModal').classList.remove('active');
     }
   </script>
 </body>
