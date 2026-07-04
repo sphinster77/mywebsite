@@ -279,7 +279,7 @@ function mainLoop() {
         for (let i = 0;  i < 10; i++)     bassSum += freq[i];
         const avgEnergy  = sum / bufLen / 255;
         const bassNorm   = Math.min(bassSum / 10 / 255, 1);
-        beatEnergy += (bassNorm - beatEnergy) * 0.18;
+        beatEnergy = bassNorm;
 
         globalHue  = (globalHue + 0.7 + beatEnergy * 5) % 360;
         beamAngle  = (beamAngle + 0.007 + beatEnergy * 0.045) % (Math.PI * 2);
