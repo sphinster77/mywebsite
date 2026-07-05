@@ -425,6 +425,15 @@
     let call = null;
     let isSharing = false;
 
+    // Check for room code in URL parameter
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        document.getElementById('roomCode').value = roomParam;
+      }
+    };
+
     function joinRoom() {
       roomCode = document.getElementById('roomCode').value.trim();
       userName = document.getElementById('userName').value.trim();
