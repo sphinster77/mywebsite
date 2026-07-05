@@ -424,6 +424,11 @@
                 <div class="card-title">Video Rec</div>
                 <div class="card-desc">Screen sharing and recording with admin/user modes. Share screens and record with mic/camera.</div>
             </div>
+            <div class="card" onclick="openAlarmMode()" style="cursor: pointer;">
+                <div class="card-icon">🚨</div>
+                <div class="card-title">Alarm Mode</div>
+                <div class="card-desc">Create or join a party, sync alarms across devices with flashing screens and siren sounds.</div>
+            </div>
         </div>
     </div>
 </div>
@@ -470,6 +475,16 @@ function openVideoRec() {
     const password = prompt('Enter password for Video Rec:');
     if (password === '1800') {
         window.location.href = 'video-rec/public/index.html';
+    } else if (password !== null) {
+        alert('Wrong password.');
+    }
+}
+
+// ── Alarm Mode password ──────────────────────────────────────────────────────
+function openAlarmMode() {
+    const password = prompt('Enter password for Alarm Mode:');
+    if (password === '1800') {
+        window.location.href = 'video-rec/public/alarm.html';
     } else if (password !== null) {
         alert('Wrong password.');
     }
