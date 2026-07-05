@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Alarm Mode - Party & Alarm Sync</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background 0.1s;
+    }
+
+    body.alarm-active {
+      animation: alarmFlash 0.5s infinite;
+    }
+
+    @keyframes alarmFlash {
+      0%, 50% {
+        background: linear-gradient(135deg, #ff0000 0%, #ff0000 100%);
+      }
+      25%, 75% {
+        background: linear-gradient(135deg, #0000ff 0%, #0000ff 100%);
+      }
+    }
+
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      background: #f0f0f0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .input-group input:disabled {
+      background: #f5f5f5;
+      cursor: not-allowed;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+      color: white;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .party-info {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .party-info.active {
+      display: block;
+    }
+
+    .party-code {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 10px 0;
+      letter-spacing: 5px;
+    }
+
+    .party-members {
+      margin-top: 15px;
+      text-align: left;
+    }
+
+    .party-members h3 {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .member-list {
+      list-style: none;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .member-item {
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .member-name {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .member-status {
+      font-size: 12px;
+      color: #4caf50;
+    }
+
+    .alarm-controls {
+      margin-top: 20px;
+      padding: 20px;
+      background: #fff3f3;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .alarm-controls.active {
+      display: block;
+    }
+
+    .mic-controls {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f0f8ff;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .mic-controls.active {
+      display: block;
+    }
+
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.active {
+      display: block;
+    }
+
+    .status.connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 20px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #333;
+      font-weight: 600;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+    }
+
+    .back-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 30px 20px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .party-code {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-btn">← Back</a>
+
+  <div class="container">
+    <h1>🚨 Alarm Mode</h1>
+    <p class="subtitle">Sync alarms across multiple devices</p>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('create')">Create Party</button>
+      <button class="tab" onclick="switchTab('join')">Join Party</button>
+    </div>
+
+    <!-- Create Party Tab -->
+    <div id="create-tab" class="tab-content active">
+      <div class="input-group">
+        <label for="create-name">Your Name</label>
+        <input type="text" id="create-name" placeholder="Enter your name">
+      </div>
+      <button class="btn btn-primary" onclick="createParty()">Create Party</button>
+    </div>
+
+    <!-- Join Party Tab -->
+    <div id="join-tab" class="tab-content">
+      <div class="input-group">
+        <label for="join-code">Party Code</label>
+        <input type="text" id="join-code" placeholder="Enter party code">
+      </div>
+      <div class="input-group">
+        <label for="join-name">Your Name</label>
+        <input type="text" id="join-name" placeholder="Enter your name">
+      </div>
+      <button class="btn btn-success" onclick="joinParty()">Join Party</button>
+    </div>
+
+    <!-- Party Info -->
+    <div id="party-info" class="party-info">
+      <h3>Party Code</h3>
+      <div id="party-code-display" class="party-code"></div>
+      <div class="party-members">
+        <h3>Party Members</h3>
+        <ul id="member-list" class="member-list"></ul>
+      </div>
+    </div>
+
+    <!-- Alarm Controls (Host Only) -->
+    <div id="alarm-controls" class="alarm-controls">
+      <h3>🚨 Alarm Controls</h3>
+      <button id="alarm-btn" class="btn btn-danger" onclick="toggleAlarm()">Activate Alarm</button>
+    </div>
+
+    <!-- Microphone Controls (Host Only) -->
+    <div id="mic-controls" class="mic-controls">
+      <h3>🎤 Microphone</h3>
+      <button id="mic-btn" class="btn btn-primary" onclick="toggleMicrophone()">Connect Microphone</button>
+      <p id="mic-status" style="margin-top: 10px; font-size: 14px; color: #666;"></p>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="status"></div>
+
+    <button id="leave-btn" class="btn btn-danger" style="display: none; margin-top: 20px;" onclick="leaveParty()">Leave Party</button>
+  </div>
+
+  <script>
+    let peer = null;
+    let connections = [];
+    let isHost = false;
+    let partyCode = '';
+    let myName = '';
+    let alarmActive = false;
+    let audioContext = null;
+    let oscillator = null;
+    let gainNode = null;
+    let micStream = null;
+    let micCall = null;
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+      document.getElementById(`${tab}-tab`).classList.add('active');
+    }
+
+    function generatePartyCode() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `status active ${type}`;
+    }
+
+    function createParty() {
+      const name = document.getElementById('create-name').value.trim();
+      if (!name) {
+        showStatus('Please enter your name', 'error');
+        return;
+      }
+
+      myName = name;
+      isHost = true;
+      partyCode = generatePartyCode();
+
+      initializePeer(partyCode);
+    }
+
+    function joinParty() {
+      const code = document.getElementById('join-code').value.trim().toUpperCase();
+      const name = document.getElementById('join-name').value.trim();
+      
+      if (!code || !name) {
+        showStatus('Please enter both party code and your name', 'error');
+        return;
+      }
+
+      myName = name;
+      partyCode = code;
+      isHost = false;
+
+      initializePeer();
+    }
+
+    function initializePeer(customId = null) {
+      showStatus('Connecting to party...', 'info');
+
+      const peerOptions = {
+        debug: 2
+      };
+
+      if (customId) {
+        peerOptions.id = customId;
+      }
+
+      peer = new Peer(peerOptions);
+
+      peer.on('open', (id) => {
+        if (isHost) {
+          partyCode = id;
+          document.getElementById('party-code-display').textContent = partyCode;
+          document.getElementById('party-info').classList.add('active');
+          document.getElementById('alarm-controls').classList.add('active');
+          document.getElementById('mic-controls').classList.add('active');
+          document.getElementById('leave-btn').style.display = 'block';
+          showStatus('Party created! Share the code with others.', 'connected');
+          addMemberToList(myName, 'Host (You)');
+        } else {
+          connectToHost(partyCode);
+        }
+      });
+
+      peer.on('connection', (conn) => {
+        if (isHost) {
+          connections.push(conn);
+          
+          conn.on('data', (data) => {
+            handleData(data, conn);
+          });
+
+          conn.on('open', () => {
+            conn.send({
+              type: 'welcome',
+              members: getMemberList()
+            });
+          });
+
+          conn.on('close', () => {
+            removeConnection(conn);
+          });
+        }
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        if (err.type === 'unavailable-id') {
+          showStatus('Party code already in use. Try again.', 'error');
+        } else if (err.type === 'peer-unavailable') {
+          showStatus('Party not found. Check the code and try again.', 'error');
+        } else {
+          showStatus('Connection error: ' + err.message, 'error');
+        }
+      });
+    }
+
+    function connectToHost(hostId) {
+      const conn = peer.connect(hostId);
+      connections.push(conn);
+
+      conn.on('open', () => {
+        showStatus('Connected to party!', 'connected');
+        document.getElementById('party-info').classList.add('active');
+        document.getElementById('leave-btn').style.display = 'block';
+        
+        conn.send({
+          type: 'join',
+          name: myName
+        });
+      });
+
+      conn.on('data', (data) => {
+        handleData(data, conn);
+      });
+
+      conn.on('close', () => {
+        showStatus('Disconnected from party', 'error');
+        leaveParty();
+      });
+    }
+
+    function handleData(data, conn) {
+      switch (data.type) {
+        case 'welcome':
+          data.members.forEach(member => {
+            addMemberToList(member.name, member.role);
+          });
+          addMemberToList(myName, 'You');
+          break;
+
+        case 'join':
+          if (isHost) {
+            addMemberToList(data.name, 'Member');
+            broadcastMembers();
+          }
+          break;
+
+        case 'members':
+          document.getElementById('member-list').innerHTML = '';
+          data.members.forEach(member => {
+            addMemberToList(member.name, member.role);
+          });
+          break;
+
+        case 'alarm':
+          if (data.active) {
+            activateAlarm();
+          } else {
+            deactivateAlarm();
+          }
+          break;
+
+        case 'audio':
+          if (data.stream && !isHost) {
+            playAudioStream(data.stream);
+          }
+          break;
+      }
+    }
+
+    function addMemberToList(name, role) {
+      const memberList = document.getElementById('member-list');
+      const existing = Array.from(memberList.children).find(
+        item => item.querySelector('.member-name').textContent === name
+      );
+      
+      if (!existing) {
+        const li = document.createElement('li');
+        li.className = 'member-item';
+        li.innerHTML = `
+          <span class="member-name">${name}</span>
+          <span class="member-status">${role}</span>
+        `;
+        memberList.appendChild(li);
+      }
+    }
+
+    function getMemberList() {
+      const members = [{ name: myName, role: 'Host' }];
+      connections.forEach(conn => {
+        if (conn.open) {
+          members.push({ name: conn.metadata?.name || 'Unknown', role: 'Member' });
+        }
+      });
+      return members;
+    }
+
+    function broadcastMembers() {
+      const members = getMemberList();
+      connections.forEach(conn => {
+        if (conn.open) {
+          conn.send({
+            type: 'members',
+            members: members
+          });
+        }
+      });
+    }
+
+    function removeConnection(conn) {
+      const index = connections.indexOf(conn);
+      if (index > -1) {
+        connections.splice(index, 1);
+      }
+      if (isHost) {
+        broadcastMembers();
+      }
+    }
+
+    function toggleAlarm() {
+      alarmActive = !alarmActive;
+      
+      if (alarmActive) {
+        activateAlarm();
+        document.getElementById('alarm-btn').textContent = 'Deactivate Alarm';
+        
+        connections.forEach(conn => {
+          if (conn.open) {
+            conn.send({
+              type: 'alarm',
+              active: true
+            });
+          }
+        });
+      } else {
+        deactivateAlarm();
+        document.getElementById('alarm-btn').textContent = 'Activate Alarm';
+        
+        connections.forEach(conn => {
+          if (conn.open) {
+            conn.send({
+              type: 'alarm',
+              active: false
+            });
+          }
+        });
+      }
+    }
+
+    function activateAlarm() {
+      document.body.classList.add('alarm-active');
+      playSiren();
+    }
+
+    function deactivateAlarm() {
+      document.body.classList.remove('alarm-active');
+      stopSiren();
+    }
+
+    function playSiren() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      oscillator = audioContext.createOscillator();
+      gainNode = audioContext.createGain();
+
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start();
+
+      // Siren effect - alternate between frequencies
+      const sirenInterval = setInterval(() => {
+        if (!alarmActive) {
+          clearInterval(sirenInterval);
+          return;
+        }
+        const currentTime = audioContext.currentTime;
+        oscillator.frequency.setValueAtTime(
+          oscillator.frequency.value === 800 ? 600 : 800,
+          currentTime
+        );
+      }, 500);
+    }
+
+    function stopSiren() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator = null;
+      }
+      if (gainNode) {
+        gainNode = null;
+      }
+    }
+
+    async function toggleMicrophone() {
+      if (micStream) {
+        stopMicrophone();
+      } else {
+        await startMicrophone();
+      }
+    }
+
+    async function startMicrophone() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        document.getElementById('mic-btn').textContent = 'Disconnect Microphone';
+        document.getElementById('mic-status').textContent = 'Microphone connected - streaming to party members';
+        
+        connections.forEach(conn => {
+          if (conn.open && conn.peer) {
+            const call = peer.call(conn.peer, micStream);
+            if (!micCall) micCall = call;
+          }
+        });
+
+        showStatus('Microphone connected and streaming', 'connected');
+      } catch (err) {
+        console.error('Microphone error:', err);
+        showStatus('Failed to access microphone: ' + err.message, 'error');
+      }
+    }
+
+    function stopMicrophone() {
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+      }
+      
+      if (micCall) {
+        micCall.close();
+        micCall = null;
+      }
+
+      document.getElementById('mic-btn').textContent = 'Connect Microphone';
+      document.getElementById('mic-status').textContent = '';
+      showStatus('Microphone disconnected', 'info');
+    }
+
+    function playAudioStream(stream) {
+      const audio = new Audio();
+      audio.srcObject = stream;
+      audio.play();
+    }
+
+    peer?.on('call', (call) => {
+      if (!isHost) {
+        call.answer();
+        call.on('stream', (stream) => {
+          playAudioStream(stream);
+        });
+      }
+    });
+
+    function leaveParty() {
+      if (alarmActive) {
+        deactivateAlarm();
+      }
+      
+      if (micStream) {
+        stopMicrophone();
+      }
+
+      connections.forEach(conn => conn.close());
+      connections = [];
+
+      if (peer) {
+        peer.destroy();
+        peer = null;
+      }
+
+      document.getElementById('party-info').classList.remove('active');
+      document.getElementById('alarm-controls').classList.remove('active');
+      document.getElementById('mic-controls').classList.remove('active');
+      document.getElementById('leave-btn').style.display = 'none';
+      document.getElementById('member-list').innerHTML = '';
+      document.getElementById('status').classList.remove('active');
+      
+      isHost =(false);
+      partyCode = '';
+      myName = '';
+      
+      document.getElementById('create-name').value = '';
+      document.getElementById('join-code').value = '';
+      document.getElementById('join-name').value = '';
+      
+      switchTab('create');
+    }
+  </script>
+</body>
+</html>

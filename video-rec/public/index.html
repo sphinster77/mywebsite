@@ -18,10 +18,15 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      padding: 20px;
     }
 
     .container {
       text-align: center;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 20px;
+      width: 100%;
     }
 
     .logo {
@@ -92,6 +97,10 @@
       border-top: 5px solid #4facfe;
     }
 
+    .alarm-card {
+      border-top: 5px solid #ff6b6b;
+    }
+
     /* iPad responsive */
     @media (max-width: 1024px) {
       .cards {
@@ -146,6 +155,12 @@
         <h2>User</h2>
         <p>Join a room, wait for approval, and share your screen with the admin.</p>
       </div>
+
+      <div class="card alarm-card" onclick="goToAlarm()">
+        <div class="card-icon">🚨</div>
+        <h2>Alarm Mode</h2>
+        <p>Create or join a party, sync alarms across devices with flashing screens and siren sounds.</p>
+      </div>
     </div>
   </div>
 
@@ -156,6 +171,10 @@
 
     function goToUser() {
       window.location.href = 'user.html';
+    }
+
+    function goToAlarm() {
+      window.location.href = 'alarm.html';
     }
   </script>
 </body>
