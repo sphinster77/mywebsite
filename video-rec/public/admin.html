@@ -509,7 +509,6 @@
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
     let peer = null;
     let roomCode = '';
@@ -910,16 +909,23 @@
       const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
       const joinUrl = `${baseUrl}/user.html?room=${code}`;
       
-      QRCode.toCanvas(joinUrl, { width: 120, margin: 1 }, function(error, canvas) {
-        if (error) {
-          console.error('QR code generation error:', error);
-          // Fallback: just show the room code text
-          qrContainer.innerHTML = `<div style="font-size: 24px; font-weight: bold; color: #333; padding: 20px;">${code}</div>`;
-        } else {
-          canvas.style.display = 'block';
-          qrContainer.appendChild(canvas);
-        }
-      });
+      // Use a simpler approach with an API
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(joinUrl)}`;
+      
+      const img = document.createElement('img');
+      img.src = qrApiUrl;
+      img.alt = 'QR Code';
+      img.style.width = '120px';
+      img.style.height = '120px';
+      img.style.display = 'block';
+      
+      img.onerror = function() {
+        console.error('QR code generation error');
+        // Fallback: just show the room code text
+        qrContainer.innerHTML = `<div style="font-size: 24px; font-weight: bold; color: #333; padding: 20px;">${code}</div>`;
+      };
+      
+      qrContainer.appendChild(img);
     }
 
   </script>

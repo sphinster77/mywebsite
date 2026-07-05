@@ -243,6 +243,40 @@
       display: block;
     }
 
+    .device-selection {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .device-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .device-group label {
+      font-size: 12px;
+      color: #666;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .device-group select {
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .device-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
     .status {
       margin-top: 15px;
       padding: 10px;
@@ -355,7 +389,17 @@
 
     <!-- Microphone Controls (Host Only) -->
     <div id="mic-controls" class="mic-controls">
-      <h3>🎤 Microphone</h3>
+      <h3>🎤 Audio Settings</h3>
+      <div class="device-selection">
+        <div class="device-group">
+          <label for="mic-select">Microphone</label>
+          <select id="mic-select"><option value="">Loading…</option></select>
+        </div>
+        <div class="device-group">
+          <label for="speaker-select">Speaker</label>
+          <select id="speaker-select"><option value="">Loading…</option></select>
+        </div>
+      </div>
       <button id="mic-btn" class="btn btn-primary" onclick="toggleMicrophone()">Connect Microphone</button>
       <p id="mic-status" style="margin-top: 10px; font-size: 14px; color: #666;"></p>
     </div>
@@ -378,6 +422,41 @@
     let gainNode = null;
     let micStream = null;
     let micCall = null;
+    let audioEl = null;
+    let micAudioContext = null;
+    let analyser = null;
+
+    // Load devices on page load
+    window.onload = function() {
+      loadDevices();
+    };
+
+    async function loadDevices() {
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+        tmp.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.error('Mic permission denied:', e);
+        return;
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter(d => d.kind === 'audioinput');
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+
+      const micSelect = document.getElementById('mic-select');
+      const speakerSelect = document.getElementById('speaker-select');
+
+      micSelect.innerHTML = inputs.map((d, i) =>
+        `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+      ).join('');
+
+      speakerSelect.innerHTML = outputs.length
+        ? outputs.map((d, i) =>
+          `<option value="${d.deviceId}">${d.label || 'Speaker ' + (i + 1)}</option>`
+        ).join('')
+        : '<option value="">Default speaker</option>';
+    }
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -440,14 +519,15 @@
       };
 
       if (customId) {
-        peerOptions.id = customId;
+        peerOptions.id = `alarm-${customId}`;
       }
 
       peer = new Peer(peerOptions);
 
       peer.on('open', (id) => {
         if (isHost) {
-          partyCode = id;
+          // Extract the party code from the peer ID
+          partyCode = id.replace('alarm-', '');
           document.getElementById('party-code-display').textContent = partyCode;
           document.getElementById('party-info').classList.add('active');
           document.getElementById('alarm-controls').classList.add('active');
@@ -494,7 +574,7 @@
     }
 
     function connectToHost(hostId) {
-      const conn = peer.connect(hostId);
+      const conn = peer.connect(`alarm-${hostId}`);
       connections.push(conn);
 
       conn.on('open', () => {
@@ -546,12 +626,6 @@
             activateAlarm();
           } else {
             deactivateAlarm();
-          }
-          break;
-
-        case 'audio':
-          if (data.stream && !isHost) {
-            playAudioStream(data.stream);
           }
           break;
       }
@@ -697,20 +771,42 @@
     }
 
     async function startMicrophone() {
+      const micId = document.getElementById('mic-select').value;
+      const spkId = document.getElementById('speaker-select').value;
+
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        document.getElementById('mic-btn').textContent = 'Disconnect Microphone';
-        document.getElementById('mic-status').textContent = 'Microphone connected - streaming to party members';
-        
-        connections.forEach(conn => {
-          if (conn.open && conn.peer) {
-            const call = peer.call(conn.peer, micStream);
-            if (!micCall) micCall = call;
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: micId ? { exact: micId } : undefined,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            latency: 0,
+            channelCount: 1,
+            sampleRate: 48000
           }
         });
 
-        showStatus('Microphone connected and streaming', 'connected');
+        // Use Web Audio API with minimal buffer size for lowest latency
+        micAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+          latencyHint: 'interactive',
+          sampleRate: 48000
+        });
+
+        const source = micAudioContext.createMediaStreamSource(micStream);
+        const destination = micAudioContext.destination;
+        
+        // Direct connection with no processing
+        source.connect(destination);
+
+        if (spkId && typeof micAudioContext.setSinkId === 'function') {
+          try { await micAudioContext.setSinkId(spkId); }
+          catch (e) { console.log('Speaker routing unavailable, using default.'); }
+        }
+
+        document.getElementById('mic-btn').textContent = 'Disconnect Microphone';
+        document.getElementById('mic-status').textContent = 'Microphone connected - audio playing locally';
+        showStatus('Microphone connected', 'connected');
       } catch (err) {
         console.error('Microphone error:', err);
         showStatus('Failed to access microphone: ' + err.message, 'error');
@@ -718,35 +814,25 @@
     }
 
     function stopMicrophone() {
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.srcObject = null;
+        audioEl = null;
+      }
+      if (micAudioContext) {
+        micAudioContext.close();
+        micAudioContext = null;
+      }
       if (micStream) {
         micStream.getTracks().forEach(track => track.stop());
         micStream = null;
       }
-      
-      if (micCall) {
-        micCall.close();
-        micCall = null;
-      }
+      analyser = null;
 
       document.getElementById('mic-btn').textContent = 'Connect Microphone';
       document.getElementById('mic-status').textContent = '';
       showStatus('Microphone disconnected', 'info');
     }
-
-    function playAudioStream(stream) {
-      const audio = new Audio();
-      audio.srcObject = stream;
-      audio.play();
-    }
-
-    peer?.on('call', (call) => {
-      if (!isHost) {
-        call.answer();
-        call.on('stream', (stream) => {
-          playAudioStream(stream);
-        });
-      }
-    });
 
     function leaveParty() {
       if (alarmActive) {
