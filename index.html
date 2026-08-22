@@ -219,7 +219,23 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.6);
             border-top: 4px solid #f0c030;
             width: min(420px, 90vw);
+            max-height: 85vh;
+            overflow-y: auto;
             position: relative;
+        }
+        .tools-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        .tools-panel::-webkit-scrollbar-track {
+            background: #0d0f1a;
+            border-radius: 4px;
+        }
+        .tools-panel::-webkit-scrollbar-thumb {
+            background: #f0c030;
+            border-radius: 4px;
+        }
+        .tools-panel::-webkit-scrollbar-thumb:hover {
+            background: #dca50c;
         }
         .tools-panel h2 {
             font-size: 1.3rem;
@@ -432,7 +448,7 @@
             <a class="card" href="screen_share.html">
                 <div class="card-icon">🖥️</div>
                 <div class="card-title">Screen Share</div>
-                <div class="card-desc">Ultra-low latency screen sharing optimized for minimal delay using WebRTC peer-to-peer technology.</div>
+                <div class="card-desc">Ultra-low latency screen sharing with wireless or cable/HDMI capture card support using WebRTC.</div>
             </a>
         </div>
     </div>

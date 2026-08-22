@@ -112,6 +112,21 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
+        .btn-secondary.active {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #1a1a2e;
+        }
+
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+        }
+
         .btn-danger {
             background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
             color: white;
@@ -218,7 +233,7 @@
 <body>
     <div class="header">
         <h1>🖥️ Ultra-Low Latency Screen Share</h1>
-        <p>Real-time screen sharing optimized for minimal delay using WebRTC</p>
+        <p>Wireless or cable-based screen sharing using WebRTC with capture card support</p>
     </div>
 
     <div class="latency-display" id="latencyDisplay">
@@ -232,8 +247,33 @@
                 <input type="text" id="roomId" placeholder="Enter room ID" maxlength="20">
                 <button class="btn btn-primary" onclick="joinRoom()">Join Room</button>
             </div>
-            <button class="btn btn-secondary" onclick="createRoom()">Create New Room</button>
+            <button class="btn btn-secondary" onclick="createRoom()">Create New Room (Host)</button>
             <div class="status" id="roomStatus"></div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="font-size: 16px; margin-bottom: 15px; color: #4facfe;">🔌 Connection Mode</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="wirelessBtn" onclick="setConnectionMode('wireless')" style="flex: 1; min-width: 120px;">
+                        📶 Wireless
+                    </button>
+                    <button class="btn btn-secondary" id="cableBtn" onclick="setConnectionMode('cable')" style="flex: 1; min-width: 120px;">
+                        🔌 Capture Card
+                    </button>
+                </div>
+                <div id="captureCardSection" style="display: none; margin-top: 15px;">
+                    <select id="captureCardSelect" style="width: 100%; padding: 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: white; border: 1px solid rgba(255,255,255,0.2); margin-bottom: 10px; font-size: 14px;">
+                        <option value="">Select capture card...</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="refreshCaptureCards()" style="width: 100%;">🔄 Refresh Devices</button>
+                    <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                        Connect your HDMI/USB capture card, then select it above. Look for devices labeled with 🔌.
+                    </p>
+                </div>
+            </div>
+            
+            <p style="margin-top: 15px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                💡 Open this page in two browser tabs/windows to test. Create a room in one, join with the same ID in the other.
+            </p>
         </div>
 
         <div class="video-container" id="videoContainer">
@@ -241,7 +281,7 @@
         </div>
 
         <div class="controls" id="controls">
-            <button class="btn btn-primary" id="shareBtn" onclick="startScreenShare()">Share Screen</button>
+            <button class="btn btn-primary" id="shareBtn" onclick="startScreenShare()">Start Sharing</button>
             <button class="btn btn-danger" onclick="stopScreenShare()">Stop Sharing</button>
             <button class="btn btn-secondary" onclick="copyRoomId()">Copy Room ID</button>
         </div>
@@ -269,22 +309,34 @@
         let isSharing = false;
         let latencyTestInterval = null;
         let lastPingTime = 0;
+        let connectionMode = 'wireless'; // 'wireless' or 'cable'
+        let captureCardDeviceId = null;
 
         const videoElement = document.getElementById('screenVideo');
         const roomStatus = document.getElementById('roomStatus');
         const connectionStatus = document.getElementById('connectionStatus');
         const latencyDisplay = document.getElementById('latencyDisplay');
         const latencyValue = document.getElementById('latencyValue');
+        const captureCardSelect = document.getElementById('captureCardSelect');
+        const captureCardSection = document.getElementById('captureCardSection');
+        const wirelessBtn = document.getElementById('wirelessBtn');
+        const cableBtn = document.getElementById('cableBtn');
 
-        // Simulated signaling (in production, use WebSocket server)
+        // Real signaling using localStorage for same-browser communication
         const signalingData = {};
+        const SIGNALING_KEY = 'webrtc_signaling_';
 
         function createRoom() {
             const roomId = generateRoomId();
             currentRoomId = roomId;
             document.getElementById('roomId').value = roomId;
             showStatus('Room created: ' + roomId, 'info');
-            initializePeerConnection();
+            
+            // Initialize as host
+            initializePeerConnection(true);
+            
+            // Start listening for join requests
+            startSignalingListener();
         }
 
         function joinRoom() {
@@ -295,14 +347,25 @@
             }
             currentRoomId = roomId;
             showStatus('Joining room: ' + roomId, 'info');
-            initializePeerConnection();
+            
+            // Initialize as guest
+            initializePeerConnection(false);
+            
+            // Start listening for host signals
+            startSignalingListener();
+            
+            // Signal join request
+            sendSignal('join', { roomId: roomId });
         }
 
         function generateRoomId() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
-        function initializePeerConnection() {
+        let isHost = false;
+
+        function initializePeerConnection(host) {
+            isHost = host;
             peerConnection = new RTCPeerConnection(rtcConfig);
 
             // Ultra-low latency configuration
@@ -315,8 +378,11 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    // In production, send this via signaling server
-                    console.log('ICE candidate:', event.candidate);
+                    // Send ICE candidate via signaling
+                    sendSignal('ice-candidate', {
+                        candidate: event.candidate,
+                        roomId: currentRoomId
+                    });
                 }
             };
 
@@ -333,6 +399,16 @@
                 } else if (state === 'disconnected' || state === 'failed') {
                     showStatus('Connection lost. Please try again.', 'error');
                     stopLatencyTest();
+                    stopSignaling();
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                const state = peerConnection.iceConnectionState;
+                console.log('ICE connection state:', state);
+                
+                if (state === 'connected' || state === 'completed') {
+                    showStatus('ICE connection established!', 'info');
                 }
             };
 
@@ -348,9 +424,178 @@
                 }).catch(e => console.log('Autoplay error:', e));
             };
 
-            // For demo purposes, simulate connection
-            simulateConnection();
+            // If host, create offer
+            if (isHost) {
+                createOffer();
+            }
         }
+
+        async function createOffer() {
+            try {
+                const offer = await peerConnection.createOffer({
+                    offerToReceiveAudio: false,
+                    offerToReceiveVideo: true
+                });
+                
+                await peerConnection.setLocalDescription(offer);
+                
+                sendSignal('offer', {
+                    offer: offer,
+                    roomId: currentRoomId
+                });
+                
+                showStatus('Waiting for peer to join...', 'info');
+            } catch (error) {
+                console.error('Error creating offer:', error);
+                showStatus('Error creating offer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleOffer(offer) {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                sendSignal('answer', {
+                    answer: answer,
+                    roomId: currentRoomId
+                });
+                
+                showStatus('Connected to host!', 'info');
+            } catch (error) {
+                console.error('Error handling offer:', error);
+                showStatus('Error handling offer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleAnswer(answer) {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                showStatus('Connection established!', 'connected');
+            } catch (error) {
+                console.error('Error handling answer:', error);
+                showStatus('Error handling answer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleIceCandidate(candidate) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+
+        // Signaling functions using localStorage
+        function sendSignal(type, data) {
+            const signal = {
+                type: type,
+                data: data,
+                timestamp: Date.now()
+            };
+            
+            // Use localStorage for same-browser signaling
+            const key = SIGNALING_KEY + type + '_' + data.roomId;
+            localStorage.setItem(key, JSON.stringify(signal));
+            
+            // Dispatch event for same-tab communication
+            window.dispatchEvent(new CustomEvent('webrtc-signal', { detail: signal }));
+            
+            console.log('Sent signal:', type, data);
+        }
+
+        function startSignalingListener() {
+            // Listen for storage events (cross-tab)
+            window.addEventListener('storage', handleStorageEvent);
+            
+            // Listen for custom events (same-tab)
+            window.addEventListener('webrtc-signal', handleCustomSignalEvent);
+            
+            // Listen for all localStorage keys
+            checkExistingSignals();
+        }
+
+        function handleStorageEvent(event) {
+            if (event.key && event.key.startsWith(SIGNALING_KEY)) {
+                try {
+                    const signal = JSON.parse(event.newValue);
+                    processSignal(signal);
+                } catch (error) {
+                    console.error('Error parsing signal:', error);
+                }
+            }
+        }
+
+        function handleCustomSignalEvent(event) {
+            processSignal(event.detail);
+        }
+
+        function checkExistingSignals() {
+            // Check for existing signals in localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
+                    try {
+                        const signal = JSON.parse(localStorage.getItem(key));
+                        processSignal(signal);
+                    } catch (error) {
+                        console.error('Error parsing existing signal:', error);
+                    }
+                }
+            }
+        }
+
+        function processSignal(signal) {
+            if (!signal || !signal.data || signal.data.roomId !== currentRoomId) {
+                return;
+            }
+
+            console.log('Received signal:', signal.type, signal.data);
+
+            switch (signal.type) {
+                case 'offer':
+                    if (!isHost) {
+                        handleOffer(signal.data.offer);
+                    }
+                    break;
+                case 'answer':
+                    if (isHost) {
+                        handleAnswer(signal.data.answer);
+                    }
+                    break;
+                case 'ice-candidate':
+                    handleIceCandidate(signal.data.candidate);
+                    break;
+                case 'join':
+                    if (isHost) {
+                        showStatus('Peer joined room!', 'info');
+                        // Re-send offer if needed
+                        if (peerConnection.signalingState === 'stable') {
+                            createOffer();
+                        }
+                    }
+                    break;
+            }
+        }
+
+        function stopSignaling() {
+            window.removeEventListener('storage', handleStorageEvent);
+            window.removeEventListener('webrtc-signal', handleCustomSignalEvent);
+            
+            // Clean up localStorage
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        }
+
+
 
         function simulateConnection() {
             // In production, this would be handled by a signaling server
@@ -364,18 +609,39 @@
 
         async function startScreenShare() {
             try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        cursor: 'always',
-                        frameRate: { ideal: 60, max: 60 },
-                        width: { ideal: 1920, max: 1920 },
-                        height: { ideal: 1080, max: 1080 },
-                        displaySurface: 'monitor',
-                        logicalSurface: true
-                    },
-                    audio: false,
-                    selfBrowserSurface: 'include'
-                });
+                let stream;
+                
+                if (connectionMode === 'wireless') {
+                    // Wireless screen sharing
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            cursor: 'always',
+                            frameRate: { ideal: 60, max: 60 },
+                            width: { ideal: 1920, max: 1920 },
+                            height: { ideal: 1080, max: 1080 },
+                            displaySurface: 'monitor',
+                            logicalSurface: true
+                        },
+                        audio: false,
+                        selfBrowserSurface: 'include'
+                    });
+                } else {
+                    // Cable/capture card mode
+                    if (!captureCardDeviceId) {
+                        showStatus('Please select a capture card first', 'error');
+                        return;
+                    }
+                    
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            deviceId: { exact: captureCardDeviceId },
+                            width: { ideal: 1920, max: 1920 },
+                            height: { ideal: 1080, max: 1080 },
+                            frameRate: { ideal: 60, max: 60 }
+                        },
+                        audio: false
+                    });
+                }
 
                 localStream = stream;
                 isSharing = true;
@@ -402,13 +668,19 @@
 
                 // Show local preview
                 videoElement.srcObject = stream;
-                document.getElementById('shareBtn').textContent = 'Screen Shared';
+                const sharingText = connectionMode === 'wireless' ? 'Screen Shared' : 'Capturing';
+                document.getElementById('shareBtn').textContent = sharingText;
                 document.getElementById('shareBtn').disabled = true;
 
-                // Handle user stopping share
-                stream.getVideoTracks()[0].onended = () => {
-                    stopScreenShare();
-                };
+                // Handle user stopping share (for wireless mode)
+                if (connectionMode === 'wireless') {
+                    stream.getVideoTracks()[0].onended = () => {
+                        stopScreenShare();
+                    };
+                }
+                
+                const modeText = connectionMode === 'wireless' ? 'Wireless' : 'Cable';
+                showStatus(`${modeText} screen sharing active!`, 'connected');
 
             } catch (error) {
                 console.error('Error sharing screen:', error);
@@ -424,7 +696,8 @@
 
             isSharing = false;
             videoElement.srcObject = null;
-            document.getElementById('shareBtn').textContent = 'Share Screen';
+            const shareText = connectionMode === 'wireless' ? 'Share Screen' : 'Start Capture';
+            document.getElementById('shareBtn').textContent = shareText;
             document.getElementById('shareBtn').disabled = false;
             
             // Remove tracks from peer connection
@@ -482,6 +755,7 @@
         // Handle page unload
         window.addEventListener('beforeunload', () => {
             stopScreenShare();
+            stopSignaling();
             if (peerConnection) {
                 peerConnection.close();
             }
@@ -489,6 +763,84 @@
 
         // Generate initial room ID for convenience
         document.getElementById('roomId').value = generateRoomId();
+        
+        // Set default connection mode
+        setConnectionMode('wireless');
+        
+        // Connection mode functions
+        function setConnectionMode(mode) {
+            connectionMode = mode;
+            
+            if (mode === 'wireless') {
+                wirelessBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                wirelessBtn.style.color = '#1a1a2e';
+                cableBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                cableBtn.style.color = 'white';
+                captureCardSection.style.display = 'none';
+                captureCardDeviceId = null;
+                document.getElementById('shareBtn').textContent = 'Share Screen';
+                showStatus('Wireless mode: Screen will be shared wirelessly', 'info');
+            } else {
+                cableBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                cableBtn.style.color = '#1a1a2e';
+                wirelessBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                wirelessBtn.style.color = 'white';
+                captureCardSection.style.display = 'block';
+                refreshCaptureCards();
+                document.getElementById('shareBtn').textContent = 'Start Capture';
+                showStatus('Capture card mode: Connect via HDMI/USB capture device', 'info');
+            }
+        }
+        
+        async function refreshCaptureCards() {
+            try {
+                // Request camera access to enumerate devices
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                captureCardSelect.innerHTML = '<option value="">Select capture card...</option>';
+                
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${index + 1}`;
+                    
+                    // Identify likely capture cards by common naming patterns
+                    const isCaptureCard = device.label.toLowerCase().includes('capture') ||
+                                        device.label.toLowerCase().includes('hdmi') ||
+                                        device.label.toLowerCase().includes('usb') ||
+                                        device.label.toLowerCase().includes('video') ||
+                                        device.label.toLowerCase().includes('webcam');
+                    
+                    if (isCaptureCard) {
+                        option.textContent = '🔌 ' + device.label;
+                        option.style.fontWeight = 'bold';
+                    }
+                    
+                    captureCardSelect.appendChild(option);
+                });
+                
+                captureCardSelect.onchange = () => {
+                    captureCardDeviceId = captureCardSelect.value || null;
+                    if (captureCardDeviceId) {
+                        showStatus('Selected: ' + captureCardSelect.options[captureCardSelect.selectedIndex].text, 'info');
+                    }
+                };
+                
+                if (videoDevices.length === 0) {
+                    showStatus('No video devices found. Connect a capture card or camera.', 'error');
+                } else {
+                    showStatus(`Found ${videoDevices.length} video device(s)`, 'info');
+                }
+                
+            } catch (error) {
+                console.error('Error enumerating devices:', error);
+                showStatus('Error accessing devices: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
 </html>
