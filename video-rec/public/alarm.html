@@ -420,23 +420,26 @@
     let audioContext = null;
     let oscillator = null;
     let gainNode = null;
+    let sirenInterval = null;
     let micStream = null;
     let micCall = null;
     let audioEl = null;
     let micAudioContext = null;
     let analyser = null;
 
-    // Load devices on page load
-    window.onload = function() {
-      loadDevices();
-    };
+    let devicesLoaded = false;
 
     async function loadDevices() {
+      if (devicesLoaded) return;
+      devicesLoaded = true;
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
         tmp.getTracks().forEach(t => t.stop());
       } catch (e) {
         console.error('Mic permission denied:', e);
+        devicesLoaded = false;
+        document.getElementById('mic-select').innerHTML = '<option value="">Microphone access denied</option>';
+        document.getElementById('speaker-select').innerHTML = '<option value="">Default speaker</option>';
         return;
       }
 
@@ -447,9 +450,11 @@
       const micSelect = document.getElementById('mic-select');
       const speakerSelect = document.getElementById('speaker-select');
 
-      micSelect.innerHTML = inputs.map((d, i) =>
-        `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
-      ).join('');
+      micSelect.innerHTML = inputs.length
+        ? inputs.map((d, i) =>
+          `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+        ).join('')
+        : '<option value="">Default microphone</option>';
 
       speakerSelect.innerHTML = outputs.length
         ? outputs.map((d, i) =>
@@ -518,11 +523,10 @@
         debug: 2
       };
 
-      if (customId) {
-        peerOptions.id = `alarm-${customId}`;
-      }
-
-      peer = new Peer(peerOptions);
+      // The peer ID must be passed as the first argument, not inside the options
+      peer = customId
+        ? new Peer(`alarm-${customId}`, peerOptions)
+        : new Peer(peerOptions);
 
       peer.on('open', (id) => {
         if (isHost) {
@@ -535,6 +539,7 @@
           document.getElementById('leave-btn').style.display = 'block';
           showStatus('Party created! Share the code with others.', 'connected');
           addMemberToList(myName, 'Host (You)');
+          loadDevices();
         } else {
           connectToHost(partyCode);
         }
@@ -543,7 +548,7 @@
       peer.on('connection', (conn) => {
         if (isHost) {
           connections.push(conn);
-          
+
           conn.on('data', (data) => {
             handleData(data, conn);
           });
@@ -579,9 +584,13 @@
 
       conn.on('open', () => {
         showStatus('Connected to party!', 'connected');
+        document.getElementById('party-code-display').textContent = partyCode;
         document.getElementById('party-info').classList.add('active');
+        document.getElementById('alarm-controls').classList.add('active');
+        document.getElementById('mic-controls').classList.add('active');
         document.getElementById('leave-btn').style.display = 'block';
-        
+        loadDevices();
+
         conn.send({
           type: 'join',
           name: myName
@@ -609,6 +618,7 @@
 
         case 'join':
           if (isHost) {
+            conn.memberName = data.name;
             addMemberToList(data.name, 'Member');
             broadcastMembers();
           }
@@ -622,10 +632,21 @@
           break;
 
         case 'alarm':
-          if (data.active) {
+          alarmActive = !!data.active;
+          document.getElementById('alarm-btn').textContent =
+            alarmActive ? 'Deactivate Alarm' : 'Activate Alarm';
+          if (alarmActive) {
             activateAlarm();
           } else {
             deactivateAlarm();
+          }
+          // The host relays the alarm to everyone else in the party
+          if (isHost) {
+            connections.forEach(other => {
+              if (other !== conn && other.open) {
+                other.send({ type: 'alarm', active: alarmActive });
+              }
+            });
           }
           break;
       }
@@ -640,10 +661,14 @@
       if (!existing) {
         const li = document.createElement('li');
         li.className = 'member-item';
-        li.innerHTML = `
-          <span class="member-name">${name}</span>
-          <span class="member-status">${role}</span>
-        `;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'member-name';
+        nameSpan.textContent = name;
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'member-status';
+        roleSpan.textContent = role;
+        li.appendChild(nameSpan);
+        li.appendChild(roleSpan);
         memberList.appendChild(li);
       }
     }
@@ -651,8 +676,8 @@
     function getMemberList() {
       const members = [{ name: myName, role: 'Host' }];
       connections.forEach(conn => {
-        if (conn.open) {
-          members.push({ name: conn.metadata?.name || 'Unknown', role: 'Member' });
+        if (conn.open && conn.memberName) {
+          members.push({ name: conn.memberName, role: 'Member' });
         }
       });
       return members;
@@ -676,8 +701,19 @@
         connections.splice(index, 1);
       }
       if (isHost) {
+        renderHostMemberList();
         broadcastMembers();
       }
+    }
+
+    function renderHostMemberList() {
+      document.getElementById('member-list').innerHTML = '';
+      addMemberToList(myName, 'Host (You)');
+      connections.forEach(conn => {
+        if (conn.open && conn.memberName) {
+          addMemberToList(conn.memberName, 'Member');
+        }
+      });
     }
 
     function toggleAlarm() {
@@ -721,8 +757,13 @@
     }
 
     function playSiren() {
+      if (oscillator) return;
+
       if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
       }
 
       oscillator = audioContext.createOscillator();
@@ -739,9 +780,11 @@
       oscillator.start();
 
       // Siren effect - alternate between frequencies
-      const sirenInterval = setInterval(() => {
-        if (!alarmActive) {
+      clearInterval(sirenInterval);
+      sirenInterval = setInterval(() => {
+        if (!oscillator) {
           clearInterval(sirenInterval);
+          sirenInterval = null;
           return;
         }
         const currentTime = audioContext.currentTime;
@@ -753,11 +796,17 @@
     }
 
     function stopSiren() {
+      if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+      }
       if (oscillator) {
         oscillator.stop();
+        oscillator.disconnect();
         oscillator = null;
       }
       if (gainNode) {
+        gainNode.disconnect();
         gainNode = null;
       }
     }
@@ -835,15 +884,17 @@
     }
 
     function leaveParty() {
-      if (alarmActive) {
-        deactivateAlarm();
-      }
-      
+      alarmActive = false;
+      deactivateAlarm();
+      document.getElementById('alarm-btn').textContent = 'Activate Alarm';
+
       if (micStream) {
         stopMicrophone();
       }
 
-      connections.forEach(conn => conn.close());
+      connections.forEach(conn => {
+        if (conn.open) conn.close();
+      });
       connections = [];
 
       if (peer) {
@@ -858,7 +909,7 @@
       document.getElementById('member-list').innerHTML = '';
       document.getElementById('status').classList.remove('active');
       
-      isHost =(false);
+      isHost = false;
       partyCode = '';
       myName = '';
       

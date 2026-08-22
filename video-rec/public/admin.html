@@ -516,9 +516,13 @@
     let connections = {};
     let approvedUsers = {};
     let calls = {};
+    let incomingCalls = {};
+    let mainPeerId = null;
     let cameraStream = null;
     let screenStream = null;
     let mediaRecorder = null;
+    let recordingStream = null;
+    let recordingAudioStream = null;
     let recordedChunks = [];
     let isRecording = false;
     let isCameraEnabled = false;
@@ -555,10 +559,15 @@
           console.log('Received stream from:', call.peer);
           addVideoStream(call.peer, stream);
         });
+        call.on('close', () => {
+          removeVideoStream(call.peer);
+          delete incomingCalls[call.peer];
+        });
         call.on('error', (err) => {
           console.error('Call error:', err);
+          removeVideoStream(call.peer);
         });
-        connections[call.peer] = call;
+        incomingCalls[call.peer] = call;
       });
 
       peer.on('connection', (conn) => {
@@ -567,7 +576,13 @@
 
       peer.on('error', (err) => {
         console.error('Peer error:', err);
-        showError('Connection error: ' + err.type);
+        if (err.type === 'unavailable-id') {
+          showError('That room code is already in use. Pick a different one.');
+          document.getElementById('loginScreen').style.display = '';
+          document.getElementById('mainScreen').classList.remove('active');
+        } else {
+          showError('Connection error: ' + err.type);
+        }
       });
     }
 
@@ -577,7 +592,16 @@
       errorDiv.style.display = 'block';
     }
 
+    function sendToApprovedUsers(message) {
+      Object.values(approvedUsers).forEach(user => {
+        if (user.conn && user.conn.open) {
+          user.conn.send(message);
+        }
+      });
+    }
+
     function handleUserConnection(conn) {
+      connections[conn.peer] = conn;
       conn.on('open', () => {
         updateUserCount();
         conn.on('data', (data) => {
@@ -591,12 +615,18 @@
       });
 
       conn.on('close', () => {
-        if (connections[conn.peer]) {
-          connections[conn.peer].close();
-          delete connections[conn.peer];
+        delete connections[conn.peer];
+        if (incomingCalls[conn.peer]) {
+          incomingCalls[conn.peer].close();
+          delete incomingCalls[conn.peer];
         }
-        const videoItem = document.querySelector(`[data-video-peer-id="${conn.peer}"]`);
-        if (videoItem) videoItem.remove();
+        if (calls[conn.peer]) {
+          calls[conn.peer].close();
+          delete calls[conn.peer];
+        }
+        removeVideoStream(conn.peer);
+        const pendingDiv = document.querySelector(`[data-peer-id="${conn.peer}"]`);
+        if (pendingDiv) pendingDiv.remove();
         delete pendingUsers[conn.peer];
         delete approvedUsers[conn.peer];
         updateUserCount();
@@ -608,12 +638,20 @@
       document.getElementById('userCount').textContent = count;
     }
 
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     function showPendingUser(peerId, name) {
       const pendingDiv = document.getElementById('pendingUsers');
+      const existing = pendingDiv.querySelector(`[data-peer-id="${peerId}"]`);
+      if (existing) existing.remove();
       const userDiv = document.createElement('div');
       userDiv.className = 'pending-user';
       userDiv.innerHTML = `
-        <span>${name}</span>
+        <span>${escapeHtml(name)}</span>
         <div>
           <button class="btn btn-success" onclick="approveUser('${peerId}')">Approve</button>
           <button class="btn btn-danger" onclick="rejectUser('${peerId}')">Reject</button>
@@ -632,7 +670,7 @@
         updateUserCount();
         
         // If admin is sharing screen, call the user
-        if (isSharingScreen && screenStream) {
+        if (isSharingScreen && screenStream && !calls[peerId]) {
           const call = peer.call(peerId, screenStream);
           calls[peerId] = call;
           call.on('close', () => {
@@ -658,6 +696,9 @@
       const mainVideo = document.getElementById('mainVideo');
       const sideVideos = document.getElementById('sideVideos');
 
+      const existing = sideVideos.querySelector(`[data-video-peer-id="${peerId}"]`);
+      if (existing) existing.remove();
+
       const videoItem = document.createElement('div');
       videoItem.className = 'video-item';
       videoItem.dataset.videoPeerId = peerId;
@@ -667,18 +708,38 @@
       video.srcObject = stream;
       video.autoplay = true;
       video.playsInline = true;
+      // Previews are muted so audio only plays from the main screen
+      video.muted = true;
 
       const userName = document.createElement('div');
       userName.className = 'user-name';
-      userName.textContent = `User ${peerId.slice(-8)}`;
+      const known = approvedUsers[peerId];
+      userName.textContent = known ? known.name : `User ${peerId.slice(-8)}`;
 
       videoItem.appendChild(video);
       videoItem.appendChild(userName);
       sideVideos.appendChild(videoItem);
 
-      // If this is the first stream, set it as main
-      if (!mainVideo.srcObject) {
+      // If this is the first stream (or replaces the current main), set it as main
+      if (!mainVideo.srcObject || mainPeerId === peerId) {
         setMainScreen(peerId);
+      }
+    }
+
+    function removeVideoStream(peerId) {
+      const videoItem = document.querySelector(`[data-video-peer-id="${peerId}"]`);
+      if (videoItem) videoItem.remove();
+
+      if (mainPeerId === peerId) {
+        mainPeerId = null;
+        const mainVideo = document.getElementById('mainVideo');
+        mainVideo.srcObject = null;
+        const next = document.querySelector('.video-item[data-video-peer-id]');
+        if (next) {
+          setMainScreen(next.dataset.videoPeerId);
+        } else if (isSharingScreen && screenStream) {
+          mainVideo.srcObject = screenStream;
+        }
       }
     }
 
@@ -691,7 +752,23 @@
         videoItem.classList.add('is-main');
         const video = videoItem.querySelector('video');
         mainVideo.srcObject = video.srcObject;
+        mainPeerId = peerId;
+        // Autoplay with sound can be blocked; fall back to muted playback
+        mainVideo.play().catch(() => {
+          mainVideo.muted = true;
+          mainVideo.play().catch(err => console.warn('Could not play main video:', err));
+        });
       }
+    }
+
+    function pickRecordingMimeType() {
+      const candidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4'
+      ];
+      return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
     }
 
     async function toggleRecording() {
@@ -705,18 +782,32 @@
           return;
         }
 
-        const stream = mainVideo.srcObject;
-        
+        // Build a separate stream so the live stream is never mutated
+        recordingStream = new MediaStream(mainVideo.srcObject.getVideoTracks());
+
         // Add audio if available
         try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const audioTrack = audioStream.getAudioTracks()[0];
-          stream.addTrack(audioTrack);
+          recordingAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recordingAudioStream.getAudioTracks().forEach(track => recordingStream.addTrack(track));
         } catch (err) {
           console.log('Could not get audio:', err);
         }
 
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        const mimeType = pickRecordingMimeType();
+        if (!mimeType) {
+          alert('Recording is not supported in this browser.');
+          stopRecordingTracks();
+          return;
+        }
+
+        try {
+          mediaRecorder = new MediaRecorder(recordingStream, { mimeType });
+        } catch (err) {
+          console.error('Could not start recorder:', err);
+          alert('Could not start recording: ' + err.message);
+          stopRecordingTracks();
+          return;
+        }
         recordedChunks = [];
 
         mediaRecorder.ondataavailable = (event) => {
@@ -726,13 +817,17 @@
         };
 
         mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const blob = new Blob(recordedChunks, { type: mimeType });
           const url = URL.createObjectURL(blob);
+          const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
           const a = document.createElement('a');
           a.href = url;
-          a.download = `recording-${Date.now()}.webm`;
+          a.download = `recording-${Date.now()}.${extension}`;
+          document.body.appendChild(a);
           a.click();
-          URL.revokeObjectURL(url);
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+          stopRecordingTracks();
         };
 
         mediaRecorder.start();
@@ -742,11 +837,7 @@
         recordBtn.classList.add('btn-danger');
         recordingIndicator.classList.add('active');
         // Notify users
-        Object.values(connections).forEach(conn => {
-          if (conn.send) {
-            conn.send({ type: 'recording-started' });
-          }
-        });
+        sendToApprovedUsers({ type: 'recording-started' });
       } else {
         mediaRecorder.stop();
         isRecording = false;
@@ -754,12 +845,16 @@
         recordBtn.classList.remove('btn-danger');
         recordBtn.classList.add('btn-success');
         recordingIndicator.classList.remove('active');
-        Object.values(connections).forEach(conn => {
-          if (conn.send) {
-            conn.send({ type: 'recording-stopped' });
-          }
-        });
+        sendToApprovedUsers({ type: 'recording-stopped' });
       }
+    }
+
+    function stopRecordingTracks() {
+      if (recordingAudioStream) {
+        recordingAudioStream.getTracks().forEach(track => track.stop());
+        recordingAudioStream = null;
+      }
+      recordingStream = null;
     }
 
     async function toggleScreenShare() {
@@ -803,8 +898,8 @@
           shareBtn.classList.remove('btn-success');
           shareBtn.classList.add('btn-danger');
 
-          // Call all connected users with screen stream
-          Object.keys(connections).forEach(peerId => {
+          // Call all approved users with screen stream
+          Object.keys(approvedUsers).forEach(peerId => {
             const call = peer.call(peerId, screenStream);
             calls[peerId] = call;
             call.on('close', () => {
@@ -813,11 +908,7 @@
           });
 
           // Notify users
-          Object.values(connections).forEach(conn => {
-            if (conn.send) {
-              conn.send({ type: 'admin-sharing-started' });
-            }
-          });
+          sendToApprovedUsers({ type: 'admin-sharing-started' });
 
           // Handle user stopping screen share via browser UI
           screenStream.getVideoTracks()[0].onended = () => {
@@ -846,7 +937,10 @@
         screenStream.getTracks().forEach(track => track.stop());
       }
 
-      mainVideo.srcObject = null;
+      screenStream = null;
+      if (mainVideo.srcObject && !mainPeerId) {
+        mainVideo.srcObject = null;
+      }
       isSharingScreen = false;
       shareBtn.textContent = 'Share Screen';
       shareBtn.classList.remove('btn-danger');
@@ -859,11 +953,7 @@
       calls = {};
 
       // Notify users
-      Object.values(connections).forEach(conn => {
-        if (conn.send) {
-          conn.send({ type: 'admin-sharing-stopped' });
-        }
-      });
+      sendToApprovedUsers({ type: 'admin-sharing-stopped' });
     }
 
     async function toggleCamera() {
