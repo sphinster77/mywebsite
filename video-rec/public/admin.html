@@ -454,7 +454,7 @@
         <div class="qr-code" id="qrCode"></div>
         <div class="qr-label">Scan to join</div>
       </div>
-      <div class="room-info">Connected Users: <span id="userCount">0</span></div>
+      <div class="room-info">Connected Users: <span id="userCount">0</span> | Admin Screen: <span id="adminScreenStatus">Not Sharing</span></div>
     </div>
 
     <div class="video-container">
@@ -555,8 +555,13 @@
           console.log('Received stream from:', call.peer);
           addVideoStream(call.peer, stream);
         });
+        call.on('close', () => {
+          console.log('Call closed from:', call.peer);
+          const videoItem = document.querySelector(`[data-video-peer-id="${call.peer}"]`);
+          if (videoItem) videoItem.remove();
+        });
         call.on('error', (err) => {
-          console.error('Call error:', err);
+          console.error('Call error from:', call.peer, err);
         });
         connections[call.peer] = call;
       });
@@ -582,7 +587,7 @@
         updateUserCount();
         conn.on('data', (data) => {
           if (data.type === 'join-request') {
-            pendingUsers[conn.peer] = { conn, name: data.name };
+            pendingUsers[conn.peer] = { conn, name: data.name, peerId: conn.peer };
             showPendingUser(conn.peer, data.name);
           } else if (data.type === 'screen-stream') {
             // User is sharing screen via PeerJS call
@@ -604,8 +609,9 @@
     }
 
     function updateUserCount() {
-      const count = Object.keys(approvedUsers).length;
-      document.getElementById('userCount').textContent = count;
+      const approvedCount = Object.keys(approvedUsers).length;
+      const pendingCount = Object.keys(pendingUsers).length;
+      document.getElementById('userCount').textContent = `${approvedCount} (${pendingCount} pending)`;
     }
 
     function showPendingUser(peerId, name) {
@@ -621,23 +627,31 @@
       `;
       userDiv.dataset.peerId = peerId;
       pendingDiv.appendChild(userDiv);
+      console.log('Showing pending user:', peerId, name);
     }
 
     function approveUser(peerId) {
       const user = pendingUsers[peerId];
       if (user) {
+        console.log('Approving user:', peerId, user.name);
         user.conn.send({ type: 'approved', roomCode, adminName });
         approvedUsers[peerId] = user;
         delete pendingUsers[peerId];
         updateUserCount();
         
-        // If admin is sharing screen, call the user
+        // If admin is sharing screen, call the user immediately
         if (isSharingScreen && screenStream) {
-          const call = peer.call(peerId, screenStream);
-          calls[peerId] = call;
-          call.on('close', () => {
-            delete calls[peerId];
-          });
+          console.log('Admin is sharing, calling newly approved user:', peerId);
+          setTimeout(() => {
+            const call = peer.call(peerId, screenStream);
+            calls[peerId] = call;
+            call.on('close', () => {
+              delete calls[peerId];
+            });
+            call.on('error', (err) => {
+              console.error('Error calling approved user:', peerId, err);
+            });
+          }, 500); // Small delay to ensure connection is established
         }
       }
       const userDiv = document.querySelector(`[data-peer-id="${peerId}"]`);
@@ -670,7 +684,9 @@
 
       const userName = document.createElement('div');
       userName.className = 'user-name';
-      userName.textContent = `User ${peerId.slice(-8)}`;
+      // Try to get the actual user name from approvedUsers
+      const user = approvedUsers[peerId];
+      userName.textContent = user ? user.name : `User ${peerId.slice(-8)}`;
 
       videoItem.appendChild(video);
       videoItem.appendChild(userName);
@@ -742,9 +758,9 @@
         recordBtn.classList.add('btn-danger');
         recordingIndicator.classList.add('active');
         // Notify users
-        Object.values(connections).forEach(conn => {
-          if (conn.send) {
-            conn.send({ type: 'recording-started' });
+        Object.values(approvedUsers).forEach(user => {
+          if (user.conn && user.conn.send) {
+            user.conn.send({ type: 'recording-started' });
           }
         });
       } else {
@@ -754,9 +770,9 @@
         recordBtn.classList.remove('btn-danger');
         recordBtn.classList.add('btn-success');
         recordingIndicator.classList.remove('active');
-        Object.values(connections).forEach(conn => {
-          if (conn.send) {
-            conn.send({ type: 'recording-stopped' });
+        Object.values(approvedUsers).forEach(user => {
+          if (user.conn && user.conn.send) {
+            user.conn.send({ type: 'recording-stopped' });
           }
         });
       }
@@ -802,20 +818,27 @@
           shareBtn.textContent = 'Stop Sharing';
           shareBtn.classList.remove('btn-success');
           shareBtn.classList.add('btn-danger');
+          document.getElementById('adminScreenStatus').textContent = 'Sharing';
+          document.getElementById('adminScreenStatus').style.color = '#4facfe';
 
-          // Call all connected users with screen stream
-          Object.keys(connections).forEach(peerId => {
+          // Call all approved users with screen stream
+          Object.keys(approvedUsers).forEach(peerId => {
+            console.log('Calling approved user:', peerId);
             const call = peer.call(peerId, screenStream);
             calls[peerId] = call;
             call.on('close', () => {
               delete calls[peerId];
             });
+            call.on('error', (err) => {
+              console.error('Error calling user:', peerId, err);
+            });
           });
 
-          // Notify users
-          Object.values(connections).forEach(conn => {
-            if (conn.send) {
-              conn.send({ type: 'admin-sharing-started' });
+          // Notify users via data connection
+          Object.values(approvedUsers).forEach(user => {
+            if (user.conn && user.conn.send) {
+              console.log('Notifying user:', user.peerId, user.name);
+              user.conn.send({ type: 'admin-sharing-started' });
             }
           });
 
@@ -851,6 +874,8 @@
       shareBtn.textContent = 'Share Screen';
       shareBtn.classList.remove('btn-danger');
       shareBtn.classList.add('btn-success');
+      document.getElementById('adminScreenStatus').textContent = 'Not Sharing';
+      document.getElementById('adminScreenStatus').style.color = '#666';
 
       // Close all calls
       Object.values(calls).forEach(call => {
@@ -858,10 +883,11 @@
       });
       calls = {};
 
-      // Notify users
-      Object.values(connections).forEach(conn => {
-        if (conn.send) {
-          conn.send({ type: 'admin-sharing-stopped' });
+      // Notify users via data connection
+      Object.values(approvedUsers).forEach(user => {
+        if (user.conn && user.conn.send) {
+          console.log('Notifying user about stop:', user.peerId);
+          user.conn.send({ type: 'admin-sharing-stopped' });
         }
       });
     }

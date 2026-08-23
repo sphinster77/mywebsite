@@ -375,7 +375,8 @@
 
     <div class="screen-share-container">
       <h3>Admin's Screen</h3>
-      <video id="adminVideo" class="preview-video" autoplay playsinline></video>
+      <video id="adminVideo" class="preview-video" autoplay playsinline muted></video>
+      <p id="adminScreenStatus" style="color: #666; font-size: 14px; margin-top: 10px;">Waiting for admin to share screen...</p>
     </div>
 
     <div class="screen-share-container">
@@ -470,10 +471,15 @@
             document.getElementById('recordingIndicator').classList.add('active');
           } else if (data.type === 'recording-stopped') {
             document.getElementById('recordingIndicator').classList.remove('active');
+          } else if (data.type === 'admin-sharing-started') {
+            document.getElementById('adminScreenStatus').textContent = 'Admin is sharing their screen!';
+            document.getElementById('adminScreenStatus').style.color = '#4facfe';
           } else if (data.type === 'admin-sharing-stopped') {
             if (adminCall) {
               document.getElementById('adminVideo').srcObject = null;
             }
+            document.getElementById('adminScreenStatus').textContent = 'Admin stopped sharing screen';
+            document.getElementById('adminScreenStatus').style.color = '#666';
           }
         });
 
@@ -495,12 +501,22 @@
 
       // Handle incoming call from admin sharing screen
       peer.on('call', (call) => {
+        console.log('Incoming call from admin');
         call.answer();
         call.on('stream', (stream) => {
+          console.log('Received admin screen stream');
           document.getElementById('adminVideo').srcObject = stream;
+          document.getElementById('adminScreenStatus').textContent = 'Admin is sharing their screen!';
+          document.getElementById('adminScreenStatus').style.color = '#4facfe';
         });
         call.on('close', () => {
+          console.log('Admin call closed');
           document.getElementById('adminVideo').srcObject = null;
+          document.getElementById('adminScreenStatus').textContent = 'Admin stopped sharing screen';
+          document.getElementById('adminScreenStatus').style.color = '#666';
+        });
+        call.on('error', (err) => {
+          console.error('Admin call error:', err);
         });
         adminCall = call;
       });

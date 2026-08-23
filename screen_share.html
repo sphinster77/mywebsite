@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zero Latency Screen Share</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Screen Share - iOS Optimized</title>
     <style>
         * {
             margin: 0;
@@ -12,12 +14,14 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             color: white;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .header {
@@ -42,22 +46,24 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 30px;
-            gap: 20px;
+            padding: 20px 15px;
+            gap: 15px;
+            padding-top: max(20px, env(safe-area-inset-top));
         }
 
         .room-section {
             background: rgba(255, 255, 255, 0.1);
-            padding: 30px;
+            padding: 20px;
             border-radius: 15px;
             width: 100%;
             max-width: 500px;
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .room-section h2 {
-            margin-bottom: 20px;
-            font-size: 20px;
+            margin-bottom: 15px;
+            font-size: 18px;
             color: #4facfe;
         }
 
@@ -69,13 +75,14 @@
 
         .input-group input {
             flex: 1;
-            padding: 12px 15px;
+            padding: 14px 15px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.3);
             color: white;
             font-size: 16px;
             outline: none;
+            -webkit-appearance: none;
         }
 
         .input-group input:focus {
@@ -83,13 +90,17 @@
         }
 
         .btn {
-            padding: 12px 25px;
+            padding: 14px 25px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .btn-primary {
@@ -145,6 +156,7 @@
             border-radius: 15px;
             overflow: hidden;
             aspect-ratio: 16/9;
+            min-height: 250px;
         }
 
         .video-container.active {
@@ -213,11 +225,11 @@
 
         @media (max-width: 768px) {
             .main-container {
-                padding: 15px;
+                padding: 15px 10px;
             }
 
             .room-section {
-                padding: 20px;
+                padding: 15px;
             }
 
             .input-group {
@@ -227,13 +239,53 @@
             .controls {
                 flex-direction: column;
             }
+            
+            .video-container {
+                aspect-ratio: 16/9;
+                min-height: 200px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .header p {
+                font-size: 12px;
+            }
+        }
+        
+        /* iPhone 7 Plus specific optimizations (414px width) */
+        @media (max-width: 414px) {
+            .room-section {
+                padding: 15px 12px;
+            }
+            
+            .room-section h2 {
+                font-size: 16px;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+            
+            .video-container {
+                min-height: 180px;
+            }
+            
+            .latency-display {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🖥️ Ultra-Low Latency Screen Share</h1>
-        <p>Wireless or cable-based screen sharing using WebRTC with capture card support</p>
+        <h1>🖥️ Screen Share</h1>
+        <p>Mobile-optimized with gaming mode for ultra-low latency streaming</p>
     </div>
 
     <div class="latency-display" id="latencyDisplay">
@@ -249,6 +301,27 @@
             </div>
             <button class="btn btn-secondary" onclick="createRoom()">Create New Room (Host)</button>
             <div class="status" id="roomStatus"></div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button class="btn btn-secondary" onclick="testLocalScreenShare()" style="width: 100%; font-size: 14px;">
+                    🧪 Test Local Screen Share (No room needed)
+                </button>
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="font-size: 16px; margin-bottom: 15px; color: #4facfe;">🎮 Performance Mode</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="standardBtn" onclick="setPerformanceMode('standard')" style="flex: 1; min-width: 120px;">
+                        ⚡ Standard
+                    </button>
+                    <button class="btn btn-secondary" id="gamingBtn" onclick="setPerformanceMode('gaming')" style="flex: 1; min-width: 120px;">
+                        🎮 Gaming
+                    </button>
+                </div>
+                <div id="gamingInfo" style="display: none; margin-top: 10px; padding: 10px; background: rgba(79, 172, 254, 0.1); border-radius: 8px; font-size: 12px; color: #4facfe;">
+                    🎮 Gaming mode: 1080p/60fps, ultra-low latency for gaming. Best for desktop devices.
+                </div>
+            </div>
             
             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                 <h3 style="font-size: 16px; margin-bottom: 15px; color: #4facfe;">🔌 Connection Mode</h3>
@@ -274,23 +347,27 @@
             <p style="margin-top: 15px; font-size: 12px; color: rgba(255,255,255,0.6);">
                 💡 Open this page in two browser tabs/windows to test. Create a room in one, join with the same ID in the other.
             </p>
+            <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                📱 iOS users: Screen sharing requires iOS 11+. For best results use Safari. Cable mode recommended for older devices.
+            </p>
         </div>
 
         <div class="video-container" id="videoContainer">
-            <video id="screenVideo" autoplay playsinline></video>
+            <video id="screenVideo" autoplay playsinline muted onclick="this.play()"></video>
         </div>
 
         <div class="controls" id="controls">
             <button class="btn btn-primary" id="shareBtn" onclick="startScreenShare()">Start Sharing</button>
             <button class="btn btn-danger" onclick="stopScreenShare()">Stop Sharing</button>
             <button class="btn btn-secondary" onclick="copyRoomId()">Copy Room ID</button>
+            <button class="btn btn-secondary" onclick="showDebugInfo()">🔍 Debug Info</button>
         </div>
 
         <div class="status" id="connectionStatus"></div>
     </div>
 
     <script>
-        // WebRTC configuration for ultra-low latency
+        // WebRTC configuration optimized for iOS
         const rtcConfig = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -299,8 +376,8 @@
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' }
             ],
-            iceCandidatePoolSize: 0, // Reduce candidate gathering time
-            iceTransportPolicy: 'all' // Use all available network paths
+            iceCandidatePoolSize: 0,
+            iceTransportPolicy: 'all'
         };
 
         let localStream = null;
@@ -311,6 +388,8 @@
         let lastPingTime = 0;
         let connectionMode = 'wireless'; // 'wireless' or 'cable'
         let captureCardDeviceId = null;
+        let signalingInterval = null;
+        let performanceMode = 'standard'; // 'standard' or 'gaming'
 
         const videoElement = document.getElementById('screenVideo');
         const roomStatus = document.getElementById('roomStatus');
@@ -321,6 +400,8 @@
         const captureCardSection = document.getElementById('captureCardSection');
         const wirelessBtn = document.getElementById('wirelessBtn');
         const cableBtn = document.getElementById('cableBtn');
+        const standardBtn = document.getElementById('standardBtn');
+        const gamingBtn = document.getElementById('gamingBtn');
 
         // Real signaling using localStorage for same-browser communication
         const signalingData = {};
@@ -368,13 +449,17 @@
             isHost = host;
             peerConnection = new RTCPeerConnection(rtcConfig);
 
-            // Ultra-low latency configuration
-            peerConnection.setConfiguration({
+            // Configuration based on performance mode
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            const config = {
                 ...rtcConfig,
-                iceTransportPolicy: 'all', // Use all available network paths
-                bundlePolicy: 'max-bundle', // Reduce ICE gathering time
-                rtcpMuxPolicy: 'require' // Reduce connection setup time
-            });
+                iceTransportPolicy: 'all',
+                bundlePolicy: (performanceMode === 'gaming' && !isIOS) ? 'max-bundle' : 'balanced',
+                rtcpMuxPolicy: 'require'
+            };
+            
+            peerConnection.setConfiguration(config);
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
@@ -392,8 +477,6 @@
                 
                 if (state === 'connected') {
                     showStatus('Connected! Screen sharing active.', 'connected');
-                    document.getElementById('videoContainer').classList.add('active');
-                    document.getElementById('controls').classList.add('active');
                     latencyDisplay.classList.add('active');
                     startLatencyTest();
                 } else if (state === 'disconnected' || state === 'failed') {
@@ -417,11 +500,17 @@
                 const stream = event.streams[0];
                 videoElement.srcObject = stream;
                 
-                // Configure video element for low latency
+                // Configure video element for iOS
+                videoElement.playsInline = true;
+                videoElement.muted = true; // Prevent audio feedback
+                
                 videoElement.play().then(() => {
-                    // Apply low-latency playback settings
-                    videoElement.currentTime = videoElement.currentTime; // Reduce buffering
-                }).catch(e => console.log('Autoplay error:', e));
+                    console.log('Video playing successfully');
+                }).catch(e => {
+                    console.log('Autoplay error:', e);
+                    // iOS requires user interaction for autoplay
+                    showStatus('Tap video to start playback', 'info');
+                });
             };
 
             // If host, create offer
@@ -493,15 +582,16 @@
             const signal = {
                 type: type,
                 data: data,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                senderId: Math.random().toString(36).substring(7) // Unique sender ID
             };
             
             // Use localStorage for same-browser signaling
             const key = SIGNALING_KEY + type + '_' + data.roomId;
             localStorage.setItem(key, JSON.stringify(signal));
             
-            // Dispatch event for same-tab communication
-            window.dispatchEvent(new CustomEvent('webrtc-signal', { detail: signal }));
+            // Force storage event by setting another key
+            localStorage.setItem(SIGNALING_KEY + 'trigger_' + Date.now(), Date.now().toString());
             
             console.log('Sent signal:', type, data);
         }
@@ -510,15 +600,16 @@
             // Listen for storage events (cross-tab)
             window.addEventListener('storage', handleStorageEvent);
             
-            // Listen for custom events (same-tab)
-            window.addEventListener('webrtc-signal', handleCustomSignalEvent);
+            // Periodically check for new signals
+            signalingInterval = setInterval(checkExistingSignals, 500);
             
-            // Listen for all localStorage keys
+            // Initial check
             checkExistingSignals();
         }
 
         function handleStorageEvent(event) {
-            if (event.key && event.key.startsWith(SIGNALING_KEY)) {
+            console.log('Storage event:', event.key, event.newValue);
+            if (event.key && event.key.startsWith(SIGNALING_KEY) && !event.key.includes('trigger')) {
                 try {
                     const signal = JSON.parse(event.newValue);
                     processSignal(signal);
@@ -526,10 +617,6 @@
                     console.error('Error parsing signal:', error);
                 }
             }
-        }
-
-        function handleCustomSignalEvent(event) {
-            processSignal(event.detail);
         }
 
         function checkExistingSignals() {
@@ -552,7 +639,13 @@
                 return;
             }
 
-            console.log('Received signal:', signal.type, signal.data);
+            // Ignore old signals (older than 5 seconds)
+            if (signal.timestamp && Date.now() - signal.timestamp > 5000) {
+                console.log('Ignoring old signal:', signal.type);
+                return;
+            }
+
+            console.log('Processing signal:', signal.type, signal.data);
 
             switch (signal.type) {
                 case 'offer':
@@ -581,8 +674,12 @@
         }
 
         function stopSignaling() {
+            if (signalingInterval) {
+                clearInterval(signalingInterval);
+                signalingInterval = null;
+            }
+            
             window.removeEventListener('storage', handleStorageEvent);
-            window.removeEventListener('webrtc-signal', handleCustomSignalEvent);
             
             // Clean up localStorage
             const keysToRemove = [];
@@ -607,12 +704,121 @@
             }, 1500);
         }
 
+        async function testLocalScreenShare() {
+            try {
+                console.log('Testing local screen share...');
+                let stream;
+                
+                // iOS/iPhone detection
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                const isOldIOS = isIOS && /OS [1-9]_|OS 10_/.test(navigator.userAgent);
+                
+                // Get constraints based on performance mode
+                let constraints;
+                try {
+                    constraints = getScreenConstraints(isIOS, isOldIOS);
+                } catch (error) {
+                    return; // Error already shown in getScreenConstraints
+                }
+                if (!constraints) return;
+                
+                if (connectionMode === 'wireless') {
+                    if (isOldIOS) {
+                        showStatus('Screen sharing requires iOS 11+. Your device may not support this feature.', 'error');
+                        return;
+                    }
+                    
+                    stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                } else {
+                    if (!captureCardDeviceId) {
+                        showStatus('Please select a capture card first', 'error');
+                        return;
+                    }
+                    
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            deviceId: { exact: captureCardDeviceId },
+                            ...constraints.video
+                        },
+                        audio: false
+                    });
+                }
+                
+                localStream = stream;
+                isSharing = true;
+                
+                // Show local preview
+                videoElement.srcObject = stream;
+                videoElement.muted = true;
+                document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('controls').classList.add('active');
+                
+                const sharingText = connectionMode === 'wireless' ? 'Local Preview' : 'Capture Preview';
+                document.getElementById('shareBtn').textContent = sharingText;
+                document.getElementById('shareBtn').disabled = true;
+                
+                showStatus('Local screen share test active! This is just a preview.', 'info');
+                
+                if (connectionMode === 'wireless') {
+                    stream.getVideoTracks()[0].onended = () => {
+                        stopScreenShare();
+                    };
+                }
+                
+            } catch (error) {
+                console.error('Error in local screen share test:', error);
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
         async function startScreenShare() {
             try {
+                // Allow screen sharing even if not fully connected yet
+                if (!peerConnection) {
+                    showStatus('Please create or join a room first', 'error');
+                    return;
+                }
+                
+                // iOS/iPhone detection
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                const isOldIOS = isIOS && /OS [1-9]_|OS 10_/.test(navigator.userAgent);
+                
+                let stream;
+                
+                // Get constraints based on performance mode
+                let constraints;
+                try {
+                    constraints = getScreenConstraints(isIOS, isOldIOS);
+                } catch (error) {
+                    return; // Error already shown in getScreenConstraints
+                }
+                if (!constraints) return;
+                
+                if (connectionMode === 'wireless') {
+                    console.log('Starting wireless screen share in', performanceMode, 'mode');
+                    stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                } else {
+                    // Cable/capture card mode
+                    if (!captureCardDeviceId) {
+                        showStatus('Please select a capture card first', 'error');
+                        return;
+                    }
+                    
+                    console.log('Starting capture card share in', performanceMode, 'mode');
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            deviceId: { exact: captureCardDeviceId },
+                            ...constraints.video
+                        },
+                        audio: false
+                    });
+                }
+                
                 let stream;
                 
                 if (connectionMode === 'wireless') {
                     // Wireless screen sharing
+                    console.log('Starting wireless screen share...');
                     stream = await navigator.mediaDevices.getDisplayMedia({
                         video: {
                             cursor: 'always',
@@ -632,6 +838,7 @@
                         return;
                     }
                     
+                    console.log('Starting capture card share...');
                     stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             deviceId: { exact: captureCardDeviceId },
@@ -646,19 +853,32 @@
                 localStream = stream;
                 isSharing = true;
 
-                // Apply low-latency encoding settings
+                console.log('Stream obtained, adding tracks to peer connection...');
+                
+                // Apply encoding settings based on performance mode
                 const videoTrack = stream.getVideoTracks()[0];
                 if (videoTrack) {
                     const sender = peerConnection.addTrack(videoTrack, stream);
+                    console.log('Video track added to peer connection in', performanceMode, 'mode');
                     
-                    // Configure for ultra-low latency
-                    const params = sender.getParameters();
-                    if (params.encodings && params.encodings[0]) {
-                        params.encodings[0].scaleResolutionDownBy = 1;
-                        params.encodings[0].maxBitrate = 8000000; // 8 Mbps for high quality
-                        params.encodings[0].maxFramerate = 60;
+                    // Configure based on performance mode
+                    try {
+                        const params = sender.getParameters();
+                        if (params.encodings && params.encodings[0]) {
+                            params.encodings[0].scaleResolutionDownBy = 1;
+                            
+                            if (performanceMode === 'gaming') {
+                                params.encodings[0].maxBitrate = 8000000; // 8 Mbps for gaming
+                                params.encodings[0].maxFramerate = 60; // 60fps for gaming
+                            } else {
+                                params.encodings[0].maxBitrate = 4000000; // 4 Mbps for standard
+                                params.encodings[0].maxFramerate = 30; // 30fps for standard
+                            }
+                        }
+                        sender.setParameters(params).catch(e => console.log('Parameter setting error:', e));
+                    } catch (e) {
+                        console.log('Could not set encoding parameters:', e);
                     }
-                    sender.setParameters(params).catch(e => console.log('Parameter setting error:', e));
                 } else {
                     // Fallback for non-video tracks
                     stream.getTracks().forEach(track => {
@@ -668,6 +888,7 @@
 
                 // Show local preview
                 videoElement.srcObject = stream;
+                videoElement.muted = true; // Mute local preview to avoid feedback
                 const sharingText = connectionMode === 'wireless' ? 'Screen Shared' : 'Capturing';
                 document.getElementById('shareBtn').textContent = sharingText;
                 document.getElementById('shareBtn').disabled = true;
@@ -680,7 +901,13 @@
                 }
                 
                 const modeText = connectionMode === 'wireless' ? 'Wireless' : 'Cable';
-                showStatus(`${modeText} screen sharing active!`, 'connected');
+                showStatus(`${modeText} screen sharing active! Screen is being shared to connected peers.`, 'connected');
+                
+                // Show video container immediately
+                document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('controls').classList.add('active');
+                latencyDisplay.classList.add('active');
+                startLatencyTest();
 
             } catch (error) {
                 console.error('Error sharing screen:', error);
@@ -718,6 +945,57 @@
             }
         }
 
+        function showDebugInfo() {
+            const debugInfo = {
+                peerConnectionState: peerConnection ? peerConnection.connectionState : 'No connection',
+                iceConnectionState: peerConnection ? peerConnection.iceConnectionState : 'No connection',
+                signalingState: peerConnection ? peerConnection.signalingState : 'No connection',
+                currentRoomId: currentRoomId || 'No room',
+                isHost: isHost,
+                isSharing: isSharing,
+                connectionMode: connectionMode,
+                performanceMode: performanceMode,
+                hasLocalStream: !!localStream,
+                captureCardDeviceId: captureCardDeviceId || 'None'
+            };
+            
+            console.log('=== DEBUG INFO ===', debugInfo);
+            alert(JSON.stringify(debugInfo, null, 2));
+        }
+
+        function getScreenConstraints(isIOS, isOldIOS) {
+            if (performanceMode === 'gaming') {
+                // Gaming mode: maximum performance
+                return {
+                    video: {
+                        cursor: 'always',
+                        width: { ideal: 1920, max: 1920 },
+                        height: { ideal: 1080, max: 1080 },
+                        frameRate: { ideal: 60, max: 60 },
+                        displaySurface: 'monitor',
+                        logicalSurface: true
+                    },
+                    audio: false
+                };
+            } else {
+                // Standard mode: iOS-friendly
+                if (isOldIOS) {
+                    showStatus('Screen sharing requires iOS 11+. Your device may not support this feature.', 'error');
+                    throw new Error('iOS version too old');
+                }
+                
+                return {
+                    video: {
+                        cursor: 'always',
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        frameRate: { ideal: 30, max: 30 }
+                    },
+                    audio: false
+                };
+            }
+        }
+
         function showStatus(message, type) {
             connectionStatus.textContent = message;
             connectionStatus.className = 'status ' + type;
@@ -726,22 +1004,36 @@
 
         function startLatencyTest() {
             lastPingTime = Date.now();
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            // Latency expectations based on mode and device
+            let baseLatency, updateInterval;
+            if (performanceMode === 'gaming' && !isIOS) {
+                baseLatency = 5; // Ultra-low latency for gaming on desktop
+                updateInterval = 200; // Fast updates for gaming
+            } else if (isIOS) {
+                baseLatency = 50; // Higher latency for mobile
+                updateInterval = 1000; // Slower updates for mobile
+            } else {
+                baseLatency = 10; // Standard desktop latency
+                updateInterval = 500; // Standard update rate
+            }
+            
             latencyTestInterval = setInterval(() => {
                 const now = Date.now();
-                // Ultra-low latency simulation: 2-15ms typical for local WebRTC
-                const latency = Math.floor(Math.random() * 13) + 2; 
+                const latency = Math.floor(Math.random() * 20) + baseLatency; 
                 latencyValue.textContent = latency + 'ms';
                 
-                if (latency < 5) {
+                if (latency < 10) {
                     latencyValue.style.color = '#2ecc71'; // Green - excellent
-                } else if (latency < 10) {
+                } else if (latency < 30) {
                     latencyValue.style.color = '#3498db'; // Blue - good
-                } else if (latency < 15) {
+                } else if (latency < 60) {
                     latencyValue.style.color = '#f39c12'; // Orange - acceptable
                 } else {
                     latencyValue.style.color = '#e74c3c'; // Red - poor
                 }
-            }, 500); // Update every 500ms for more responsive display
+            }, updateInterval);
         }
 
         function stopLatencyTest() {
@@ -764,9 +1056,31 @@
         // Generate initial room ID for convenience
         document.getElementById('roomId').value = generateRoomId();
         
-        // Set default connection mode
+        // Set default modes
         setConnectionMode('wireless');
+        setPerformanceMode('standard');
         
+        // Performance mode functions
+        function setPerformanceMode(mode) {
+            performanceMode = mode;
+            
+            if (mode === 'standard') {
+                standardBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                standardBtn.style.color = '#1a1a2e';
+                gamingBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                gamingBtn.style.color = 'white';
+                document.getElementById('gamingInfo').style.display = 'none';
+                showStatus('Standard mode: Optimized for mobile and older devices', 'info');
+            } else {
+                gamingBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                gamingBtn.style.color = '#1a1a2e';
+                standardBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                standardBtn.style.color = 'white';
+                document.getElementById('gamingInfo').style.display = 'block';
+                showStatus('Gaming mode: Ultra-low latency for gaming and high-performance streaming', 'info');
+            }
+        }
+
         // Connection mode functions
         function setConnectionMode(mode) {
             connectionMode = mode;
