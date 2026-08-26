@@ -546,6 +546,9 @@
         
         // Generate QR code with room code
         generateQRCode(roomCode);
+        
+        // Show status that admin is ready to receive connections
+        showAdminStatus('Room created! Waiting for users to join...');
       });
 
       peer.on('call', (call) => {
@@ -581,12 +584,24 @@
       errorDiv.textContent = message;
       errorDiv.style.display = 'block';
     }
+    
+    function showAdminStatus(message) {
+      const statusDiv = document.getElementById('adminStatus');
+      if (statusDiv) {
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+      }
+    }
 
     function handleUserConnection(conn) {
+      console.log('New user connection from:', conn.peer);
       conn.on('open', () => {
+        console.log('Connection opened with:', conn.peer);
         updateUserCount();
         conn.on('data', (data) => {
+          console.log('Received data from', conn.peer, ':', data);
           if (data.type === 'join-request') {
+            console.log('Join request from:', data.name);
             pendingUsers[conn.peer] = { conn, name: data.name, peerId: conn.peer };
             showPendingUser(conn.peer, data.name);
           } else if (data.type === 'screen-stream') {
@@ -596,6 +611,7 @@
       });
 
       conn.on('close', () => {
+        console.log('Connection closed from:', conn.peer);
         if (connections[conn.peer]) {
           connections[conn.peer].close();
           delete connections[conn.peer];
@@ -605,6 +621,10 @@
         delete pendingUsers[conn.peer];
         delete approvedUsers[conn.peer];
         updateUserCount();
+      });
+      
+      conn.on('error', (err) => {
+        console.error('Connection error with', conn.peer, ':', err);
       });
     }
 
