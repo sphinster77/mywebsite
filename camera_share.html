@@ -6,6 +6,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Camera Share - Multi-Device Video Streaming</title>
+    <!-- MQTT.js: used only as a signaling relay so devices on different networks
+         can find each other (the video itself stays peer-to-peer). -->
+    <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -796,15 +799,16 @@
             </div>
             
             <p style="margin-top: 15px; font-size: 12px; color: rgba(255,255,255,0.6);">
-                💡 Create a room in one tab/window, then open this page in another tab or window
+                💡 Create a room on one device, then open this page on the other device(s)
                 and Join with the same room ID. Pick a camera, then press "Start Sharing".
+                Wait for "Relay connected" before joining.
             </p>
             <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
                 👑 Whoever creates the room is the Admin and gets the extra controls below.
             </p>
             <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
-                ⚠️ Connects tabs/windows in the <strong>same browser</strong> (BroadcastChannel signaling).
-                Cross-device streaming needs a signaling server.
+                🔒 Must be opened over <strong>https</strong> (or localhost) for camera access.
+                Signaling uses a free public relay; the video stays direct peer-to-peer.
             </p>
         </div>
 
@@ -868,9 +872,11 @@
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
+                // Free public TURN (Open Relay) — needed when both peers are behind
+                // strict/symmetric NAT, e.g. on mobile data.
+                { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
             ]
         };
 
@@ -882,7 +888,12 @@
         let localStream = null;      // our camera+mic stream while sharing
         let screenStream = null;     // our screen-share stream (admin)
         let remoteStream = null;     // the stream currently shown in the <video>
-        let channel = null;          // BroadcastChannel used for signaling
+        let channel = null;          // BroadcastChannel (same-browser signaling)
+        let mqttClient = null;       // public MQTT broker (cross-device signaling)
+        let mqttTopic = null;
+        let msgSeq = 0;
+        const seenMsgIds = new Set(); // de-dupe messages arriving on both transports
+        const SIGNAL_RELAY = 'wss://broker.emqx.io:8084/mqtt';
         const peers = new Map();     // peerId -> { pc, makingOffer, ignoreOffer, polite, name }
 
         let currentRoomId = null;
@@ -1116,21 +1127,73 @@
             openChannel();
         }
 
-        // --- Signaling transport: BroadcastChannel (works across tabs/windows in
-        // the same browser). Cross-device needs a signaling server; see notes. ---
+        // --- Signaling transport ---
+        // Two channels run in parallel:
+        //   1. BroadcastChannel  → instant, same browser only
+        //   2. public MQTT broker → works across devices / networks
+        // The actual audio/video is still direct peer-to-peer WebRTC; the broker
+        // only carries the tiny "let's connect" handshake messages.
         function openChannel() {
-            if (channel) return;
+            if (channel || mqttClient) return;
+            mqttTopic = 'camshare/' + currentRoomId;
+
+            // 1. same-browser transport
             try {
                 channel = new BroadcastChannel('camera_share_' + currentRoomId);
+                channel.onmessage = (e) => deliverSignal(e.data);
             } catch (e) {
-                showStatus('This browser does not support BroadcastChannel signaling.', 'error');
-                return;
+                channel = null;
             }
-            channel.onmessage = (e) => onSignal(e.data);
-            // Announce ourselves so existing peers create a connection for us.
-            broadcast('hello', { name: deviceLabel(), admin: isAdmin });
+
+            // 2. cross-device transport
+            if (window.mqtt) {
+                try {
+                    const will = JSON.stringify({ from: MY_ID, roomId: currentRoomId, kind: 'bye', payload: {}, mid: MY_ID + '-will' });
+                    mqttClient = window.mqtt.connect(SIGNAL_RELAY, {
+                        clientId: 'cs_' + MY_ID + '_' + Math.floor(Math.random() * 1e6),
+                        reconnectPeriod: 3000,
+                        connectTimeout: 8000,
+                        clean: true,
+                        will: { topic: mqttTopic, payload: will, qos: 0, retain: false }
+                    });
+                    mqttClient.on('connect', () => {
+                        mqttClient.subscribe(mqttTopic, { qos: 0 }, () => {
+                            showStatus('Relay connected — share room "' + currentRoomId + '" with the other device.', 'connected');
+                            sayHello();
+                        });
+                    });
+                    mqttClient.on('message', (t, payload) => {
+                        try { deliverSignal(JSON.parse(payload.toString())); } catch (e) {}
+                    });
+                    mqttClient.on('reconnect', () => showStatus('Reconnecting to relay…', 'info'));
+                    mqttClient.on('error', (err) => console.warn('relay error', err));
+                } catch (e) {
+                    console.warn('relay connect failed', e);
+                    showStatus('Could not reach the relay — only same-browser tabs will connect.', 'error');
+                }
+            } else {
+                showStatus('Relay library did not load — only same-browser tabs will connect.', 'error');
+            }
+
+            // announce right away for the BroadcastChannel side
+            sayHello();
+
             window.addEventListener('pagehide', announceLeave);
             window.addEventListener('beforeunload', announceLeave);
+        }
+
+        function sayHello() {
+            broadcast('hello', { name: deviceLabel(), admin: isAdmin });
+        }
+
+        function deliverSignal(msg) {
+            if (!msg) return;
+            if (msg.mid) {
+                if (seenMsgIds.has(msg.mid)) return;
+                seenMsgIds.add(msg.mid);
+                if (seenMsgIds.size > 600) seenMsgIds.clear();
+            }
+            onSignal(msg);
         }
 
         function announceLeave() {
@@ -1331,8 +1394,14 @@
 
         // --- Signaling message helpers ---
         function post(msg) {
-            if (!channel) return;
-            channel.postMessage(Object.assign({ from: MY_ID, roomId: currentRoomId, admin: isAdmin }, msg));
+            const full = Object.assign(
+                { from: MY_ID, roomId: currentRoomId, admin: isAdmin, mid: MY_ID + '-' + (++msgSeq) },
+                msg
+            );
+            try { if (channel) channel.postMessage(full); } catch (e) {}
+            try {
+                if (mqttClient && mqttClient.connected) mqttClient.publish(mqttTopic, JSON.stringify(full), { qos: 0 });
+            } catch (e) {}
         }
         function broadcast(kind, payload) { post({ kind, payload, to: null }); }
         function sendTo(peerId, kind, payload) { post({ kind, payload, to: peerId }); }
@@ -1406,13 +1475,17 @@
         }
 
         function stopSignaling() {
+            announceLeave();
             peers.forEach(rec => { try { rec.pc.close(); } catch (e) {} });
             peers.clear();
             connectedPeers.clear();
             if (channel) {
-                announceLeave();
-                channel.close();
+                try { channel.close(); } catch (e) {}
                 channel = null;
+            }
+            if (mqttClient) {
+                try { mqttClient.end(false); } catch (e) {}
+                mqttClient = null;
             }
         }
 
@@ -2089,6 +2162,9 @@
             const debugInfo = {
                 myId: MY_ID,
                 currentRoomId: currentRoomId || 'No room',
+                relay: mqttClient ? (mqttClient.connected ? 'connected' : 'connecting/offline') : 'not started',
+                broadcastChannel: channel ? 'open' : 'off',
+                mqttLibLoaded: !!window.mqtt,
                 isAdmin: isAdmin,
                 adminDeviceId: adminDeviceId || 'None',
                 isSharing: isSharing,
