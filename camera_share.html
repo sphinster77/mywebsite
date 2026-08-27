@@ -606,7 +606,7 @@
                 <input type="text" id="roomId" placeholder="Enter room ID" maxlength="20">
                 <button class="btn btn-primary" onclick="joinRoom()">Join Room</button>
             </div>
-            <button class="btn btn-secondary" onclick="createRoom()">Create New Room (Admin)</button>
+            <button class="btn btn-secondary" onclick="createRoom()" id="createRoomBtn">Create New Room (Admin)</button>
             <div class="status" id="roomStatus"></div>
             
             <div class="camera-select-section">
@@ -787,58 +787,77 @@
         const SIGNALING_KEY = 'camera_signaling_';
 
         function createRoom() {
-            const roomId = generateRoomId();
-            currentRoomId = roomId;
-            document.getElementById('roomId').value = roomId;
-            
-            // Set admin status for room creator
-            isAdmin = true;
-            adminDeviceId = getDeviceId();
-            
-            showStatus('Room created: ' + roomId + ' - You are the Admin', 'info');
-            updateRoleIndicator();
-            
-            // Show admin-specific features
-            adminControls.classList.add('active');
-            screenShareSection.style.display = 'block';
-            recordingSection.style.display = 'block';
-            zoomControlsSection.style.display = 'block';
-            updateZoomControls();
-            
-            // Initialize as host
-            initializePeerConnection(true);
-            
-            // Start listening for join requests
-            startSignalingListener();
+            try {
+                console.log('Creating room...');
+                alert('Create room button clicked!'); // Debug alert
+                
+                const roomId = generateRoomId();
+                currentRoomId = roomId;
+                document.getElementById('roomId').value = roomId;
+                
+                // Set admin status for room creator
+                isAdmin = true;
+                adminDeviceId = getDeviceId();
+                
+                showStatus('Room created: ' + roomId + ' - You are the Admin', 'info');
+                updateRoleIndicator();
+                
+                // Show admin-specific features
+                adminControls.classList.add('active');
+                screenShareSection.style.display = 'block';
+                recordingSection.style.display = 'block';
+                zoomControlsSection.style.display = 'block';
+                updateZoomControls();
+                
+                // Initialize as host
+                initializePeerConnection(true);
+                
+                // Start listening for join requests
+                startSignalingListener();
+                
+                console.log('Room created successfully:', roomId);
+            } catch (error) {
+                console.error('Error creating room:', error);
+                showStatus('Error creating room: ' + error.message, 'error');
+                alert('Error: ' + error.message); // Debug alert
+            }
         }
 
         function joinRoom() {
-            const roomId = document.getElementById('roomId').value.trim();
-            if (!roomId) {
-                showStatus('Please enter a room ID', 'error');
-                return;
+            try {
+                console.log('Joining room...');
+                const roomId = document.getElementById('roomId').value.trim();
+                if (!roomId) {
+                    showStatus('Please enter a room ID', 'error');
+                    return;
+                }
+                currentRoomId = roomId;
+                
+                // Participant is not admin
+                isAdmin = false;
+                
+                // Hide admin-specific features for participants
+                screenShareSection.style.display = 'none';
+                recordingSection.style.display = 'none';
+                zoomControlsSection.style.display = 'none';
+                
+                showStatus('Joining room: ' + roomId + ' as participant', 'info');
+                updateRoleIndicator();
+                
+                // Initialize as guest
+                initializePeerConnection(false);
+                
+                // Start listening for host signals
+                startSignalingListener();
+                
+                // Signal join request
+                sendSignal('join', { roomId: roomId, deviceId: getDeviceId() });
+                
+                console.log('Room join requested:', roomId);
+            } catch (error) {
+                console.error('Error joining room:', error);
+                showStatus('Error joining room: ' + error.message, 'error');
             }
-            currentRoomId = roomId;
-            
-            // Participant is not admin
-            isAdmin = false;
-            
-            // Hide admin-specific features for participants
-            screenShareSection.style.display = 'none';
-            recordingSection.style.display = 'none';
-            zoomControlsSection.style.display = 'none';
-            
-            showStatus('Joining room: ' + roomId + ' as participant', 'info');
-            updateRoleIndicator();
-            
-            // Initialize as guest
-            initializePeerConnection(false);
-            
-            // Start listening for host signals
-            startSignalingListener();
-            
-            // Signal join request
-            sendSignal('join', { roomId: roomId, deviceId: getDeviceId() });
         }
 
         function generateRoomId() {
@@ -1967,6 +1986,7 @@
         }
 
         function showStatus(message, type) {
+            console.log('Status:', message, type);
             connectionStatus.textContent = message;
             connectionStatus.className = 'status ' + type;
             connectionStatus.style.display = 'block';
@@ -2104,8 +2124,13 @@
         setQualityMode('standard');
         
         // Initialize cameras and microphones on load
+        console.log('Page loaded, initializing devices...');
         refreshCameras();
         refreshMicrophones();
+        
+        // Test if functions are accessible
+        console.log('createRoom function available:', typeof createRoom);
+        console.log('joinRoom function available:', typeof joinRoom);
     </script>
 </body>
 </html>
