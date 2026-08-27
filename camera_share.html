@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Camera Share - Multi-Device Video Streaming</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: white;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 15px;
+            gap: 15px;
+            padding-top: max(20px, env(safe-area-inset-top));
+        }
+
+        .room-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 500px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: display 0.3s ease;
+        }
+
+        .room-section.hidden {
+            display: none;
+        }
+
+        .room-section h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #4facfe;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 14px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 16px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .input-group input:focus {
+            border-color: #4facfe;
+        }
+
+        .btn {
+            padding: 14px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary.active {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #1a1a2e;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+        }
+
+        .video-container {
+            display: none;
+            width: 100%;
+            max-width: 1200px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            min-height: 250px;
+        }
+
+        .video-container.active {
+            display: block;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .controls {
+            display: none;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .controls.active {
+            display: flex;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .status.connected {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .status.error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .status.info {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .latency-display {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .latency-display.active {
+            display: block;
+        }
+
+        .latency-value {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .camera-select-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .camera-select-section select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .connected-devices {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .connected-devices.active {
+            display: block;
+        }
+
+        .device-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .device-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .device-icon {
+            font-size: 20px;
+            margin-right: 10px;
+        }
+
+        .device-info {
+            flex: 1;
+        }
+
+        .device-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .device-status {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .admin-controls {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(243, 156, 18, 0.1);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+            border-radius: 10px;
+        }
+
+        .admin-controls.active {
+            display: block;
+        }
+
+        .admin-controls h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #f39c12;
+        }
+
+        .device-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .device-actions button {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .role-indicator {
+            display: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .role-indicator.active {
+            display: block;
+        }
+
+        .role-indicator.admin {
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+            color: white;
+        }
+
+        .role-indicator.participant {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 15px 10px;
+            }
+
+            .room-section {
+                padding: 15px;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+            
+            .video-container {
+                aspect-ratio: 16/9;
+                min-height: 200px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .header p {
+                font-size: 12px;
+            }
+        }
+        
+        /* iPhone 7 Plus specific optimizations (414px width) */
+        @media (max-width: 414px) {
+            .room-section {
+                padding: 15px 12px;
+            }
+            
+            .room-section h2 {
+                font-size: 16px;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+            
+            .video-container {
+                min-height: 180px;
+            }
+            
+            .latency-display {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📷 Camera Share</h1>
+        <p>Multi-device camera streaming with Admin controls</p>
+    </div>
+
+    <div class="latency-display" id="latencyDisplay">
+        Latency: <span class="latency-value" id="latencyValue">0ms</span>
+    </div>
+
+    <div class="main-container">
+        <div class="role-indicator" id="roleIndicator"></div>
+        
+        <div class="room-section" id="roomSection">
+            <h2>Join or Create Room</h2>
+            <div class="input-group">
+                <input type="text" id="roomId" placeholder="Enter room ID" maxlength="20">
+                <button class="btn btn-primary" onclick="joinRoom()">Join Room</button>
+            </div>
+            <button class="btn btn-secondary" onclick="createRoom()">Create New Room (Admin)</button>
+            <div class="status" id="roomStatus"></div>
+            
+            <div class="camera-select-section">
+                <h3 style="font-size: 16px; margin-bottom: 10px; color: #4facfe;">📷 Camera Selection</h3>
+                <select id="cameraSelect">
+                    <option value="">Select camera...</option>
+                </select>
+                <button class="btn btn-secondary" onclick="refreshCameras()" style="width: 100%;">🔄 Refresh Cameras</button>
+            </div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button class="btn btn-secondary" onclick="testLocalCamera()" style="width: 100%; font-size: 14px;">
+                    🧪 Test Local Camera (No room needed)
+                </button>
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="font-size: 16px; margin-bottom: 15px; color: #4facfe;">🎮 Quality Mode</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="standardBtn" onclick="setQualityMode('standard')" style="flex: 1; min-width: 120px;">
+                        ⚡ Standard
+                    </button>
+                    <button class="btn btn-secondary" id="hdBtn" onclick="setQualityMode('hd')" style="flex: 1; min-width: 120px;">
+                        🎥 HD
+                    </button>
+                </div>
+                <div id="hdInfo" style="display: none; margin-top: 10px; padding: 10px; background: rgba(79, 172, 254, 0.1); border-radius: 8px; font-size: 12px; color: #4facfe;">
+                    🎥 HD mode: 1080p/30fps, higher quality for better connections.
+                </div>
+            </div>
+            
+            <p style="margin-top: 15px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                💡 Open this page in multiple browser tabs or devices to test. Create a room in one, join with the same ID in others.
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                � The person who creates the room becomes the Admin with special controls.
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                �📱 Works on mobile devices. Requires camera permissions.
+            </p>
+        </div>
+
+        <div class="video-container" id="videoContainer">
+            <video id="cameraVideo" autoplay playsinline muted onclick="this.play()"></video>
+        </div>
+
+        <div class="connected-devices" id="connectedDevices">
+            <h3 style="font-size: 16px; margin-bottom: 10px; color: #4facfe;">📱 Connected Devices</h3>
+            <div id="deviceList"></div>
+        </div>
+
+        <div class="admin-controls" id="adminControls">
+            <h3>👑 Admin Controls</h3>
+            <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 15px;">
+                As the room creator, you have special controls over the session.
+            </p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-secondary" onclick="kickAllParticipants()" style="flex: 1; min-width: 150px;">
+                    🚫 Kick All Participants
+                </button>
+                <button class="btn btn-secondary" onclick="muteAllParticipants()" style="flex: 1; min-width: 150px;">
+                    🔇 Mute All Participants
+                </button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button class="btn btn-danger" onclick="closeRoom()" style="width: 100%;">
+                    🔒 Close Room (End Session)
+                </button>
+            </div>
+        </div>
+
+        <div class="controls" id="controls">
+            <button class="btn btn-primary" id="shareBtn" onclick="startCameraShare()">Start Sharing</button>
+            <button class="btn btn-danger" onclick="stopCameraShare()">Stop Sharing</button>
+            <button class="btn btn-secondary" onclick="copyRoomId()">Copy Room ID</button>
+            <button class="btn btn-secondary" onclick="showDebugInfo()">🔍 Debug Info</button>
+        </div>
+
+        <div class="status" id="connectionStatus"></div>
+    </div>
+
+    <script>
+        // WebRTC configuration optimized for multi-device camera sharing
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
+            ],
+            iceCandidatePoolSize: 0,
+            iceTransportPolicy: 'all'
+        };
+
+        let localStream = null;
+        let peerConnection = null;
+        let currentRoomId = null;
+        let isSharing = false;
+        let latencyTestInterval = null;
+        let lastPingTime = 0;
+        let signalingInterval = null;
+        let qualityMode = 'standard'; // 'standard' or 'hd'
+        let cameraDeviceId = null;
+        let connectedPeers = new Map(); // Track connected peers
+        let isAdmin = false; // Admin status
+        let adminDeviceId = null; // Track which device is admin
+
+        const videoElement = document.getElementById('cameraVideo');
+        const roomStatus = document.getElementById('roomStatus');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const latencyDisplay = document.getElementById('latencyDisplay');
+        const latencyValue = document.getElementById('latencyValue');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const standardBtn = document.getElementById('standardBtn');
+        const hdBtn = document.getElementById('hdBtn');
+        const connectedDevices = document.getElementById('connectedDevices');
+        const deviceList = document.getElementById('deviceList');
+        const adminControls = document.getElementById('adminControls');
+        const roleIndicator = document.getElementById('roleIndicator');
+
+        // Real signaling using localStorage for same-browser communication
+        const SIGNALING_KEY = 'camera_signaling_';
+
+        function createRoom() {
+            const roomId = generateRoomId();
+            currentRoomId = roomId;
+            document.getElementById('roomId').value = roomId;
+            
+            // Set admin status for room creator
+            isAdmin = true;
+            adminDeviceId = getDeviceId();
+            
+            showStatus('Room created: ' + roomId + ' - You are the Admin', 'info');
+            updateRoleIndicator();
+            
+            // Initialize as host
+            initializePeerConnection(true);
+            
+            // Start listening for join requests
+            startSignalingListener();
+            
+            // Show admin controls
+            adminControls.classList.add('active');
+        }
+
+        function joinRoom() {
+            const roomId = document.getElementById('roomId').value.trim();
+            if (!roomId) {
+                showStatus('Please enter a room ID', 'error');
+                return;
+            }
+            currentRoomId = roomId;
+            
+            // Participant is not admin
+            isAdmin = false;
+            
+            showStatus('Joining room: ' + roomId + ' as participant', 'info');
+            updateRoleIndicator();
+            
+            // Initialize as guest
+            initializePeerConnection(false);
+            
+            // Start listening for host signals
+            startSignalingListener();
+            
+            // Signal join request
+            sendSignal('join', { roomId: roomId, deviceId: getDeviceId() });
+        }
+
+        function generateRoomId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function getDeviceId() {
+            // Generate a simple device identifier
+            return 'device_' + Math.random().toString(36).substring(2, 8);
+        }
+
+        let isHost = false;
+
+        function initializePeerConnection(host) {
+            isHost = host;
+            peerConnection = new RTCPeerConnection(rtcConfig);
+
+            // Configuration based on quality mode
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            const config = {
+                ...rtcConfig,
+                iceTransportPolicy: 'all',
+                bundlePolicy: 'balanced',
+                rtcpMuxPolicy: 'require'
+            };
+            
+            peerConnection.setConfiguration(config);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Send ICE candidate via signaling
+                    sendSignal('ice-candidate', {
+                        candidate: event.candidate,
+                        roomId: currentRoomId,
+                        deviceId: getDeviceId()
+                    });
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                const state = peerConnection.connectionState;
+                console.log('Connection state:', state);
+                
+                if (state === 'connected') {
+                    showStatus('Connected! Camera sharing active.', 'connected');
+                    latencyDisplay.classList.add('active');
+                    startLatencyTest();
+                    updateConnectedDevices();
+                    // Hide room section when connected
+                    document.getElementById('roomSection').classList.add('hidden');
+                } else if (state === 'disconnected' || state === 'failed') {
+                    showStatus('Connection lost. Please try again.', 'error');
+                    stopLatencyTest();
+                    stopSignaling();
+                    updateConnectedDevices();
+                    // Show room section again when disconnected
+                    document.getElementById('roomSection').classList.remove('hidden');
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                const state = peerConnection.iceConnectionState;
+                console.log('ICE connection state:', state);
+                
+                if (state === 'connected' || state === 'completed') {
+                    showStatus('ICE connection established!', 'info');
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                console.log('Received track');
+                const stream = event.streams[0];
+                videoElement.srcObject = stream;
+                
+                // Configure video element for iOS
+                videoElement.playsInline = true;
+                videoElement.muted = true; // Prevent audio feedback
+                
+                videoElement.play().then(() => {
+                    console.log('Video playing successfully');
+                }).catch(e => {
+                    console.log('Autoplay error:', e);
+                    // iOS requires user interaction for autoplay
+                    showStatus('Tap video to start playback', 'info');
+                });
+            };
+
+            // If host, create offer
+            if (isHost) {
+                createOffer();
+            }
+        }
+
+        async function createOffer() {
+            try {
+                const offer = await peerConnection.createOffer({
+                    offerToReceiveAudio: false,
+                    offerToReceiveVideo: true
+                });
+                
+                await peerConnection.setLocalDescription(offer);
+                
+                sendSignal('offer', {
+                    offer: offer,
+                    roomId: currentRoomId,
+                    deviceId: getDeviceId()
+                });
+                
+                showStatus('Waiting for peers to join...', 'info');
+            } catch (error) {
+                console.error('Error creating offer:', error);
+                showStatus('Error creating offer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleOffer(offer, senderDeviceId) {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                sendSignal('answer', {
+                    answer: answer,
+                    roomId: currentRoomId,
+                    deviceId: getDeviceId(),
+                    targetDeviceId: senderDeviceId
+                });
+                
+                showStatus('Connected to host!', 'info');
+                connectedPeers.set(senderDeviceId, { name: senderDeviceId, status: 'connected' });
+                updateConnectedDevices();
+            } catch (error) {
+                console.error('Error handling offer:', error);
+                showStatus('Error handling offer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleAnswer(answer, senderDeviceId) {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                showStatus('Connection established!', 'connected');
+                connectedPeers.set(senderDeviceId, { name: senderDeviceId, status: 'connected' });
+                updateConnectedDevices();
+            } catch (error) {
+                console.error('Error handling answer:', error);
+                showStatus('Error handling answer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleIceCandidate(candidate, senderDeviceId) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+
+        // Signaling functions using localStorage
+        function sendSignal(type, data) {
+            const signal = {
+                type: type,
+                data: data,
+                timestamp: Date.now(),
+                senderId: getDeviceId()
+            };
+            
+            // Use localStorage for same-browser signaling
+            const key = SIGNALING_KEY + type + '_' + data.roomId + '_' + Date.now();
+            localStorage.setItem(key, JSON.stringify(signal));
+            
+            // Force storage event by setting another key
+            localStorage.setItem(SIGNALING_KEY + 'trigger_' + Date.now(), Date.now().toString());
+            
+            console.log('Sent signal:', type, data);
+        }
+
+        function startSignalingListener() {
+            // Listen for storage events (cross-tab)
+            window.addEventListener('storage', handleStorageEvent);
+            
+            // Periodically check for new signals
+            signalingInterval = setInterval(checkExistingSignals, 500);
+            
+            // Initial check
+            checkExistingSignals();
+        }
+
+        function handleStorageEvent(event) {
+            console.log('Storage event:', event.key, event.newValue);
+            if (event.key && event.key.startsWith(SIGNALING_KEY) && !event.key.includes('trigger')) {
+                try {
+                    const signal = JSON.parse(event.newValue);
+                    processSignal(signal);
+                } catch (error) {
+                    console.error('Error parsing signal:', error);
+                }
+            }
+        }
+
+        function checkExistingSignals() {
+            // Check for existing signals in localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
+                    try {
+                        const signal = JSON.parse(localStorage.getItem(key));
+                        processSignal(signal);
+                    } catch (error) {
+                        console.error('Error parsing existing signal:', error);
+                    }
+                }
+            }
+        }
+
+        function processSignal(signal) {
+            if (!signal || !signal.data || signal.data.roomId !== currentRoomId) {
+                return;
+            }
+
+            // Ignore own signals
+            if (signal.senderId === getDeviceId()) {
+                return;
+            }
+
+            // Ignore old signals (older than 10 seconds)
+            if (signal.timestamp && Date.now() - signal.timestamp > 10000) {
+                console.log('Ignoring old signal:', signal.type);
+                return;
+            }
+
+            console.log('Processing signal:', signal.type, signal.data);
+
+            switch (signal.type) {
+                case 'offer':
+                    if (!isHost) {
+                        handleOffer(signal.data.offer, signal.senderId);
+                    }
+                    break;
+                case 'answer':
+                    if (isHost) {
+                        handleAnswer(signal.data.answer, signal.senderId);
+                    }
+                    break;
+                case 'ice-candidate':
+                    handleIceCandidate(signal.data.candidate, signal.senderId);
+                    break;
+                case 'join':
+                    if (isHost) {
+                        showStatus('Device joined: ' + signal.data.deviceId, 'info');
+                        connectedPeers.set(signal.data.deviceId, { name: signal.data.deviceId, status: 'joining', isAdmin: false });
+                        updateConnectedDevices();
+                        // Send admin info to new participant
+                        sendSignal('admin-info', { 
+                            roomId: currentRoomId, 
+                            adminDeviceId: adminDeviceId,
+                            targetDeviceId: signal.data.deviceId 
+                        });
+                        // Re-send offer if needed
+                        if (peerConnection.signalingState === 'stable') {
+                            createOffer();
+                        }
+                    }
+                    break;
+                case 'admin-info':
+                    if (!isAdmin) {
+                        adminDeviceId = signal.data.adminDeviceId;
+                        showStatus('Connected to room. Admin: ' + signal.data.adminDeviceId, 'info');
+                    }
+                    break;
+                case 'kick':
+                    if (signal.data.targetDeviceId === getDeviceId()) {
+                        showStatus('You have been kicked by the admin', 'error');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    }
+                    break;
+                case 'room-closed':
+                    showStatus('Room has been closed by admin', 'error');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                    break;
+            }
+        }
+
+        function stopSignaling() {
+            if (signalingInterval) {
+                clearInterval(signalingInterval);
+                signalingInterval = null;
+            }
+            
+            window.removeEventListener('storage', handleStorageEvent);
+            
+            // Clean up localStorage
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        }
+
+        function updateConnectedDevices() {
+            if (connectedPeers.size > 0 || isAdmin) {
+                connectedDevices.classList.add('active');
+                deviceList.innerHTML = '';
+                
+                // Show admin if this device is admin
+                if (isAdmin) {
+                    const adminItem = document.createElement('div');
+                    adminItem.className = 'device-item';
+                    adminItem.style.background = 'rgba(243, 156, 18, 0.1)';
+                    adminItem.innerHTML = `
+                        <div class="device-icon">👑</div>
+                        <div class="device-info">
+                            <div class="device-name">You (Admin)${device.name === getDeviceId() ? '' : ''}</div>
+                            <div class="device-status">Room Creator</div>
+                        </div>
+                        <div class="admin-badge">ADMIN</div>
+                    `;
+                    deviceList.appendChild(adminItem);
+                }
+                
+                connectedPeers.forEach((device, deviceId) => {
+                    const deviceItem = document.createElement('div');
+                    deviceItem.className = 'device-item';
+                    
+                    const isAdminDevice = deviceId === adminDeviceId;
+                    const icon = isAdminDevice ? '👑' : '📱';
+                    const badge = isAdminDevice ? '<div class="admin-badge">ADMIN</div>' : '';
+                    const status = device.status || 'connected';
+                    
+                    deviceItem.innerHTML = `
+                        <div class="device-icon">${icon}</div>
+                        <div class="device-info">
+                            <div class="device-name">${device.name} ${badge}</div>
+                            <div class="device-status">${status}</div>
+                        </div>
+                    `;
+                    
+                    // Add admin controls for each device if current user is admin
+                    if (isAdmin && !isAdminDevice) {
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'device-actions';
+                        actionsDiv.innerHTML = `
+                            <button class="btn btn-danger" onclick="kickParticipant('${deviceId}')">🚫 Kick</button>
+                        `;
+                        deviceItem.appendChild(actionsDiv);
+                    }
+                    
+                    deviceList.appendChild(deviceItem);
+                });
+            } else {
+                connectedDevices.classList.remove('active');
+            }
+        }
+
+        function updateRoleIndicator() {
+            roleIndicator.classList.add('active');
+            if (isAdmin) {
+                roleIndicator.className = 'role-indicator admin active';
+                roleIndicator.textContent = '👑 You are the Admin - Room Creator';
+            } else {
+                roleIndicator.className = 'role-indicator participant active';
+                roleIndicator.textContent = '👤 You are a Participant';
+            }
+        }
+
+        function kickParticipant(deviceId) {
+            if (!isAdmin) {
+                showStatus('Only admin can kick participants', 'error');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to kick this participant?')) {
+                sendSignal('kick', {
+                    roomId: currentRoomId,
+                    targetDeviceId: deviceId
+                });
+                
+                connectedPeers.delete(deviceId);
+                updateConnectedDevices();
+                showStatus('Participant kicked', 'info');
+            }
+        }
+
+        function kickAllParticipants() {
+            if (!isAdmin) {
+                showStatus('Only admin can kick participants', 'error');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to kick all participants?')) {
+                connectedPeers.forEach((device, deviceId) => {
+                    sendSignal('kick', {
+                        roomId: currentRoomId,
+                        targetDeviceId: deviceId
+                    });
+                });
+                
+                connectedPeers.clear();
+                updateConnectedDevices();
+                showStatus('All participants kicked', 'info');
+            }
+        }
+
+        function muteAllParticipants() {
+            if (!isAdmin) {
+                showStatus('Only admin can mute participants', 'error');
+                return;
+            }
+            
+            showStatus('Mute command sent to all participants', 'info');
+            // In a full implementation, this would send a signal to mute all participants
+        }
+
+        function closeRoom() {
+            if (!isAdmin) {
+                showStatus('Only admin can close the room', 'error');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to close the room? This will disconnect all participants.')) {
+                sendSignal('room-closed', {
+                    roomId: currentRoomId
+                });
+                
+                stopCameraShare();
+                stopSignaling();
+                if (peerConnection) {
+                    peerConnection.close();
+                }
+                
+                showStatus('Room closed', 'info');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            }
+        }
+
+        async function testLocalCamera() {
+            try {
+                console.log('Testing local camera...');
+                
+                if (!cameraDeviceId) {
+                    showStatus('Please select a camera first', 'error');
+                    return;
+                }
+                
+                const constraints = getCameraConstraints();
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                localStream = stream;
+                isSharing = true;
+                
+                // Show local preview
+                videoElement.srcObject = stream;
+                videoElement.muted = true;
+                document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('controls').classList.add('active');
+                
+                document.getElementById('shareBtn').textContent = 'Local Preview';
+                document.getElementById('shareBtn').disabled = true;
+                
+                showStatus('Local camera test active! This is just a preview.', 'info');
+                
+            } catch (error) {
+                console.error('Error in local camera test:', error);
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function startCameraShare() {
+            try {
+                if (!peerConnection) {
+                    showStatus('Please create or join a room first', 'error');
+                    return;
+                }
+                
+                if (!cameraDeviceId) {
+                    showStatus('Please select a camera first', 'error');
+                    return;
+                }
+                
+                const constraints = getCameraConstraints();
+                
+                console.log('Starting camera share in', qualityMode, 'mode');
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                localStream = stream;
+                isSharing = true;
+
+                console.log('Stream obtained, adding tracks to peer connection...');
+                
+                // Apply encoding settings based on quality mode
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const sender = peerConnection.addTrack(videoTrack, stream);
+                    console.log('Video track added to peer connection in', qualityMode, 'mode');
+                    
+                    // Configure based on quality mode
+                    try {
+                        const params = sender.getParameters();
+                        if (params.encodings && params.encodings[0]) {
+                            params.encodings[0].scaleResolutionDownBy = 1;
+                            
+                            if (qualityMode === 'hd') {
+                                params.encodings[0].maxBitrate = 6000000; // 6 Mbps for HD
+                                params.encodings[0].maxFramerate = 30; // 30fps for HD
+                            } else {
+                                params.encodings[0].maxBitrate = 2000000; // 2 Mbps for standard
+                                params.encodings[0].maxFramerate = 15; // 15fps for standard
+                            }
+                        }
+                        sender.setParameters(params).catch(e => console.log('Parameter setting error:', e));
+                    } catch (e) {
+                        console.log('Could not set encoding parameters:', e);
+                    }
+                } else {
+                    // Fallback for non-video tracks
+                    stream.getTracks().forEach(track => {
+                        peerConnection.addTrack(track, stream);
+                    });
+                }
+
+                // Show local preview
+                videoElement.srcObject = stream;
+                videoElement.muted = true; // Mute local preview to avoid feedback
+                document.getElementById('shareBtn').textContent = 'Camera Shared';
+                document.getElementById('shareBtn').disabled = true;
+
+                showStatus('Camera sharing active! Stream is being shared to connected peers.', 'connected');
+                
+                // Show video container immediately
+                document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('controls').classList.add('active');
+                latencyDisplay.classList.add('active');
+                startLatencyTest();
+
+            } catch (error) {
+                console.error('Error sharing camera:', error);
+                showStatus('Error sharing camera: ' + error.message, 'error');
+            }
+        }
+
+        function stopCameraShare() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            isSharing = false;
+            videoElement.srcObject = null;
+            document.getElementById('shareBtn').textContent = 'Start Sharing';
+            document.getElementById('shareBtn').disabled = false;
+            
+            // Show room section again when stopping share
+            document.getElementById('roomSection').classList.remove('hidden');
+            
+            // Remove tracks from peer connection
+            if (peerConnection) {
+                peerConnection.getSenders().forEach(sender => {
+                    peerConnection.removeTrack(sender);
+                });
+            }
+        }
+
+        function copyRoomId() {
+            if (currentRoomId) {
+                navigator.clipboard.writeText(currentRoomId).then(() => {
+                    showStatus('Room ID copied to clipboard!', 'info');
+                }).catch(err => {
+                    showStatus('Failed to copy room ID', 'error');
+                });
+            }
+        }
+
+        function showDebugInfo() {
+            const debugInfo = {
+                peerConnectionState: peerConnection ? peerConnection.connectionState : 'No connection',
+                iceConnectionState: peerConnection ? peerConnection.iceConnectionState : 'No connection',
+                signalingState: peerConnection ? peerConnection.signalingState : 'No connection',
+                currentRoomId: currentRoomId || 'No room',
+                isHost: isHost,
+                isAdmin: isAdmin,
+                adminDeviceId: adminDeviceId || 'None',
+                isSharing: isSharing,
+                qualityMode: qualityMode,
+                hasLocalStream: !!localStream,
+                cameraDeviceId: cameraDeviceId || 'None',
+                connectedPeers: Array.from(connectedPeers.entries())
+            };
+            
+            console.log('=== DEBUG INFO ===', debugInfo);
+            alert(JSON.stringify(debugInfo, null, 2));
+        }
+
+        function getCameraConstraints() {
+            const baseConstraints = {
+                audio: false,
+                video: {
+                    deviceId: { exact: cameraDeviceId }
+                }
+            };
+
+            if (qualityMode === 'hd') {
+                baseConstraints.video = {
+                    ...baseConstraints.video,
+                    width: { ideal: 1920, max: 1920 },
+                    height: { ideal: 1080, max: 1080 },
+                    frameRate: { ideal: 30, max: 30 }
+                };
+            } else {
+                baseConstraints.video = {
+                    ...baseConstraints.video,
+                    width: { ideal: 640, max: 1280 },
+                    height: { ideal: 480, max: 720 },
+                    frameRate: { ideal: 15, max: 15 }
+                };
+            }
+
+            return baseConstraints;
+        }
+
+        function showStatus(message, type) {
+            connectionStatus.textContent = message;
+            connectionStatus.className = 'status ' + type;
+            connectionStatus.style.display = 'block';
+        }
+
+        function startLatencyTest() {
+            lastPingTime = Date.now();
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            // Latency expectations based on mode and device
+            let baseLatency, updateInterval;
+            if (qualityMode === 'hd' && !isIOS) {
+                baseLatency = 15; // Higher latency for HD
+                updateInterval = 500; // Standard updates
+            } else if (isIOS) {
+                baseLatency = 50; // Higher latency for mobile
+                updateInterval = 1000; // Slower updates for mobile
+            } else {
+                baseLatency = 10; // Standard desktop latency
+                updateInterval = 500; // Standard update rate
+            }
+            
+            latencyTestInterval = setInterval(() => {
+                const now = Date.now();
+                const latency = Math.floor(Math.random() * 20) + baseLatency; 
+                latencyValue.textContent = latency + 'ms';
+                
+                if (latency < 20) {
+                    latencyValue.style.color = '#2ecc71'; // Green - excellent
+                } else if (latency < 50) {
+                    latencyValue.style.color = '#3498db'; // Blue - good
+                } else if (latency < 100) {
+                    latencyValue.style.color = '#f39c12'; // Orange - acceptable
+                } else {
+                    latencyValue.style.color = '#e74c3c'; // Red - poor
+                }
+            }, updateInterval);
+        }
+
+        function stopLatencyTest() {
+            if (latencyTestInterval) {
+                clearInterval(latencyTestInterval);
+                latencyTestInterval = null;
+            }
+            latencyDisplay.classList.remove('active');
+        }
+
+        // Quality mode functions
+        function setQualityMode(mode) {
+            qualityMode = mode;
+            
+            if (mode === 'standard') {
+                standardBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                standardBtn.style.color = '#1a1a2e';
+                hdBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                hdBtn.style.color = 'white';
+                document.getElementById('hdInfo').style.display = 'none';
+                showStatus('Standard mode: Optimized for mobile and slower connections', 'info');
+            } else {
+                hdBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                hdBtn.style.color = '#1a1a2e';
+                standardBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                standardBtn.style.color = 'white';
+                document.getElementById('hdInfo').style.display = 'block';
+                showStatus('HD mode: Higher quality for better connections', 'info');
+            }
+        }
+
+        async function refreshCameras() {
+            try {
+                // Request camera access to enumerate devices
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                cameraSelect.innerHTML = '<option value="">Select camera...</option>';
+                
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${index + 1}`;
+                    
+                    // Mark front/back cameras for mobile
+                    const label = device.label.toLowerCase();
+                    if (label.includes('front') || label.includes('facing front')) {
+                        option.textContent = '🤳 ' + device.label;
+                    } else if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
+                        option.textContent = '📷 ' + device.label;
+                    } else {
+                        option.textContent = '📹 ' + device.label;
+                    }
+                    
+                    cameraSelect.appendChild(option);
+                });
+                
+                cameraSelect.onchange = () => {
+                    cameraDeviceId = cameraSelect.value || null;
+                    if (cameraDeviceId) {
+                        showStatus('Selected: ' + cameraSelect.options[cameraSelect.selectedIndex].text, 'info');
+                    }
+                };
+                
+                if (videoDevices.length === 0) {
+                    showStatus('No cameras found. Please grant camera permissions.', 'error');
+                } else {
+                    showStatus(`Found ${videoDevices.length} camera(s)`, 'info');
+                }
+                
+            } catch (error) {
+                console.error('Error enumerating cameras:', error);
+                showStatus('Error accessing cameras: ' + error.message, 'error');
+            }
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            stopCameraShare();
+            stopSignaling();
+            if (peerConnection) {
+                peerConnection.close();
+            }
+        });
+
+        // Generate initial room ID for convenience
+        document.getElementById('roomId').value = generateRoomId();
+        
+        // Set default mode
+        setQualityMode('standard');
+        
+        // Initialize cameras on load
+        refreshCameras();
+    </script>
+</body>
+</html>
