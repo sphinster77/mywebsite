@@ -375,8 +375,7 @@
 
     <div class="screen-share-container">
       <h3>Admin's Screen</h3>
-      <video id="adminVideo" class="preview-video" autoplay playsinline muted></video>
-      <p id="adminScreenStatus" style="color: #666; font-size: 14px; margin-top: 10px;">Waiting for admin to share screen...</p>
+      <video id="adminVideo" class="preview-video" autoplay playsinline></video>
     </div>
 
     <div class="screen-share-container">
@@ -425,6 +424,8 @@
     let localStream = null;
     let call = null;
     let isSharing = false;
+    let isApproved = false;
+    let isLeaving = false;
 
     // Check for room code in URL parameter
     window.onload = function() {
@@ -460,65 +461,65 @@
 
         adminConnection.on('data', (data) => {
           if (data.type === 'approved') {
+            isApproved = true;
             document.getElementById('waitingScreen').classList.remove('active');
             document.getElementById('mainScreen').classList.add('active');
             document.getElementById('displayRoomCode').textContent = roomCode;
             document.getElementById('displayUserName').textContent = userName;
           } else if (data.type === 'rejected') {
+            isLeaving = true;
             alert('Your request was rejected by the admin');
             location.reload();
           } else if (data.type === 'recording-started') {
             document.getElementById('recordingIndicator').classList.add('active');
           } else if (data.type === 'recording-stopped') {
             document.getElementById('recordingIndicator').classList.remove('active');
-          } else if (data.type === 'admin-sharing-started') {
-            document.getElementById('adminScreenStatus').textContent = 'Admin is sharing their screen!';
-            document.getElementById('adminScreenStatus').style.color = '#4facfe';
           } else if (data.type === 'admin-sharing-stopped') {
-            if (adminCall) {
-              document.getElementById('adminVideo').srcObject = null;
-            }
-            document.getElementById('adminScreenStatus').textContent = 'Admin stopped sharing screen';
-            document.getElementById('adminScreenStatus').style.color = '#666';
+            document.getElementById('adminVideo').srcObject = null;
+            adminCall = null;
           }
         });
 
         adminConnection.on('close', () => {
+          if (isLeaving || !isApproved) return;
+          isLeaving = true;
           alert('Admin disconnected');
           location.reload();
         });
 
         adminConnection.on('error', (err) => {
           console.error('Connection error:', err);
-          showError('Could not connect to admin. Make sure the room exists.');
+          backToLogin('Could not connect to admin. Make sure the room exists.');
         });
       });
 
       peer.on('error', (err) => {
         console.error('Peer error:', err);
-        showError('Connection error: ' + err.type);
+        if (err.type === 'peer-unavailable') {
+          backToLogin('Room not found. Check the code and make sure the admin created the room.');
+        } else if (!isApproved) {
+          backToLogin('Connection error: ' + err.type);
+        } else {
+          showError('Connection error: ' + err.type);
+        }
       });
 
       // Handle incoming call from admin sharing screen
-      peer.on('call', (call) => {
-        console.log('Incoming call from admin');
-        call.answer();
-        call.on('stream', (stream) => {
-          console.log('Received admin screen stream');
-          document.getElementById('adminVideo').srcObject = stream;
-          document.getElementById('adminScreenStatus').textContent = 'Admin is sharing their screen!';
-          document.getElementById('adminScreenStatus').style.color = '#4facfe';
+      peer.on('call', (incoming) => {
+        incoming.answer();
+        const adminVideo = document.getElementById('adminVideo');
+        incoming.on('stream', (stream) => {
+          adminVideo.srcObject = stream;
+          adminVideo.play().catch(() => {
+            adminVideo.muted = true;
+            adminVideo.play().catch(err => console.warn('Could not play admin video:', err));
+          });
         });
-        call.on('close', () => {
-          console.log('Admin call closed');
-          document.getElementById('adminVideo').srcObject = null;
-          document.getElementById('adminScreenStatus').textContent = 'Admin stopped sharing screen';
-          document.getElementById('adminScreenStatus').style.color = '#666';
+        incoming.on('close', () => {
+          adminVideo.srcObject = null;
+          adminCall = null;
         });
-        call.on('error', (err) => {
-          console.error('Admin call error:', err);
-        });
-        adminCall = call;
+        adminCall = incoming;
       });
 
       document.getElementById('loginScreen').style.display = 'none';
@@ -529,6 +530,19 @@
       const errorDiv = document.getElementById('errorMessage');
       errorDiv.textContent = message;
       errorDiv.style.display = 'block';
+    }
+
+    // Return to the login form so the user isn't stuck on the waiting spinner
+    function backToLogin(message) {
+      if (isApproved) return;
+      document.getElementById('waitingScreen').classList.remove('active');
+      document.getElementById('loginScreen').style.display = '';
+      showError(message);
+      if (peer && !peer.destroyed) {
+        peer.destroy();
+      }
+      peer = null;
+      adminConnection = null;
     }
 
     async function toggleScreenShare() {
@@ -579,7 +593,7 @@
 
           call.on('close', () => {
             console.log('Call closed');
-            stopScreenShare();
+            if (isSharing) stopScreenShare();
           });
 
           call.on('error', (err) => {
@@ -627,6 +641,7 @@
     }
 
     function leaveRoom() {
+      isLeaving = true;
       stopScreenShare();
       if (adminConnection) {
         adminConnection.close();
