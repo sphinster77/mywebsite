@@ -526,6 +526,34 @@
             color: #4facfe;
         }
 
+        /* ── Zoom control under the main video ── */
+        .main-zoom {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 10px;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 10px;
+        }
+
+        .main-zoom.active {
+            display: flex;
+        }
+
+        .main-zoom-label {
+            font-size: 13px;
+            color: #4facfe;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .main-zoom .zoom-slider {
+            flex: 1;
+        }
+
         /* ── Admin source rail ── */
         .source-rail {
             position: fixed;
@@ -619,45 +647,6 @@
 
         .source-tile video {
             transition: transform 0.12s ease;
-        }
-
-        .tile-zoom-row {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 5px;
-        }
-
-        .tile-zoom {
-            flex: 1;
-            -webkit-appearance: none;
-            appearance: none;
-            height: 4px;
-            border-radius: 2px;
-            background: rgba(255, 255, 255, 0.2);
-            outline: none;
-        }
-
-        .tile-zoom::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #4facfe;
-            cursor: pointer;
-        }
-
-        .tile-zoom::-moz-range-thumb {
-            width: 12px; height: 12px; border: none;
-            border-radius: 50%; background: #4facfe; cursor: pointer;
-        }
-
-        .zoom-pct {
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.7);
-            min-width: 34px;
-            text-align: right;
         }
 
         /* ── Fixed bottom Record bar ── */
@@ -890,6 +879,14 @@
             <video id="cameraVideo" autoplay playsinline muted onclick="this.play()"></video>
         </div>
 
+        <div class="main-zoom" id="mainZoom">
+            <span class="main-zoom-label">🔍 Zoom</span>
+            <input type="range" class="zoom-slider" id="mainZoomSlider" min="1" max="10" step="0.1" value="1"
+                   oninput="setMainZoom(this.value)">
+            <span class="zoom-value" id="mainZoomValue">100%</span>
+            <button class="btn btn-secondary" id="mainZoomReset" onclick="setMainZoom(1)" style="padding: 6px 12px; font-size: 12px;">1×</button>
+        </div>
+
         <div class="connected-devices" id="connectedDevices">
             <h3 style="font-size: 16px; margin-bottom: 10px; color: #4facfe;">📱 Connected Devices</h3>
             <div id="deviceList"></div>
@@ -911,7 +908,8 @@
             <p style="margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.7);">
                 🎛️ Every camera & screen appears in the <strong>Sources</strong> rail on the
                 left. Rename a tile, or click one to make it the main view — that's what
-                participants see and what Recording captures.
+                participants see and what Recording captures. The <strong>🔍 Zoom</strong>
+                slider under the video zooms whichever source is main.
             </p>
             <div class="multi-mic-section" id="multiMicSection">
                 <h3>🎤 Microphone Management</h3>
@@ -1052,10 +1050,40 @@
             renderSourceRail();
         }
 
+        let viewZoom = 1; // local-only zoom used when there is no admin source
+
         function applySourceTransform(el, zoom) {
             if (!el) return;
             el.style.transformOrigin = 'center center';
             el.style.transform = (zoom && zoom > 1.001) ? 'scale(' + zoom + ')' : 'none';
+        }
+
+        function syncMainZoomUI(z) {
+            const sl = document.getElementById('mainZoomSlider');
+            const val = document.getElementById('mainZoomValue');
+            if (sl && document.activeElement !== sl && parseFloat(sl.value) !== z) sl.value = String(z);
+            if (val) val.textContent = Math.round(z * 100) + '%';
+        }
+
+        function showMainZoom(show) {
+            const el = document.getElementById('mainZoom');
+            if (el) el.classList.toggle('active', !!show);
+        }
+
+        // The single zoom slider under the main video — zooms whatever is main.
+        function setMainZoom(value) {
+            const z = Math.max(1, Math.min(10, parseFloat(value) || 1));
+            if (isAdmin && mainSourceId && sources.has(mainSourceId)) {
+                setSourceZoom(mainSourceId, z);
+            } else {
+                viewZoom = z;
+                applySourceTransform(videoElement, z);
+                syncMainZoomUI(z);
+                const vt = localStream && localStream.getVideoTracks()[0];
+                if (vt && vt.getCapabilities && vt.getCapabilities().zoom) {
+                    vt.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
+                }
+            }
         }
 
         function setSourceZoom(id, value) {
@@ -1064,14 +1092,12 @@
             s.zoom = Math.max(1, Math.min(10, parseFloat(value) || 1));
 
             const tile = sourceTiles.querySelector('[data-src="' + id + '"]');
-            if (tile) {
-                applySourceTransform(tile.querySelector('video'), s.zoom);
-                const pct = tile.querySelector('.zoom-pct');
-                if (pct) pct.textContent = Math.round(s.zoom * 100) + '%';
-                const sl = tile.querySelector('.tile-zoom');
-                if (sl && parseFloat(sl.value) !== s.zoom) sl.value = s.zoom;
+            if (tile) applySourceTransform(tile.querySelector('video'), s.zoom);
+
+            if (id === mainSourceId) {
+                applySourceTransform(videoElement, s.zoom);
+                syncMainZoomUI(s.zoom);
             }
-            if (id === mainSourceId) applySourceTransform(videoElement, s.zoom);
 
             // Ask the real camera to zoom too (hardware zoom where supported).
             if (s.owner === 'me') {
@@ -1091,7 +1117,7 @@
                 mainSourceId = null;
                 const next = sources.keys().next().value;
                 if (next) setMainSource(next);
-                else if (!localStream && !screenStream) videoElement.srcObject = null;
+                else if (!localStream && !screenStream) { videoElement.srcObject = null; showMainZoom(false); }
             }
             renderSourceRail();
         }
@@ -1106,6 +1132,8 @@
             applySourceTransform(videoElement, s.zoom || 1);
             videoElement.play().catch(() => {});
             document.getElementById('videoContainer').classList.add('active');
+            showMainZoom(true);
+            syncMainZoomUI(s.zoom || 1);
             if (isRecording) wireRecordingAudio();
 
             // Push this video out to every participant (skip the tile's own owner
@@ -1166,23 +1194,6 @@
                     };
                     tile.appendChild(name);
 
-                    const zrow = document.createElement('div');
-                    zrow.className = 'tile-zoom-row';
-                    zrow.onclick = (e) => e.stopPropagation();
-                    const zslider = document.createElement('input');
-                    zslider.className = 'tile-zoom';
-                    zslider.type = 'range';
-                    zslider.min = '1'; zslider.max = '10'; zslider.step = '0.1';
-                    zslider.value = String(s.zoom || 1);
-                    zslider.oninput = () => setSourceZoom(id, zslider.value);
-                    const zpct = document.createElement('span');
-                    zpct.className = 'zoom-pct';
-                    zpct.textContent = Math.round((s.zoom || 1) * 100) + '%';
-                    zpct.ondblclick = () => setSourceZoom(id, 1);
-                    zrow.appendChild(zslider);
-                    zrow.appendChild(zpct);
-                    tile.appendChild(zrow);
-
                     sourceTiles.appendChild(tile);
                 }
 
@@ -1194,9 +1205,6 @@
                 tile.querySelector('.main-flag').textContent = (id === mainSourceId ? '● MAIN' : '');
                 const name = tile.querySelector('.source-name');
                 if (document.activeElement !== name) name.value = s.label;
-                const zsl = tile.querySelector('.tile-zoom');
-                if (zsl && document.activeElement !== zsl && parseFloat(zsl.value) !== (s.zoom || 1)) zsl.value = String(s.zoom || 1);
-                tile.querySelector('.zoom-pct').textContent = Math.round((s.zoom || 1) * 100) + '%';
             });
 
             // Drop tiles for sources that no longer exist.
@@ -1405,7 +1413,10 @@
                 } else {
                     videoElement.srcObject = incoming;
                     videoElement.playsInline = true;
+                    applySourceTransform(videoElement, viewZoom);
                     videoElement.play().catch(() => showStatus('Tap the video to start playback', 'info'));
+                    showMainZoom(true);
+                    syncMainZoomUI(viewZoom);
                     showStatus('Receiving video from the room.', 'connected');
                 }
             };
@@ -1873,7 +1884,7 @@
                     recCtx.fillRect(0, 0, cw, ch);
                     if (v && v.videoWidth) {
                         const cur = mainSourceId && sources.get(mainSourceId);
-                        const z = (cur && cur.zoom) || 1;
+                        const z = (cur && cur.zoom) || viewZoom || 1;
                         const sw = v.videoWidth / z, sh = v.videoHeight / z;
                         const sx = (v.videoWidth - sw) / 2, sy = (v.videoHeight - sh) / 2;
                         const scale = Math.min(cw / sw, ch / sh);
@@ -2082,8 +2093,8 @@
             applySourceTransform(videoElement, zoomLevel);
         }
 
-        // The old admin zoom panel is replaced by per-tile zoom sliders in the
-        // source rail; keep this as a stub so existing callers don't break.
+        // The old admin zoom panel is replaced by the single zoom slider under the
+        // main video; keep this as a stub so existing callers don't break.
         function updateZoomControls() {
             if (zoomControlsSection) zoomControlsSection.style.display = 'none';
         }
@@ -2124,9 +2135,12 @@
                 // Show local preview
                 videoElement.srcObject = stream;
                 videoElement.muted = true;
+                applySourceTransform(videoElement, viewZoom);
                 document.getElementById('videoContainer').classList.add('active');
                 document.getElementById('controls').classList.add('active');
-                
+                showMainZoom(true);
+                syncMainZoomUI(viewZoom);
+
                 document.getElementById('shareBtn').textContent = 'Local Preview';
                 document.getElementById('shareBtn').disabled = true;
                 
@@ -2208,7 +2222,13 @@
 
             if (!mainSourceId) {
                 videoElement.srcObject = remoteStream || null;
-                videoElement.style.transform = 'none';
+                if (remoteStream) {
+                    applySourceTransform(videoElement, viewZoom);
+                    syncMainZoomUI(viewZoom);
+                } else {
+                    videoElement.style.transform = 'none';
+                    showMainZoom(false);
+                }
             }
         }
 
