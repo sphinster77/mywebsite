@@ -523,6 +523,138 @@
             color: #4facfe;
         }
 
+        /* ── Admin source rail ── */
+        .source-rail {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 168px;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 12px 10px calc(12px + env(safe-area-inset-bottom));
+            overflow-y: auto;
+            z-index: 900;
+            display: none;
+        }
+
+        .source-rail.active {
+            display: block;
+        }
+
+        body.has-rail .main-container,
+        body.has-rail .header {
+            padding-left: 180px;
+        }
+
+        .source-rail-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #4facfe;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .source-tile {
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 6px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .source-tile:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .source-tile.main {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.15);
+        }
+
+        .source-tile video {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #000;
+            display: block;
+        }
+
+        .source-badge {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.75);
+            margin: 4px 0 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .source-badge .main-flag {
+            color: #4facfe;
+            font-weight: 700;
+        }
+
+        .source-name {
+            width: 100%;
+            padding: 4px 6px;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.35);
+            color: white;
+            outline: none;
+        }
+
+        .source-name:focus {
+            border-color: #4facfe;
+        }
+
+        @media (max-width: 768px) {
+            .source-rail {
+                top: auto;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: 118px;
+                display: none;
+                border-right: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.12);
+                white-space: nowrap;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            }
+
+            .source-rail.active {
+                display: flex;
+                gap: 8px;
+            }
+
+            .source-rail-title {
+                display: none;
+            }
+
+            .source-tile {
+                width: 150px;
+                flex: 0 0 auto;
+                margin-bottom: 0;
+            }
+
+            body.has-rail .main-container {
+                padding-left: 10px;
+                padding-bottom: 130px;
+            }
+
+            body.has-rail .header {
+                padding-left: 20px;
+            }
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 padding: 15px 10px;
@@ -583,6 +715,11 @@
     </style>
 </head>
 <body>
+    <div class="source-rail" id="sourceRail">
+        <div class="source-rail-title">🎛️ Sources</div>
+        <div id="sourceTiles"></div>
+    </div>
+
     <div class="header">
         <h1>📷 Camera Share</h1>
         <p>Multi-device camera streaming with Admin controls, screen sharing & recording</p>
@@ -693,11 +830,11 @@
                     🔇 Mute All Participants
                 </button>
             </div>
-            <div style="margin-top: 10px;">
-                <button class="btn btn-secondary" onclick="setMainScreen()" style="width: 100%;">
-                    🖥️ Set My Screen as Main Screen
-                </button>
-            </div>
+            <p style="margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.7);">
+                🎛️ Every camera & screen appears in the <strong>Sources</strong> rail on the
+                left. Rename a tile, or click one to make it the main view — that's what
+                participants see and what Recording captures.
+            </p>
             <div class="multi-mic-section" id="multiMicSection">
                 <h3>🎤 Microphone Management</h3>
                 <div id="micList"></div>
@@ -767,6 +904,12 @@
         let cameraZoomLevels = new Map();
         let currentZoom = 1.0;
 
+        // Admin "source rail": every live camera/screen, one tile each. The admin
+        // names them and clicks one to make it the main view (which is what the
+        // participants see and what recording captures).
+        const sources = new Map(); // id -> { kind:'camera'|'screen', owner:'me'|peerId, label, userNamed, stream }
+        let mainSourceId = null;
+
         // Kept for compatibility with older UI code paths.
         let isHost = false;
         const connectedPeers = new Map();
@@ -791,6 +934,131 @@
         const micList = document.getElementById('micList');
         const zoomControlsSection = document.getElementById('zoomControlsSection');
         const zoomList = document.getElementById('zoomList');
+        const sourceRail = document.getElementById('sourceRail');
+        const sourceTiles = document.getElementById('sourceTiles');
+
+        // ── Source rail (admin) ─────────────────────────────────────────────
+        function defaultSourceLabel(kind, owner) {
+            if (owner === 'me') return kind === 'screen' ? 'My Screen' : 'My Camera';
+            const peer = connectedPeers.get(owner) || peers.get(owner);
+            const who = (peer && peer.name) || 'Participant';
+            return kind === 'screen' ? who + ' (Screen)' : who;
+        }
+
+        function upsertSource(id, kind, owner, stream) {
+            if (!stream) return;
+            let s = sources.get(id);
+            if (s) {
+                s.stream = stream;
+                s.kind = kind;
+                if (!s.userNamed) s.label = defaultSourceLabel(kind, owner);
+            } else {
+                s = { kind, owner, label: defaultSourceLabel(kind, owner), userNamed: false, stream };
+                sources.set(id, s);
+            }
+            if (!mainSourceId || !sources.has(mainSourceId)) setMainSource(id);
+            renderSourceRail();
+        }
+
+        function removeSource(id) {
+            if (!sources.has(id)) return;
+            sources.delete(id);
+            if (mainSourceId === id) {
+                mainSourceId = null;
+                const next = sources.keys().next().value;
+                if (next) setMainSource(next);
+                else if (!localStream && !screenStream) videoElement.srcObject = null;
+            }
+            renderSourceRail();
+        }
+
+        function setMainSource(id) {
+            const s = sources.get(id);
+            if (!s) return;
+            mainSourceId = id;
+
+            // Admin's own big view
+            videoElement.srcObject = s.stream;
+            videoElement.style.transform = 'none';
+            videoElement.play().catch(() => {});
+            document.getElementById('videoContainer').classList.add('active');
+
+            // Push this video out to every participant (skip the tile's own owner
+            // so we don't echo a participant's camera back to them).
+            if (isAdmin) {
+                const vtrack = s.stream.getVideoTracks()[0];
+                if (vtrack) {
+                    peers.forEach((rec, peerId) => {
+                        if (peerId === s.owner) return;
+                        const sender = rec.pc.getSenders().find(x => x.track && x.track.kind === 'video');
+                        if (sender) sender.replaceTrack(vtrack).catch(() => {});
+                        else rec.pc.addTrack(vtrack, s.stream);
+                    });
+                }
+                broadcast('main-source', { label: s.label });
+            }
+
+            showStatus('Main view: ' + s.label, 'info');
+            renderSourceRail();
+        }
+
+        function renderSourceRail() {
+            if (!isAdmin) { sourceRail.classList.remove('active'); document.body.classList.remove('has-rail'); return; }
+            const show = sources.size > 0;
+            sourceRail.classList.toggle('active', show);
+            document.body.classList.toggle('has-rail', show);
+
+            // Reuse existing tiles where possible so <video> playback isn't interrupted.
+            const seen = new Set();
+            sources.forEach((s, id) => {
+                seen.add(id);
+                let tile = sourceTiles.querySelector('[data-src="' + id + '"]');
+                if (!tile) {
+                    tile = document.createElement('div');
+                    tile.className = 'source-tile';
+                    tile.dataset.src = id;
+                    tile.onclick = () => setMainSource(id);
+
+                    const v = document.createElement('video');
+                    v.autoplay = true; v.muted = true; v.playsInline = true;
+                    tile.appendChild(v);
+
+                    const badge = document.createElement('div');
+                    badge.className = 'source-badge';
+                    badge.innerHTML = '<span class="kind"></span><span class="main-flag"></span>';
+                    tile.appendChild(badge);
+
+                    const name = document.createElement('input');
+                    name.className = 'source-name';
+                    name.type = 'text';
+                    name.maxLength = 24;
+                    name.onclick = (e) => e.stopPropagation();
+                    name.onchange = () => {
+                        s.label = name.value.trim() || defaultSourceLabel(s.kind, s.owner);
+                        name.value = s.label;
+                        s.userNamed = true;
+                        if (id === mainSourceId && isAdmin) broadcast('main-source', { label: s.label });
+                        renderSourceRail();
+                    };
+                    tile.appendChild(name);
+
+                    sourceTiles.appendChild(tile);
+                }
+
+                const v = tile.querySelector('video');
+                if (v.srcObject !== s.stream) { v.srcObject = s.stream; v.play().catch(() => {}); }
+                tile.classList.toggle('main', id === mainSourceId);
+                tile.querySelector('.kind').textContent = (s.kind === 'screen' ? '🖥️ Screen' : '📷 Camera');
+                tile.querySelector('.main-flag').textContent = (id === mainSourceId ? '● MAIN' : '');
+                const name = tile.querySelector('.source-name');
+                if (document.activeElement !== name) name.value = s.label;
+            });
+
+            // Drop tiles for sources that no longer exist.
+            Array.from(sourceTiles.children).forEach(tile => {
+                if (!seen.has(tile.dataset.src)) tile.remove();
+            });
+        }
 
         function generateRoomId() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -926,19 +1194,37 @@
             };
 
             pc.ontrack = ({ track, streams }) => {
-                remoteStream = streams[0] || new MediaStream([track]);
-                videoElement.srcObject = remoteStream;
-                videoElement.playsInline = true;
-                videoElement.play().catch(() => showStatus('Tap the video to start playback', 'info'));
+                const incoming = streams[0] || new MediaStream([track]);
+                remoteStream = incoming;
                 document.getElementById('videoContainer').classList.add('active');
                 document.getElementById('controls').classList.add('active');
                 document.getElementById('roomSection').classList.add('hidden');
-                showStatus('Receiving video from a peer.', 'connected');
+
+                if (isAdmin) {
+                    // Feed the admin's source rail; the admin picks the main view.
+                    upsertSource('peer:' + peerId, 'camera', peerId, incoming);
+                    showStatus('New source available: ' + (rec.name || 'a participant') + '.', 'info');
+                } else {
+                    videoElement.srcObject = incoming;
+                    videoElement.playsInline = true;
+                    videoElement.play().catch(() => showStatus('Tap the video to start playback', 'info'));
+                    showStatus('Receiving video from the room.', 'connected');
+                }
             };
 
             // If we're already sharing, push our tracks to this new peer.
-            const outgoing = screenStream || localStream;
+            const outgoing = localStream || screenStream;
             if (outgoing) addStreamToPc(rec, outgoing);
+
+            // Admin: make sure the new peer gets whatever source is currently main.
+            if (isAdmin && mainSourceId && sources.has(mainSourceId) && mainSourceId !== 'peer:' + peerId) {
+                const vtrack = sources.get(mainSourceId).stream.getVideoTracks()[0];
+                if (vtrack) {
+                    const sender = rec.pc.getSenders().find(x => x.track && x.track.kind === 'video');
+                    if (sender) sender.replaceTrack(vtrack).catch(() => {});
+                    else rec.pc.addTrack(vtrack, sources.get(mainSourceId).stream);
+                }
+            }
 
             refreshPeerUI();
             return rec;
@@ -1013,6 +1299,7 @@
                 peers.delete(peerId);
             }
             connectedPeers.delete(peerId);
+            removeSource('peer:' + peerId);
             if (!peers.size) {
                 remoteStream = null;
                 if (!localStream && !screenStream) videoElement.srcObject = null;
@@ -1031,6 +1318,7 @@
             if (isAdmin) {
                 updateZoomControls();
                 updateAdminMicManagement();
+                renderSourceRail();
             }
         }
 
@@ -1095,6 +1383,9 @@
                         mainScreenSource = p.source;
                         showStatus('The admin changed the main screen.', 'info');
                     }
+                    break;
+                case 'main-source':
+                    if (!isAdmin && p.label) showStatus('Now showing: ' + p.label, 'info');
                     break;
                 case 'mic-toggle':
                     if (p.targetDeviceId === MY_ID) setLocalAudioEnabled(!!p.enabled);
@@ -1282,24 +1573,14 @@
                 screenStream = stream;
                 isScreenSharing = true;
 
-                // Show screen share locally
-                videoElement.srcObject = stream;
-                videoElement.muted = true;
-                document.getElementById('videoContainer').classList.add('active');
-
-                // Send the screen video to every peer, replacing the camera track
-                // in place when possible (no full renegotiation needed).
-                const screenTrack = stream.getVideoTracks()[0];
-                peers.forEach(rec => {
-                    const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(screenTrack);
-                    else if (screenTrack) rec.pc.addTrack(screenTrack, stream);
-                });
+                // Adds a "My Screen" tile to the rail and makes it the main view
+                // (which pushes it to every participant).
+                upsertSource('me:screen', 'screen', 'me', stream);
 
                 document.getElementById('stopScreenShareBtn').style.display = 'block';
-                showStatus('Screen sharing active as main screen', 'connected');
-                
-                // Handle user stopping share
+                showStatus('Screen sharing active as the main view', 'connected');
+
+                // Handle the user stopping the share from the browser UI
                 stream.getVideoTracks()[0].onended = () => {
                     stopScreenShare();
                 };
@@ -1315,30 +1596,26 @@
                 screenStream.getTracks().forEach(track => track.stop());
                 screenStream = null;
             }
-            
+
             isScreenSharing = false;
             mainScreenSource = 'camera';
-
             document.getElementById('stopScreenShareBtn').style.display = 'none';
 
-            const camTrack = localStream && localStream.getVideoTracks()[0];
-            peers.forEach(rec => {
-                const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                if (sender && camTrack) sender.replaceTrack(camTrack);
-                else if (sender && !camTrack) { try { rec.pc.removeTrack(sender); } catch (e) {} }
-            });
-
-            videoElement.srcObject = localStream || remoteStream || null;
-            showStatus(camTrack ? 'Screen sharing stopped — back to camera.' : 'Screen sharing stopped.', 'info');
+            // Removing the tile auto-promotes the next available source (e.g. the
+            // admin's camera) to main and pushes it out.
+            removeSource('me:screen');
+            showStatus('Screen sharing stopped.', 'info');
         }
 
         async function startRecording() {
             try {
-                const streamToRecord = isScreenSharing ? screenStream
-                    : (videoElement.srcObject || localStream || remoteStream);
+                // Record whatever is currently the main view.
+                const mainSrc = mainSourceId && sources.get(mainSourceId);
+                const streamToRecord = (mainSrc && mainSrc.stream)
+                    || videoElement.srcObject || localStream || screenStream || remoteStream;
 
                 if (!streamToRecord) {
-                    showStatus('Nothing to record yet. Start your camera or connect to a peer first.', 'error');
+                    showStatus('Nothing to record yet. Start your camera or pick a source first.', 'error');
                     return;
                 }
 
@@ -1746,7 +2023,6 @@
                 // connected or join later.
                 peers.forEach(rec => addStreamToPc(rec, stream));
 
-                videoElement.srcObject = stream;
                 videoElement.muted = true; // local preview muted to avoid feedback
                 document.getElementById('shareBtn').textContent = 'Sharing…';
                 document.getElementById('shareBtn').disabled = true;
@@ -1754,6 +2030,13 @@
                 document.getElementById('controls').classList.add('active');
                 latencyDisplay.classList.add('active');
                 startLatencyTest();
+
+                if (isAdmin) {
+                    // Add "My Camera" to the source rail (auto-main if nothing else is).
+                    upsertSource('me:camera', 'camera', 'me', stream);
+                } else {
+                    videoElement.srcObject = stream;
+                }
 
                 showStatus(peers.size
                     ? 'Sharing your camera with ' + peers.size + ' peer(s).'
@@ -1776,6 +2059,8 @@
             document.getElementById('shareBtn').disabled = false;
             document.getElementById('roomSection').classList.remove('hidden');
 
+            removeSource('me:camera');
+
             // Stop sending our tracks; removeTrack triggers renegotiation so the
             // peer's view clears too.
             peers.forEach(rec => {
@@ -1784,8 +2069,10 @@
                 });
             });
 
-            videoElement.srcObject = remoteStream || null;
-            videoElement.style.transform = 'none';
+            if (!mainSourceId) {
+                videoElement.srcObject = remoteStream || null;
+                videoElement.style.transform = 'none';
+            }
         }
 
         function copyRoomId() {
