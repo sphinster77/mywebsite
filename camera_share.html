@@ -617,6 +617,72 @@
             border-color: #4facfe;
         }
 
+        .source-tile video {
+            transition: transform 0.12s ease;
+        }
+
+        .tile-zoom-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .tile-zoom {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+        }
+
+        .tile-zoom::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+        }
+
+        .tile-zoom::-moz-range-thumb {
+            width: 12px; height: 12px; border: none;
+            border-radius: 50%; background: #4facfe; cursor: pointer;
+        }
+
+        .zoom-pct {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            min-width: 34px;
+            text-align: right;
+        }
+
+        /* ── Fixed bottom Record bar ── */
+        .rec-bar {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: calc(16px + env(safe-area-inset-bottom));
+            z-index: 950;
+            display: none;
+        }
+
+        .rec-bar.active {
+            display: block;
+        }
+
+        .rec-bar .btn {
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+            min-width: 180px;
+        }
+
+        #recToggleBtn.recording {
+            animation: pulse 1.2s infinite;
+        }
+
         @media (max-width: 768px) {
             .source-rail {
                 top: auto;
@@ -655,6 +721,14 @@
 
             body.has-rail .header {
                 padding-left: 20px;
+            }
+
+            body.has-rail .rec-bar {
+                bottom: calc(128px + env(safe-area-inset-bottom));
+            }
+
+            .rec-bar .btn {
+                min-width: 150px;
             }
         }
 
@@ -866,6 +940,10 @@
         <div class="status" id="connectionStatus"></div>
     </div>
 
+    <div class="rec-bar" id="recBar">
+        <button class="btn btn-danger" id="recToggleBtn" onclick="toggleRecording()">⏺ Record</button>
+    </div>
+
     <script>
         // WebRTC configuration for peer-to-peer camera sharing
         const rtcConfig = {
@@ -909,6 +987,9 @@
         let microphoneDeviceId = null;
         let mediaRecorder = null;
         let recordedChunks = [];
+        // Canvas compositor for recording — lets the admin switch sources mid-record.
+        let recCanvas = null, recCtx = null, recRAF = 0;
+        let recAudioCtx = null, recDest = null, recAudioSrc = null, recStream = null;
         let mainScreenSource = null;
         let availableMicrophones = new Map();
         let activeMicrophones = new Set();
@@ -964,11 +1045,43 @@
                 s.kind = kind;
                 if (!s.userNamed) s.label = defaultSourceLabel(kind, owner);
             } else {
-                s = { kind, owner, label: defaultSourceLabel(kind, owner), userNamed: false, stream };
+                s = { kind, owner, label: defaultSourceLabel(kind, owner), userNamed: false, stream, zoom: 1 };
                 sources.set(id, s);
             }
             if (!mainSourceId || !sources.has(mainSourceId)) setMainSource(id);
             renderSourceRail();
+        }
+
+        function applySourceTransform(el, zoom) {
+            if (!el) return;
+            el.style.transformOrigin = 'center center';
+            el.style.transform = (zoom && zoom > 1.001) ? 'scale(' + zoom + ')' : 'none';
+        }
+
+        function setSourceZoom(id, value) {
+            const s = sources.get(id);
+            if (!s) return;
+            s.zoom = Math.max(1, Math.min(10, parseFloat(value) || 1));
+
+            const tile = sourceTiles.querySelector('[data-src="' + id + '"]');
+            if (tile) {
+                applySourceTransform(tile.querySelector('video'), s.zoom);
+                const pct = tile.querySelector('.zoom-pct');
+                if (pct) pct.textContent = Math.round(s.zoom * 100) + '%';
+                const sl = tile.querySelector('.tile-zoom');
+                if (sl && parseFloat(sl.value) !== s.zoom) sl.value = s.zoom;
+            }
+            if (id === mainSourceId) applySourceTransform(videoElement, s.zoom);
+
+            // Ask the real camera to zoom too (hardware zoom where supported).
+            if (s.owner === 'me') {
+                const vt = localStream && localStream.getVideoTracks()[0];
+                if (vt && vt.getCapabilities && vt.getCapabilities().zoom) {
+                    vt.applyConstraints({ advanced: [{ zoom: s.zoom }] }).catch(() => {});
+                }
+            } else {
+                sendSignal('zoom-change', { roomId: currentRoomId, targetDeviceId: s.owner, zoomLevel: s.zoom });
+            }
         }
 
         function removeSource(id) {
@@ -990,9 +1103,10 @@
 
             // Admin's own big view
             videoElement.srcObject = s.stream;
-            videoElement.style.transform = 'none';
+            applySourceTransform(videoElement, s.zoom || 1);
             videoElement.play().catch(() => {});
             document.getElementById('videoContainer').classList.add('active');
+            if (isRecording) wireRecordingAudio();
 
             // Push this video out to every participant (skip the tile's own owner
             // so we don't echo a participant's camera back to them).
@@ -1052,16 +1166,37 @@
                     };
                     tile.appendChild(name);
 
+                    const zrow = document.createElement('div');
+                    zrow.className = 'tile-zoom-row';
+                    zrow.onclick = (e) => e.stopPropagation();
+                    const zslider = document.createElement('input');
+                    zslider.className = 'tile-zoom';
+                    zslider.type = 'range';
+                    zslider.min = '1'; zslider.max = '10'; zslider.step = '0.1';
+                    zslider.value = String(s.zoom || 1);
+                    zslider.oninput = () => setSourceZoom(id, zslider.value);
+                    const zpct = document.createElement('span');
+                    zpct.className = 'zoom-pct';
+                    zpct.textContent = Math.round((s.zoom || 1) * 100) + '%';
+                    zpct.ondblclick = () => setSourceZoom(id, 1);
+                    zrow.appendChild(zslider);
+                    zrow.appendChild(zpct);
+                    tile.appendChild(zrow);
+
                     sourceTiles.appendChild(tile);
                 }
 
                 const v = tile.querySelector('video');
                 if (v.srcObject !== s.stream) { v.srcObject = s.stream; v.play().catch(() => {}); }
+                applySourceTransform(v, s.zoom || 1);
                 tile.classList.toggle('main', id === mainSourceId);
                 tile.querySelector('.kind').textContent = (s.kind === 'screen' ? '🖥️ Screen' : '📷 Camera');
                 tile.querySelector('.main-flag').textContent = (id === mainSourceId ? '● MAIN' : '');
                 const name = tile.querySelector('.source-name');
                 if (document.activeElement !== name) name.value = s.label;
+                const zsl = tile.querySelector('.tile-zoom');
+                if (zsl && document.activeElement !== zsl && parseFloat(zsl.value) !== (s.zoom || 1)) zsl.value = String(s.zoom || 1);
+                tile.querySelector('.zoom-pct').textContent = Math.round((s.zoom || 1) * 100) + '%';
             });
 
             // Drop tiles for sources that no longer exist.
@@ -1095,10 +1230,10 @@
             updateRoleIndicator();
             adminControls.classList.add('active');
             screenShareSection.style.display = 'block';
-            recordingSection.style.display = 'block';
-            zoomControlsSection.style.display = 'block';
-            updateZoomControls();
+            recordingSection.style.display = 'none';   // replaced by the fixed Record bar
+            zoomControlsSection.style.display = 'none'; // replaced by per-tile zoom sliders
             document.getElementById('controls').classList.add('active');
+            document.getElementById('recBar').classList.add('active');
             document.getElementById('createRoomBtn').disabled = true;
 
             openChannel();
@@ -1115,12 +1250,13 @@
             isHost = false;
 
             screenShareSection.style.display = 'none';
-            recordingSection.style.display = 'block';
+            recordingSection.style.display = 'none';
             zoomControlsSection.style.display = 'none';
 
             showStatus('Joined room "' + roomId + '". Waiting for a camera…', 'info');
             updateRoleIndicator();
             document.getElementById('controls').classList.add('active');
+            document.getElementById('recBar').classList.add('active');
             document.getElementById('createRoomBtn').disabled = true;
 
             openChannel();
@@ -1679,61 +1815,127 @@
             showStatus('Screen sharing stopped.', 'info');
         }
 
-        async function startRecording() {
-            try {
-                // Record whatever is currently the main view.
-                const mainSrc = mainSourceId && sources.get(mainSourceId);
-                const streamToRecord = (mainSrc && mainSrc.stream)
-                    || videoElement.srcObject || localStream || screenStream || remoteStream;
+        function toggleRecording() {
+            if (isRecording) stopRecording();
+            else startRecording();
+        }
 
-                if (!streamToRecord) {
-                    showStatus('Nothing to record yet. Start your camera or pick a source first.', 'error');
+        function updateRecUI(on) {
+            const btn = document.getElementById('recToggleBtn');
+            if (btn) {
+                btn.textContent = on ? '⏹ Stop Recording' : '⏺ Record';
+                btn.classList.toggle('recording', on);
+            }
+            recordingIndicator.classList.toggle('active', on);
+            const oldStop = document.getElementById('stopRecordingBtn');
+            if (oldStop) oldStop.style.display = on ? 'block' : 'none';
+        }
+
+        // Re-point the recording's audio at whatever source is currently main.
+        function wireRecordingAudio() {
+            if (!recAudioCtx || !recDest) return;
+            try { if (recAudioSrc) recAudioSrc.disconnect(); } catch (e) {}
+            recAudioSrc = null;
+
+            const main = mainSourceId && sources.get(mainSourceId);
+            const st = (main && main.stream) || videoElement.srcObject;
+            const tracks = [];
+            if (st) st.getAudioTracks().forEach(t => { if (t.enabled) tracks.push(t); });
+            // Always fold in the admin's own mic if it isn't already there.
+            if (localStream) localStream.getAudioTracks().forEach(t => { if (t.enabled && !tracks.includes(t)) tracks.push(t); });
+            if (!tracks.length) return;
+            try {
+                recAudioSrc = recAudioCtx.createMediaStreamSource(new MediaStream(tracks));
+                recAudioSrc.connect(recDest);
+            } catch (e) { /* ignore */ }
+        }
+
+        function startRecording() {
+            try {
+                const main = mainSourceId && sources.get(mainSourceId);
+                const probe = (main && main.stream) || videoElement.srcObject || localStream || screenStream || remoteStream;
+                if (!probe) {
+                    showStatus('Nothing to record yet. Start a camera or pick a source first.', 'error');
                     return;
                 }
 
-                recordedChunks = [];
-                const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-                    .find(t => MediaRecorder.isTypeSupported(t)) || '';
-                mediaRecorder = new MediaRecorder(streamToRecord, mime ? { mimeType: mime } : undefined);
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
+                // Composite the *current main view* onto a canvas each frame, so the
+                // admin can switch sources / zoom mid-recording without breaking it.
+                recCanvas = document.createElement('canvas');
+                recCanvas.width = 1280;
+                recCanvas.height = 720;
+                recCtx = recCanvas.getContext('2d');
+
+                const drawFrame = () => {
+                    const v = videoElement;
+                    const cw = recCanvas.width, ch = recCanvas.height;
+                    recCtx.fillStyle = '#000';
+                    recCtx.fillRect(0, 0, cw, ch);
+                    if (v && v.videoWidth) {
+                        const cur = mainSourceId && sources.get(mainSourceId);
+                        const z = (cur && cur.zoom) || 1;
+                        const sw = v.videoWidth / z, sh = v.videoHeight / z;
+                        const sx = (v.videoWidth - sw) / 2, sy = (v.videoHeight - sh) / 2;
+                        const scale = Math.min(cw / sw, ch / sh);
+                        const dw = sw * scale, dh = sh * scale;
+                        recCtx.drawImage(v, sx, sy, sw, sh, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
                     }
+                    recRAF = requestAnimationFrame(drawFrame);
                 };
-                
+                drawFrame();
+
+                recStream = recCanvas.captureStream(30);
+
+                try {
+                    recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    if (recAudioCtx.state === 'suspended') recAudioCtx.resume();
+                    recDest = recAudioCtx.createMediaStreamDestination();
+                    wireRecordingAudio();
+                    recDest.stream.getAudioTracks().forEach(t => recStream.addTrack(t));
+                } catch (e) {
+                    console.warn('recording audio unavailable', e);
+                }
+
+                recordedChunks = [];
+                const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+                    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+                mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
+
+                mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
                     const blob = new Blob(recordedChunks, { type: 'video/webm' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `recording_${Date.now()}.webm`;
+                    a.download = 'camera_share_' + Date.now() + '.webm';
                     a.click();
-                    URL.revokeObjectURL(url);
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
                 };
-                
-                mediaRecorder.start();
+
+                mediaRecorder.start(1000);
                 isRecording = true;
-                
-                document.getElementById('stopRecordingBtn').style.display = 'block';
-                recordingIndicator.classList.add('active');
-                showStatus('Recording started', 'info');
-                
+                updateRecUI(true);
+                showStatus('Recording — switch sources or zoom freely, it keeps recording the main view.', 'info');
+
             } catch (error) {
                 console.error('Error starting recording:', error);
-                showStatus('Error starting recording: ' + error.message, 'error');
+                showStatus('Could not start recording: ' + error.message, 'error');
+                stopRecording();
             }
         }
 
         function stopRecording() {
             if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                
-                document.getElementById('stopRecordingBtn').style.display = 'none';
-                recordingIndicator.classList.remove('active');
-                showStatus('Recording stopped and saved', 'info');
+                try { mediaRecorder.stop(); } catch (e) {}
             }
+            isRecording = false;
+            cancelAnimationFrame(recRAF);
+            recRAF = 0;
+            if (recAudioCtx) { try { recAudioCtx.close(); } catch (e) {} }
+            recAudioCtx = null; recDest = null; recAudioSrc = null;
+            if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+            recCanvas = null; recCtx = null;
+            updateRecUI(false);
         }
 
         async function refreshMicrophones() {
@@ -1859,169 +2061,31 @@
             updateAdminMicManagement();
         }
 
+        // Participant side: the admin asked us to zoom our camera. Do it in
+        // hardware where the camera supports it (that's what actually changes the
+        // video we send). Cameras without hardware zoom can't be digitally zoomed
+        // on the sending side without re-encoding, so the admin zooms their view.
         function applyZoom(zoomLevel) {
             currentZoom = zoomLevel;
-            
-            if (localStream) {
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    const capabilities = videoTrack.getCapabilities();
-                    if (capabilities && capabilities.zoom) {
-                        // Use advanced camera controls if available
-                        videoTrack.applyConstraints({
-                            advanced: [{ zoom: zoomLevel }]
-                        }).then(() => {
-                            console.log('Hardware zoom applied:', zoomLevel);
-                            // Also apply CSS zoom for visual feedback
-                            applyDigitalZoom(zoomLevel);
-                        }).catch(err => {
-                            console.log('Could not apply hardware zoom:', err);
-                            // Fallback to digital zoom via CSS
-                            applyDigitalZoom(zoomLevel);
-                        });
-                    } else {
-                        // Fallback to digital zoom
-                        applyDigitalZoom(zoomLevel);
-                    }
-                }
+            const vt = localStream && localStream.getVideoTracks()[0];
+            if (!vt) return;
+            const caps = vt.getCapabilities ? vt.getCapabilities() : null;
+            if (caps && caps.zoom) {
+                vt.applyConstraints({ advanced: [{ zoom: zoomLevel }] })
+                    .catch(err => console.log('hardware zoom failed', err));
+            } else {
+                console.log('This camera has no hardware zoom.');
             }
         }
 
         function applyDigitalZoom(zoomLevel) {
-            // Apply digital zoom using CSS transform
-            if (videoElement) {
-                videoElement.style.transform = `scale(${zoomLevel})`;
-                videoElement.style.transformOrigin = 'center center';
-                console.log('Digital zoom applied:', zoomLevel);
-            }
+            applySourceTransform(videoElement, zoomLevel);
         }
 
+        // The old admin zoom panel is replaced by per-tile zoom sliders in the
+        // source rail; keep this as a stub so existing callers don't break.
         function updateZoomControls() {
-            if (!isAdmin) return;
-            
-            zoomControlsSection.style.display = 'block';
-            zoomList.innerHTML = '';
-            
-            // Add admin's own camera zoom control
-            if (cameraDeviceId) {
-                const adminZoomItem = createZoomControlItem(getDeviceId(), 'Your Camera', currentZoom, true);
-                zoomList.appendChild(adminZoomItem);
-            }
-            
-            // Add participants' camera zoom controls
-            connectedPeers.forEach((device, deviceId) => {
-                const currentZoomLevel = cameraZoomLevels.get(deviceId) || 1.0;
-                const participantZoomItem = createZoomControlItem(deviceId, device.name + ' Camera', currentZoomLevel, false);
-                zoomList.appendChild(participantZoomItem);
-            });
-        }
-
-        function createZoomControlItem(deviceId, name, currentZoomLevel, isAdminCamera) {
-            const zoomItem = document.createElement('div');
-            zoomItem.className = 'device-item';
-            
-            const icon = isAdminCamera ? '👑' : '📷';
-            const zoomPercentage = (currentZoomLevel * 100).toFixed(0);
-            
-            zoomItem.innerHTML = `
-                <div class="device-icon">${icon}</div>
-                <div class="device-info" style="flex: 1;">
-                    <div class="device-name">${name}</div>
-                    <div class="zoom-controls">
-                        <span style="font-size: 12px; color: rgba(255,255,255,0.6);">Zoom:</span>
-                        <input type="range" 
-                               class="zoom-slider" 
-                               id="zoomSlider_${deviceId}"
-                               min="1" 
-                               max="10" 
-                               step="0.1" 
-                               value="${currentZoomLevel}"
-                               onchange="changeZoom('${deviceId}', this.value)"
-                               oninput="updateZoomDisplay('${deviceId}', this.value)">
-                        <span class="zoom-value" id="zoomValue_${deviceId}">${zoomPercentage}%</span>
-                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 10px;" onclick="resetZoom('${deviceId}')">↺</button>
-                    </div>
-                    <div style="display: flex; gap: 5px; margin-top: 5px;">
-                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px; flex: 1;" onclick="setPresetZoom('${deviceId}', 1.0)">1x</button>
-                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px; flex: 1;" onclick="setPresetZoom('${deviceId}', 2.0)">2x</button>
-                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px; flex: 1;" onclick="setPresetZoom('${deviceId}', 5.0)">5x</button>
-                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px; flex: 1;" onclick="setPresetZoom('${deviceId}', 10.0)">10x</button>
-                    </div>
-                </div>
-            `;
-            
-            return zoomItem;
-        }
-
-        function setPresetZoom(deviceId, zoomLevel) {
-            if (!isAdmin) {
-                showStatus('Only admin can control zoom', 'error');
-                return;
-            }
-            
-            changeZoom(deviceId, zoomLevel);
-            
-            // Update the slider
-            const slider = document.getElementById(`zoomSlider_${deviceId}`);
-            if (slider) {
-                slider.value = zoomLevel;
-            }
-        }
-
-        function resetZoom(deviceId) {
-            if (!isAdmin) {
-                showStatus('Only admin can control zoom', 'error');
-                return;
-            }
-            
-            changeZoom(deviceId, 1.0);
-            
-            // Update the slider and display
-            const zoomValueElement = document.getElementById(`zoomValue_${deviceId}`);
-            if (zoomValueElement) {
-                zoomValueElement.textContent = '100%';
-            }
-            
-            // Find and update the slider input
-            const slider = document.querySelector(`input[onchange="changeZoom('${deviceId}', this.value)"]`);
-            if (slider) {
-                slider.value = 1.0;
-            }
-            
-            showStatus('Zoom reset to 100%', 'info');
-        }
-
-        function changeZoom(deviceId, zoomLevel) {
-            if (!isAdmin) {
-                showStatus('Only admin can control zoom', 'error');
-                return;
-            }
-            
-            const zoomValue = parseFloat(zoomLevel);
-            cameraZoomLevels.set(deviceId, zoomValue);
-            
-            if (deviceId === getDeviceId()) {
-                // Apply zoom to admin's own camera
-                applyZoom(zoomValue);
-            } else {
-                // Send zoom command to participant
-                sendSignal('zoom-change', {
-                    roomId: currentRoomId,
-                    targetDeviceId: deviceId,
-                    zoomLevel: zoomValue
-                });
-            }
-            
-            showStatus(`Zoom set to ${(zoomValue * 100).toFixed(0)}%`, 'info');
-        }
-
-        function updateZoomDisplay(deviceId, zoomLevel) {
-            const zoomValue = parseFloat(zoomLevel);
-            const zoomPercentage = (zoomValue * 100).toFixed(0);
-            const zoomValueElement = document.getElementById(`zoomValue_${deviceId}`);
-            if (zoomValueElement) {
-                zoomValueElement.textContent = zoomPercentage + '%';
-            }
+            if (zoomControlsSection) zoomControlsSection.style.display = 'none';
         }
 
         function closeRoom() {
@@ -2032,6 +2096,7 @@
             
             if (confirm('Close the room? This disconnects everyone.')) {
                 broadcast('room-closed', {});
+                if (isRecording) stopRecording();
                 stopCameraShare();
                 stopSignaling();
                 stopLatencyTest();
