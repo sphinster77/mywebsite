@@ -659,13 +659,15 @@
             </div>
             
             <p style="margin-top: 15px; font-size: 12px; color: rgba(255,255,255,0.6);">
-                💡 Open this page in multiple browser tabs or devices to test. Create a room in one, join with the same ID in others.
+                💡 Create a room in one tab/window, then open this page in another tab or window
+                and Join with the same room ID. Pick a camera, then press "Start Sharing".
             </p>
             <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
-                � The person who creates the room becomes the Admin with special controls.
+                👑 Whoever creates the room is the Admin and gets the extra controls below.
             </p>
             <p style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">
-                �📱 Works on mobile devices. Requires camera permissions.
+                ⚠️ Connects tabs/windows in the <strong>same browser</strong> (BroadcastChannel signaling).
+                Cross-device streaming needs a signaling server.
             </p>
         </div>
 
@@ -715,6 +717,7 @@
         <div class="controls" id="controls">
             <button class="btn btn-primary" id="shareBtn" onclick="startCameraShare()">Start Sharing</button>
             <button class="btn btn-danger" onclick="stopCameraShare()">Stop Sharing</button>
+            <button class="btn btn-secondary" id="audioBtn" onclick="toggleRemoteAudio()">🔊 Unmute</button>
             <button class="btn btn-secondary" onclick="copyRoomId()">Copy Room ID</button>
             <button class="btn btn-secondary" onclick="showDebugInfo()">🔍 Debug Info</button>
         </div>
@@ -723,7 +726,7 @@
     </div>
 
     <script>
-        // WebRTC configuration optimized for multi-device camera sharing
+        // WebRTC configuration for peer-to-peer camera sharing
         const rtcConfig = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -731,34 +734,42 @@
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' }
-            ],
-            iceCandidatePoolSize: 0,
-            iceTransportPolicy: 'all'
+            ]
         };
 
-        let localStream = null;
-        let peerConnection = null;
+        // A stable id for this tab/device, generated once (was regenerated on every
+        // call before, which broke self-signal filtering and peer targeting).
+        const MY_ID = 'dev_' + Math.random().toString(36).slice(2, 10);
+        function getDeviceId() { return MY_ID; }
+
+        let localStream = null;      // our camera+mic stream while sharing
+        let screenStream = null;     // our screen-share stream (admin)
+        let remoteStream = null;     // the stream currently shown in the <video>
+        let channel = null;          // BroadcastChannel used for signaling
+        const peers = new Map();     // peerId -> { pc, makingOffer, ignoreOffer, polite, name }
+
         let currentRoomId = null;
         let isSharing = false;
+        let isScreenSharing = false;
+        let isRecording = false;
+        let isAdmin = false;
+        let adminDeviceId = null;
         let latencyTestInterval = null;
-        let lastPingTime = 0;
-        let signalingInterval = null;
+        let latencySourceId = null;
         let qualityMode = 'standard'; // 'standard' or 'hd'
         let cameraDeviceId = null;
         let microphoneDeviceId = null;
-        let connectedPeers = new Map(); // Track connected peers
-        let isAdmin = false; // Admin status
-        let adminDeviceId = null; // Track which device is admin
-        let screenStream = null; // Screen sharing stream
-        let isScreenSharing = false;
         let mediaRecorder = null;
         let recordedChunks = [];
-        let isRecording = false;
-        let mainScreenSource = null; // 'camera' or 'screen'
-        let availableMicrophones = new Map(); // Track available microphones
-        let activeMicrophones = new Set(); // Track active microphones
-        let cameraZoomLevels = new Map(); // Track zoom levels for each camera
-        let currentZoom = 1.0; // Current zoom level (1.0 = no zoom)
+        let mainScreenSource = null;
+        let availableMicrophones = new Map();
+        let activeMicrophones = new Set();
+        let cameraZoomLevels = new Map();
+        let currentZoom = 1.0;
+
+        // Kept for compatibility with older UI code paths.
+        let isHost = false;
+        const connectedPeers = new Map();
 
         const videoElement = document.getElementById('cameraVideo');
         const roomStatus = document.getElementById('roomStatus');
@@ -780,413 +791,338 @@
         const micList = document.getElementById('micList');
         const zoomControlsSection = document.getElementById('zoomControlsSection');
         const zoomList = document.getElementById('zoomList');
-        const adminControls = document.getElementById('adminControls');
-        const roleIndicator = document.getElementById('roleIndicator');
-
-        // Real signaling using localStorage for same-browser communication
-        const SIGNALING_KEY = 'camera_signaling_';
-
-        function createRoom() {
-            try {
-                console.log('Creating room...');
-                alert('Create room button clicked!'); // Debug alert
-                
-                const roomId = generateRoomId();
-                currentRoomId = roomId;
-                document.getElementById('roomId').value = roomId;
-                
-                // Set admin status for room creator
-                isAdmin = true;
-                adminDeviceId = getDeviceId();
-                
-                showStatus('Room created: ' + roomId + ' - You are the Admin', 'info');
-                updateRoleIndicator();
-                
-                // Show admin-specific features
-                adminControls.classList.add('active');
-                screenShareSection.style.display = 'block';
-                recordingSection.style.display = 'block';
-                zoomControlsSection.style.display = 'block';
-                updateZoomControls();
-                
-                // Initialize as host
-                initializePeerConnection(true);
-                
-                // Start listening for join requests
-                startSignalingListener();
-                
-                console.log('Room created successfully:', roomId);
-            } catch (error) {
-                console.error('Error creating room:', error);
-                showStatus('Error creating room: ' + error.message, 'error');
-                alert('Error: ' + error.message); // Debug alert
-            }
-        }
-
-        function joinRoom() {
-            try {
-                console.log('Joining room...');
-                const roomId = document.getElementById('roomId').value.trim();
-                if (!roomId) {
-                    showStatus('Please enter a room ID', 'error');
-                    return;
-                }
-                currentRoomId = roomId;
-                
-                // Participant is not admin
-                isAdmin = false;
-                
-                // Hide admin-specific features for participants
-                screenShareSection.style.display = 'none';
-                recordingSection.style.display = 'none';
-                zoomControlsSection.style.display = 'none';
-                
-                showStatus('Joining room: ' + roomId + ' as participant', 'info');
-                updateRoleIndicator();
-                
-                // Initialize as guest
-                initializePeerConnection(false);
-                
-                // Start listening for host signals
-                startSignalingListener();
-                
-                // Signal join request
-                sendSignal('join', { roomId: roomId, deviceId: getDeviceId() });
-                
-                console.log('Room join requested:', roomId);
-            } catch (error) {
-                console.error('Error joining room:', error);
-                showStatus('Error joining room: ' + error.message, 'error');
-            }
-        }
 
         function generateRoomId() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
-        function getDeviceId() {
-            // Generate a simple device identifier
-            return 'device_' + Math.random().toString(36).substring(2, 8);
+        function deviceLabel() {
+            const ua = navigator.userAgent;
+            if (/iPhone|iPad|iPod/.test(ua)) return 'iOS device';
+            if (/Android/.test(ua)) return 'Android device';
+            if (/Mac/.test(ua)) return 'Mac';
+            if (/Windows/.test(ua)) return 'Windows PC';
+            return 'Device';
         }
 
-        let isHost = false;
+        function createRoom() {
+            const roomId = (document.getElementById('roomId').value.trim() || generateRoomId()).toUpperCase();
+            currentRoomId = roomId;
+            isAdmin = true;
+            isHost = true;
+            adminDeviceId = MY_ID;
+            document.getElementById('roomId').value = roomId;
 
-        function initializePeerConnection(host) {
-            isHost = host;
-            peerConnection = new RTCPeerConnection(rtcConfig);
+            showStatus('Room "' + roomId + '" ready. You are the admin — share this ID.', 'info');
+            updateRoleIndicator();
+            adminControls.classList.add('active');
+            screenShareSection.style.display = 'block';
+            recordingSection.style.display = 'block';
+            zoomControlsSection.style.display = 'block';
+            updateZoomControls();
+            document.getElementById('controls').classList.add('active');
+            document.getElementById('createRoomBtn').disabled = true;
 
-            // Configuration based on quality mode
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            
-            const config = {
-                ...rtcConfig,
-                iceTransportPolicy: 'all',
-                bundlePolicy: 'balanced',
-                rtcpMuxPolicy: 'require'
+            openChannel();
+        }
+
+        function joinRoom() {
+            const roomId = document.getElementById('roomId').value.trim().toUpperCase();
+            if (!roomId) {
+                showStatus('Enter a room ID first', 'error');
+                return;
+            }
+            currentRoomId = roomId;
+            isAdmin = false;
+            isHost = false;
+
+            screenShareSection.style.display = 'none';
+            recordingSection.style.display = 'block';
+            zoomControlsSection.style.display = 'none';
+
+            showStatus('Joined room "' + roomId + '". Waiting for a camera…', 'info');
+            updateRoleIndicator();
+            document.getElementById('controls').classList.add('active');
+            document.getElementById('createRoomBtn').disabled = true;
+
+            openChannel();
+        }
+
+        // --- Signaling transport: BroadcastChannel (works across tabs/windows in
+        // the same browser). Cross-device needs a signaling server; see notes. ---
+        function openChannel() {
+            if (channel) return;
+            try {
+                channel = new BroadcastChannel('camera_share_' + currentRoomId);
+            } catch (e) {
+                showStatus('This browser does not support BroadcastChannel signaling.', 'error');
+                return;
+            }
+            channel.onmessage = (e) => onSignal(e.data);
+            // Announce ourselves so existing peers create a connection for us.
+            broadcast('hello', { name: deviceLabel(), admin: isAdmin });
+            window.addEventListener('pagehide', announceLeave);
+            window.addEventListener('beforeunload', announceLeave);
+        }
+
+        function announceLeave() {
+            try { broadcast('bye', {}); } catch (e) {}
+        }
+
+        // --- Per-peer connection with the "perfect negotiation" pattern so either
+        // side can add/replace tracks at any time without glare. ---
+        function ensurePeer(peerId, name) {
+            if (peers.has(peerId)) {
+                if (name) { peers.get(peerId).name = name; connectedPeers.get(peerId) && (connectedPeers.get(peerId).name = name); }
+                return peers.get(peerId);
+            }
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            const rec = {
+                pc,
+                makingOffer: false,
+                ignoreOffer: false,
+                polite: MY_ID > peerId, // deterministic tie-break
+                name: name || 'Device',
+                pendingIce: []
             };
-            
-            peerConnection.setConfiguration(config);
+            peers.set(peerId, rec);
+            connectedPeers.set(peerId, { name: rec.name, status: 'in room' });
 
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    // Send ICE candidate via signaling
-                    sendSignal('ice-candidate', {
-                        candidate: event.candidate,
-                        roomId: currentRoomId,
-                        deviceId: getDeviceId()
-                    });
+            pc.onnegotiationneeded = async () => {
+                try {
+                    rec.makingOffer = true;
+                    await pc.setLocalDescription();
+                    sendTo(peerId, 'sdp', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+                } catch (err) {
+                    console.error('negotiation error', err);
+                } finally {
+                    rec.makingOffer = false;
                 }
             };
 
-            peerConnection.onconnectionstatechange = () => {
-                const state = peerConnection.connectionState;
-                console.log('Connection state:', state);
-                
-                if (state === 'connected') {
-                    showStatus('Connected! Camera sharing active.', 'connected');
+            pc.onicecandidate = ({ candidate }) => {
+                if (candidate) sendTo(peerId, 'ice', candidate.toJSON());
+            };
+
+            pc.onconnectionstatechange = () => {
+                const s = pc.connectionState;
+                const entry = connectedPeers.get(peerId);
+                if (entry) entry.status = s;
+                if (s === 'connected') {
+                    showStatus('Peer connected.', 'connected');
+                    document.getElementById('roomSection').classList.remove('hidden');
                     latencyDisplay.classList.add('active');
                     startLatencyTest();
-                    updateConnectedDevices();
-                    // Hide room section when connected
-                    document.getElementById('roomSection').classList.add('hidden');
-                } else if (state === 'disconnected' || state === 'failed') {
-                    showStatus('Connection lost. Please try again.', 'error');
-                    stopLatencyTest();
-                    stopSignaling();
-                    updateConnectedDevices();
-                    // Show room section again when disconnected
-                    document.getElementById('roomSection').classList.remove('hidden');
+                } else if (s === 'failed') {
+                    try { pc.restartIce(); } catch (e) {}
+                } else if (s === 'disconnected' || s === 'closed') {
+                    if (remoteStream && !anyConnected()) {
+                        showStatus('Connection lost.', 'error');
+                    }
                 }
+                updateLatencySource();
+                refreshPeerUI();
             };
 
-            peerConnection.oniceconnectionstatechange = () => {
-                const state = peerConnection.iceConnectionState;
-                console.log('ICE connection state:', state);
-                
-                if (state === 'connected' || state === 'completed') {
-                    showStatus('ICE connection established!', 'info');
-                }
-            };
-
-            peerConnection.ontrack = (event) => {
-                console.log('Received track');
-                const stream = event.streams[0];
-                videoElement.srcObject = stream;
-                
-                // Configure video element for iOS
+            pc.ontrack = ({ track, streams }) => {
+                remoteStream = streams[0] || new MediaStream([track]);
+                videoElement.srcObject = remoteStream;
                 videoElement.playsInline = true;
-                videoElement.muted = true; // Prevent audio feedback
-                
-                videoElement.play().then(() => {
-                    console.log('Video playing successfully');
-                }).catch(e => {
-                    console.log('Autoplay error:', e);
-                    // iOS requires user interaction for autoplay
-                    showStatus('Tap video to start playback', 'info');
-                });
+                videoElement.play().catch(() => showStatus('Tap the video to start playback', 'info'));
+                document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('controls').classList.add('active');
+                document.getElementById('roomSection').classList.add('hidden');
+                showStatus('Receiving video from a peer.', 'connected');
             };
 
-            // If host, create offer
-            if (isHost) {
-                createOffer();
-            }
+            // If we're already sharing, push our tracks to this new peer.
+            const outgoing = screenStream || localStream;
+            if (outgoing) addStreamToPc(rec, outgoing);
+
+            refreshPeerUI();
+            return rec;
         }
 
-        async function createOffer() {
+        function addStreamToPc(rec, stream) {
+            stream.getTracks().forEach(track => {
+                const exists = rec.pc.getSenders().some(s => s.track === track);
+                if (!exists) rec.pc.addTrack(track, stream);
+            });
+            applyEncodingParams(rec);
+        }
+
+        function applyEncodingParams(rec) {
+            const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (!sender) return;
             try {
-                const offer = await peerConnection.createOffer({
-                    offerToReceiveAudio: false,
-                    offerToReceiveVideo: true
-                });
-                
-                await peerConnection.setLocalDescription(offer);
-                
-                sendSignal('offer', {
-                    offer: offer,
-                    roomId: currentRoomId,
-                    deviceId: getDeviceId()
-                });
-                
-                showStatus('Waiting for peers to join...', 'info');
-            } catch (error) {
-                console.error('Error creating offer:', error);
-                showStatus('Error creating offer: ' + error.message, 'error');
-            }
+                const params = sender.getParameters();
+                if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+                if (qualityMode === 'hd') {
+                    params.encodings[0].maxBitrate = 6000000;
+                    params.encodings[0].maxFramerate = 30;
+                } else {
+                    params.encodings[0].maxBitrate = 2000000;
+                    params.encodings[0].maxFramerate = 20;
+                }
+                sender.setParameters(params).catch(() => {});
+            } catch (e) { /* not all browsers allow this */ }
         }
 
-        async function handleOffer(offer, senderDeviceId) {
+        async function handleSdp(peerId, description, senderName) {
+            const rec = peers.get(peerId) || ensurePeer(peerId, senderName);
+            const pc = rec.pc;
+            const offerCollision = description.type === 'offer' &&
+                (rec.makingOffer || pc.signalingState !== 'stable');
+
+            rec.ignoreOffer = !rec.polite && offerCollision;
+            if (rec.ignoreOffer) return;
+
             try {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                sendSignal('answer', {
-                    answer: answer,
-                    roomId: currentRoomId,
-                    deviceId: getDeviceId(),
-                    targetDeviceId: senderDeviceId
-                });
-                
-                showStatus('Connected to host!', 'info');
-                connectedPeers.set(senderDeviceId, { name: senderDeviceId, status: 'connected' });
-                updateConnectedDevices();
-                if (isAdmin) updateZoomControls();
-            } catch (error) {
-                console.error('Error handling offer:', error);
-                showStatus('Error handling offer: ' + error.message, 'error');
+                await pc.setRemoteDescription(description);
+                for (const c of rec.pendingIce.splice(0)) {
+                    try { await pc.addIceCandidate(c); } catch (e) {}
+                }
+                if (description.type === 'offer') {
+                    await pc.setLocalDescription();
+                    sendTo(peerId, 'sdp', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+                }
+            } catch (err) {
+                console.error('handleSdp error', err);
             }
         }
 
-        async function handleAnswer(answer, senderDeviceId) {
+        async function handleIce(peerId, candidate) {
+            const rec = peers.get(peerId);
+            if (!rec) return;
+            if (!rec.pc.remoteDescription) {
+                rec.pendingIce.push(candidate); // buffer until we have the remote SDP
+                return;
+            }
             try {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                showStatus('Connection established!', 'connected');
-                connectedPeers.set(senderDeviceId, { name: senderDeviceId, status: 'connected' });
-                updateConnectedDevices();
-                if (isAdmin) updateZoomControls();
-            } catch (error) {
-                console.error('Error handling answer:', error);
-                showStatus('Error handling answer: ' + error.message, 'error');
+                await rec.pc.addIceCandidate(candidate);
+            } catch (err) {
+                if (!rec.ignoreOffer) console.error('addIceCandidate error', err);
             }
         }
 
-        async function handleIceCandidate(candidate, senderDeviceId) {
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (error) {
-                console.error('Error adding ICE candidate:', error);
+        function dropPeer(peerId) {
+            const rec = peers.get(peerId);
+            if (rec) {
+                try { rec.pc.close(); } catch (e) {}
+                peers.delete(peerId);
+            }
+            connectedPeers.delete(peerId);
+            if (!peers.size) {
+                remoteStream = null;
+                if (!localStream && !screenStream) videoElement.srcObject = null;
+            }
+            updateLatencySource();
+            refreshPeerUI();
+        }
+
+        function anyConnected() {
+            for (const rec of peers.values()) if (rec.pc.connectionState === 'connected') return true;
+            return false;
+        }
+
+        function refreshPeerUI() {
+            updateConnectedDevices();
+            if (isAdmin) {
+                updateZoomControls();
+                updateAdminMicManagement();
             }
         }
 
-        // Signaling functions using localStorage
+        function updateLatencySource() {
+            latencySourceId = null;
+            for (const [id, rec] of peers) {
+                if (rec.pc.connectionState === 'connected') latencySourceId = id;
+            }
+        }
+
+        // --- Signaling message helpers ---
+        function post(msg) {
+            if (!channel) return;
+            channel.postMessage(Object.assign({ from: MY_ID, roomId: currentRoomId, admin: isAdmin }, msg));
+        }
+        function broadcast(kind, payload) { post({ kind, payload, to: null }); }
+        function sendTo(peerId, kind, payload) { post({ kind, payload, to: peerId }); }
+
+        // Adapter kept so existing UI code (kick/mute/zoom/close) keeps working.
         function sendSignal(type, data) {
-            const signal = {
-                type: type,
-                data: data,
-                timestamp: Date.now(),
-                senderId: getDeviceId()
-            };
-            
-            // Use localStorage for same-browser signaling
-            const key = SIGNALING_KEY + type + '_' + data.roomId + '_' + Date.now();
-            localStorage.setItem(key, JSON.stringify(signal));
-            
-            // Force storage event by setting another key
-            localStorage.setItem(SIGNALING_KEY + 'trigger_' + Date.now(), Date.now().toString());
-            
-            console.log('Sent signal:', type, data);
+            post({ kind: type, payload: data, to: (data && data.targetDeviceId) || null });
         }
 
-        function startSignalingListener() {
-            // Listen for storage events (cross-tab)
-            window.addEventListener('storage', handleStorageEvent);
-            
-            // Periodically check for new signals
-            signalingInterval = setInterval(checkExistingSignals, 500);
-            
-            // Initial check
-            checkExistingSignals();
-        }
+        async function onSignal(msg) {
+            if (!msg || msg.roomId !== currentRoomId || msg.from === MY_ID) return;
+            if (msg.to && msg.to !== MY_ID) return;
 
-        function handleStorageEvent(event) {
-            console.log('Storage event:', event.key, event.newValue);
-            if (event.key && event.key.startsWith(SIGNALING_KEY) && !event.key.includes('trigger')) {
-                try {
-                    const signal = JSON.parse(event.newValue);
-                    processSignal(signal);
-                } catch (error) {
-                    console.error('Error parsing signal:', error);
-                }
-            }
-        }
+            if (msg.admin && !adminDeviceId) adminDeviceId = msg.from;
 
-        function checkExistingSignals() {
-            // Check for existing signals in localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
-                    try {
-                        const signal = JSON.parse(localStorage.getItem(key));
-                        processSignal(signal);
-                    } catch (error) {
-                        console.error('Error parsing existing signal:', error);
-                    }
-                }
-            }
-        }
-
-        function processSignal(signal) {
-            if (!signal || !signal.data || signal.data.roomId !== currentRoomId) {
-                return;
-            }
-
-            // Ignore own signals
-            if (signal.senderId === getDeviceId()) {
-                return;
-            }
-
-            // Ignore old signals (older than 10 seconds)
-            if (signal.timestamp && Date.now() - signal.timestamp > 10000) {
-                console.log('Ignoring old signal:', signal.type);
-                return;
-            }
-
-            console.log('Processing signal:', signal.type, signal.data);
-
-            switch (signal.type) {
-                case 'offer':
-                    if (!isHost) {
-                        handleOffer(signal.data.offer, signal.senderId);
-                    }
+            const p = msg.payload || {};
+            switch (msg.kind) {
+                case 'hello':
+                    ensurePeer(msg.from, p.name);
+                    if (p.admin) adminDeviceId = msg.from;
+                    sendTo(msg.from, 'welcome', { name: deviceLabel(), admin: isAdmin });
                     break;
-                case 'answer':
-                    if (isHost) {
-                        handleAnswer(signal.data.answer, signal.senderId);
-                    }
+                case 'welcome':
+                    ensurePeer(msg.from, p.name);
+                    if (p.admin) adminDeviceId = msg.from;
                     break;
-                case 'ice-candidate':
-                    handleIceCandidate(signal.data.candidate, signal.senderId);
+                case 'bye':
+                    dropPeer(msg.from);
                     break;
-                case 'join':
-                    if (isHost) {
-                        showStatus('Device joined: ' + signal.data.deviceId, 'info');
-                        connectedPeers.set(signal.data.deviceId, { name: signal.data.deviceId, status: 'joining', isAdmin: false });
-                        updateConnectedDevices();
-                        updateZoomControls(); // Update zoom controls when new participant joins
-                        // Send admin info to new participant
-                        sendSignal('admin-info', { 
-                            roomId: currentRoomId, 
-                            adminDeviceId: adminDeviceId,
-                            targetDeviceId: signal.data.deviceId 
-                        });
-                        // Re-send offer if needed
-                        if (peerConnection.signalingState === 'stable') {
-                            createOffer();
-                        }
-                    }
+                case 'sdp':
+                    await handleSdp(msg.from, p, msg.fromName);
                     break;
-                case 'admin-info':
-                    if (!isAdmin) {
-                        adminDeviceId = signal.data.adminDeviceId;
-                        showStatus('Connected to room. Admin: ' + signal.data.adminDeviceId, 'info');
-                    }
+                case 'ice':
+                    await handleIce(msg.from, p);
                     break;
                 case 'kick':
-                    if (signal.data.targetDeviceId === getDeviceId()) {
-                        showStatus('You have been kicked by the admin', 'error');
-                        setTimeout(() => {
-                            location.reload();
-                        }, 2000);
+                    if (p.targetDeviceId === MY_ID) {
+                        showStatus('You were removed from the room by the admin.', 'error');
+                        setTimeout(() => location.reload(), 1500);
                     }
                     break;
                 case 'room-closed':
-                    showStatus('Room has been closed by admin', 'error');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
+                    showStatus('The admin closed the room.', 'error');
+                    setTimeout(() => location.reload(), 1500);
                     break;
                 case 'main-screen-set':
                     if (!isAdmin) {
-                        mainScreenSource = signal.data.source;
-                        showStatus('Main screen changed to: ' + signal.data.source, 'info');
+                        mainScreenSource = p.source;
+                        showStatus('The admin changed the main screen.', 'info');
                     }
                     break;
                 case 'mic-toggle':
-                    if (signal.data.targetDeviceId === getDeviceId()) {
-                        if (signal.data.enabled) {
-                            showStatus('Admin enabled your microphone', 'info');
-                        } else {
-                            showStatus('Admin disabled your microphone', 'info');
-                        }
-                    }
+                    if (p.targetDeviceId === MY_ID) setLocalAudioEnabled(!!p.enabled);
                     break;
                 case 'zoom-change':
-                    if (signal.data.targetDeviceId === getDeviceId()) {
-                        applyZoom(signal.data.zoomLevel);
-                        showStatus('Admin changed camera zoom to: ' + (signal.data.zoomLevel * 100).toFixed(0) + '%', 'info');
+                    if (p.targetDeviceId === MY_ID) {
+                        applyZoom(parseFloat(p.zoomLevel));
+                        showStatus('The admin set your camera zoom to ' + (p.zoomLevel * 100).toFixed(0) + '%.', 'info');
                     }
                     break;
             }
         }
 
+        function setLocalAudioEnabled(on) {
+            if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = on);
+            activeMicrophones[on ? 'add' : 'delete'](microphoneDeviceId);
+            showStatus(on ? 'The admin unmuted your microphone.' : 'The admin muted your microphone.', 'info');
+        }
+
         function stopSignaling() {
-            if (signalingInterval) {
-                clearInterval(signalingInterval);
-                signalingInterval = null;
+            peers.forEach(rec => { try { rec.pc.close(); } catch (e) {} });
+            peers.clear();
+            connectedPeers.clear();
+            if (channel) {
+                announceLeave();
+                channel.close();
+                channel = null;
             }
-            
-            window.removeEventListener('storage', handleStorageEvent);
-            
-            // Clean up localStorage
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(SIGNALING_KEY) && key.includes(currentRoomId)) {
-                    keysToRemove.push(key);
-                }
-            }
-            keysToRemove.forEach(key => localStorage.removeItem(key));
         }
 
         function updateConnectedDevices() {
@@ -1266,9 +1202,8 @@
                     roomId: currentRoomId,
                     targetDeviceId: deviceId
                 });
-                
-                connectedPeers.delete(deviceId);
-                updateConnectedDevices();
+
+                dropPeer(deviceId);
                 showStatus('Participant kicked', 'info');
             }
         }
@@ -1280,15 +1215,13 @@
             }
             
             if (confirm('Are you sure you want to kick all participants?')) {
-                connectedPeers.forEach((device, deviceId) => {
+                Array.from(connectedPeers.keys()).forEach(deviceId => {
                     sendSignal('kick', {
                         roomId: currentRoomId,
                         targetDeviceId: deviceId
                     });
+                    dropPeer(deviceId);
                 });
-                
-                connectedPeers.clear();
-                updateConnectedDevices();
                 showStatus('All participants kicked', 'info');
             }
         }
@@ -1348,33 +1281,21 @@
                 
                 screenStream = stream;
                 isScreenSharing = true;
-                
-                // Replace video with screen share
+
+                // Show screen share locally
                 videoElement.srcObject = stream;
                 videoElement.muted = true;
-                
-                // Add screen tracks to peer connection
-                if (peerConnection) {
-                    // Remove existing video tracks
-                    peerConnection.getSenders().forEach(sender => {
-                        if (sender.track.kind === 'video') {
-                            peerConnection.removeTrack(sender);
-                        }
-                    });
-                    
-                    // Add screen video track
-                    const videoTrack = stream.getVideoTracks()[0];
-                    if (videoTrack) {
-                        peerConnection.addTrack(videoTrack, stream);
-                    }
-                    
-                    // Add screen audio track if available
-                    const audioTrack = stream.getAudioTracks()[0];
-                    if (audioTrack) {
-                        peerConnection.addTrack(audioTrack, stream);
-                    }
-                }
-                
+                document.getElementById('videoContainer').classList.add('active');
+
+                // Send the screen video to every peer, replacing the camera track
+                // in place when possible (no full renegotiation needed).
+                const screenTrack = stream.getVideoTracks()[0];
+                peers.forEach(rec => {
+                    const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) sender.replaceTrack(screenTrack);
+                    else if (screenTrack) rec.pc.addTrack(screenTrack, stream);
+                });
+
                 document.getElementById('stopScreenShareBtn').style.display = 'block';
                 showStatus('Screen sharing active as main screen', 'connected');
                 
@@ -1397,47 +1318,34 @@
             
             isScreenSharing = false;
             mainScreenSource = 'camera';
-            
+
             document.getElementById('stopScreenShareBtn').style.display = 'none';
-            
-            // Switch back to camera
-            if (localStream) {
-                videoElement.srcObject = localStream;
-                
-                // Remove screen tracks and add camera tracks back
-                if (peerConnection) {
-                    peerConnection.getSenders().forEach(sender => {
-                        peerConnection.removeTrack(sender);
-                    });
-                    
-                    const videoTrack = localStream.getVideoTracks()[0];
-                    if (videoTrack) {
-                        peerConnection.addTrack(videoTrack, localStream);
-                    }
-                }
-            }
-            
-            showStatus('Screen sharing stopped, back to camera', 'info');
+
+            const camTrack = localStream && localStream.getVideoTracks()[0];
+            peers.forEach(rec => {
+                const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender && camTrack) sender.replaceTrack(camTrack);
+                else if (sender && !camTrack) { try { rec.pc.removeTrack(sender); } catch (e) {} }
+            });
+
+            videoElement.srcObject = localStream || remoteStream || null;
+            showStatus(camTrack ? 'Screen sharing stopped — back to camera.' : 'Screen sharing stopped.', 'info');
         }
 
         async function startRecording() {
             try {
-                if (!isAdmin) {
-                    showStatus('Only admin can record', 'error');
-                    return;
-                }
-                
-                const streamToRecord = isScreenSharing ? screenStream : localStream;
-                
+                const streamToRecord = isScreenSharing ? screenStream
+                    : (videoElement.srcObject || localStream || remoteStream);
+
                 if (!streamToRecord) {
-                    showStatus('No stream to record. Start camera or screen share first.', 'error');
+                    showStatus('Nothing to record yet. Start your camera or connect to a peer first.', 'error');
                     return;
                 }
-                
+
                 recordedChunks = [];
-                mediaRecorder = new MediaRecorder(streamToRecord, {
-                    mimeType: 'video/webm;codecs=vp9'
-                });
+                const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+                    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+                mediaRecorder = new MediaRecorder(streamToRecord, mime ? { mimeType: mime } : undefined);
                 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
@@ -1773,21 +1681,13 @@
                 return;
             }
             
-            if (confirm('Are you sure you want to close the room? This will disconnect all participants.')) {
-                sendSignal('room-closed', {
-                    roomId: currentRoomId
-                });
-                
+            if (confirm('Close the room? This disconnects everyone.')) {
+                broadcast('room-closed', {});
                 stopCameraShare();
                 stopSignaling();
-                if (peerConnection) {
-                    peerConnection.close();
-                }
-                
+                stopLatencyTest();
                 showStatus('Room closed', 'info');
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                setTimeout(() => location.reload(), 1500);
             }
         }
 
@@ -1826,83 +1726,42 @@
 
         async function startCameraShare() {
             try {
-                if (!peerConnection) {
-                    showStatus('Please create or join a room first', 'error');
+                if (!currentRoomId) {
+                    showStatus('Create or join a room first', 'error');
                     return;
                 }
-                
                 if (!cameraDeviceId) {
-                    showStatus('Please select a camera first', 'error');
+                    showStatus('Select a camera first (use "Refresh Cameras")', 'error');
                     return;
                 }
-                
-                const constraints = getCameraConstraints();
-                
-                console.log('Starting camera share in', qualityMode, 'mode');
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
+
+                const stream = await navigator.mediaDevices.getUserMedia(getCameraConstraints());
                 localStream = stream;
                 isSharing = true;
 
-                console.log('Stream obtained, adding tracks to peer connection...');
-                
-                // Add video track
-                const videoTrack = stream.getVideoTracks()[0];
-                if (videoTrack) {
-                    const sender = peerConnection.addTrack(videoTrack, stream);
-                    console.log('Video track added to peer connection in', qualityMode, 'mode');
-                    
-                    // Configure based on quality mode
-                    try {
-                        const params = sender.getParameters();
-                        if (params.encodings && params.encodings[0]) {
-                            params.encodings[0].scaleResolutionDownBy = 1;
-                            
-                            if (qualityMode === 'hd') {
-                                params.encodings[0].maxBitrate = 6000000; // 6 Mbps for HD
-                                params.encodings[0].maxFramerate = 30; // 30fps for HD
-                            } else {
-                                params.encodings[0].maxBitrate = 2000000; // 2 Mbps for standard
-                                params.encodings[0].maxFramerate = 15; // 15fps for standard
-                            }
-                        }
-                        sender.setParameters(params).catch(e => console.log('Parameter setting error:', e));
-                    } catch (e) {
-                        console.log('Could not set encoding parameters:', e);
-                    }
-                }
-                
-                // Add audio track if microphone is selected
-                const audioTrack = stream.getAudioTracks()[0];
-                if (audioTrack) {
-                    peerConnection.addTrack(audioTrack, stream);
-                    console.log('Audio track added to peer connection');
-                } else {
-                    // Fallback for any remaining tracks
-                    stream.getTracks().forEach(track => {
-                        if (track.kind !== 'video' && !peerConnection.getSenders().some(s => s.track === track)) {
-                            peerConnection.addTrack(track, stream);
-                        }
-                    });
-                }
+                if (currentZoom !== 1.0) applyZoom(currentZoom);
 
-                // Show local preview
+                // Push our tracks to every peer. addTrack triggers onnegotiationneeded,
+                // which sends a fresh offer — so this works whether peers are already
+                // connected or join later.
+                peers.forEach(rec => addStreamToPc(rec, stream));
+
                 videoElement.srcObject = stream;
-                videoElement.muted = true; // Mute local preview to avoid feedback
-                document.getElementById('shareBtn').textContent = 'Camera Shared';
+                videoElement.muted = true; // local preview muted to avoid feedback
+                document.getElementById('shareBtn').textContent = 'Sharing…';
                 document.getElementById('shareBtn').disabled = true;
-
-                showStatus('Camera sharing active! Stream is being shared to connected peers.', 'connected');
-                
-                // Show video container immediately
                 document.getElementById('videoContainer').classList.add('active');
                 document.getElementById('controls').classList.add('active');
                 latencyDisplay.classList.add('active');
                 startLatencyTest();
 
+                showStatus(peers.size
+                    ? 'Sharing your camera with ' + peers.size + ' peer(s).'
+                    : 'Camera on. Waiting for someone to join room "' + currentRoomId + '"…', 'connected');
+
             } catch (error) {
                 console.error('Error sharing camera:', error);
-                showStatus('Error sharing camera: ' + error.message, 'error');
+                showStatus('Could not start camera: ' + error.message, 'error');
             }
         }
 
@@ -1913,19 +1772,20 @@
             }
 
             isSharing = false;
-            videoElement.srcObject = null;
             document.getElementById('shareBtn').textContent = 'Start Sharing';
             document.getElementById('shareBtn').disabled = false;
-            
-            // Show room section again when stopping share
             document.getElementById('roomSection').classList.remove('hidden');
-            
-            // Remove tracks from peer connection
-            if (peerConnection) {
-                peerConnection.getSenders().forEach(sender => {
-                    peerConnection.removeTrack(sender);
+
+            // Stop sending our tracks; removeTrack triggers renegotiation so the
+            // peer's view clears too.
+            peers.forEach(rec => {
+                rec.pc.getSenders().forEach(sender => {
+                    if (sender.track) { try { rec.pc.removeTrack(sender); } catch (e) {} }
                 });
-            }
+            });
+
+            videoElement.srcObject = remoteStream || null;
+            videoElement.style.transform = 'none';
         }
 
         function copyRoomId() {
@@ -1940,20 +1800,25 @@
 
         function showDebugInfo() {
             const debugInfo = {
-                peerConnectionState: peerConnection ? peerConnection.connectionState : 'No connection',
-                iceConnectionState: peerConnection ? peerConnection.iceConnectionState : 'No connection',
-                signalingState: peerConnection ? peerConnection.signalingState : 'No connection',
+                myId: MY_ID,
                 currentRoomId: currentRoomId || 'No room',
-                isHost: isHost,
                 isAdmin: isAdmin,
                 adminDeviceId: adminDeviceId || 'None',
                 isSharing: isSharing,
+                isScreenSharing: isScreenSharing,
                 qualityMode: qualityMode,
                 hasLocalStream: !!localStream,
                 cameraDeviceId: cameraDeviceId || 'None',
-                connectedPeers: Array.from(connectedPeers.entries())
+                microphoneDeviceId: microphoneDeviceId || 'None',
+                peers: Array.from(peers.entries()).map(([id, rec]) => ({
+                    id,
+                    polite: rec.polite,
+                    connection: rec.pc.connectionState,
+                    ice: rec.pc.iceConnectionState,
+                    signaling: rec.pc.signalingState
+                }))
             };
-            
+
             console.log('=== DEBUG INFO ===', debugInfo);
             alert(JSON.stringify(debugInfo, null, 2));
         }
@@ -1993,37 +1858,31 @@
         }
 
         function startLatencyTest() {
-            lastPingTime = Date.now();
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            
-            // Latency expectations based on mode and device
-            let baseLatency, updateInterval;
-            if (qualityMode === 'hd' && !isIOS) {
-                baseLatency = 15; // Higher latency for HD
-                updateInterval = 500; // Standard updates
-            } else if (isIOS) {
-                baseLatency = 50; // Higher latency for mobile
-                updateInterval = 1000; // Slower updates for mobile
-            } else {
-                baseLatency = 10; // Standard desktop latency
-                updateInterval = 500; // Standard update rate
-            }
-            
-            latencyTestInterval = setInterval(() => {
-                const now = Date.now();
-                const latency = Math.floor(Math.random() * 20) + baseLatency; 
-                latencyValue.textContent = latency + 'ms';
-                
-                if (latency < 20) {
-                    latencyValue.style.color = '#2ecc71'; // Green - excellent
-                } else if (latency < 50) {
-                    latencyValue.style.color = '#3498db'; // Blue - good
-                } else if (latency < 100) {
-                    latencyValue.style.color = '#f39c12'; // Orange - acceptable
-                } else {
-                    latencyValue.style.color = '#e74c3c'; // Red - poor
+            stopLatencyTest();
+            latencyDisplay.classList.add('active');
+            updateLatencySource();
+            latencyTestInterval = setInterval(async () => {
+                const rec = latencySourceId && peers.get(latencySourceId);
+                if (!rec || rec.pc.connectionState !== 'connected') {
+                    latencyValue.textContent = '—';
+                    latencyValue.style.color = 'rgba(255,255,255,0.6)';
+                    return;
                 }
-            }, updateInterval);
+                try {
+                    const stats = await rec.pc.getStats();
+                    let rtt = null;
+                    stats.forEach(r => {
+                        if (r.type === 'candidate-pair' && r.currentRoundTripTime != null &&
+                            (r.nominated || r.state === 'succeeded')) {
+                            rtt = r.currentRoundTripTime;
+                        }
+                    });
+                    if (rtt == null) return;
+                    const ms = Math.round(rtt * 1000);
+                    latencyValue.textContent = ms + 'ms';
+                    latencyValue.style.color = ms < 50 ? '#2ecc71' : ms < 150 ? '#f39c12' : '#e74c3c';
+                } catch (e) { /* getStats can throw briefly during setup */ }
+            }, 1000);
         }
 
         function stopLatencyTest() {
@@ -2104,33 +1963,30 @@
             }
         }
 
+        function toggleRemoteAudio() {
+            videoElement.muted = !videoElement.muted;
+            const btn = document.getElementById('audioBtn');
+            if (btn) btn.textContent = videoElement.muted ? '🔊 Unmute' : '🔇 Mute';
+            if (!videoElement.muted) videoElement.play().catch(() => {});
+        }
+
         // Handle page unload
         window.addEventListener('beforeunload', () => {
-            stopCameraShare();
-            stopScreenShare();
-            if (isRecording) {
-                stopRecording();
-            }
-            stopSignaling();
-            if (peerConnection) {
-                peerConnection.close();
-            }
+            try { announceLeave(); } catch (e) {}
+            if (isRecording) stopRecording();
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+            peers.forEach(rec => { try { rec.pc.close(); } catch (e) {} });
         });
 
-        // Generate initial room ID for convenience
+        // Generate an initial room ID for convenience
         document.getElementById('roomId').value = generateRoomId();
-        
-        // Set default mode
+
         setQualityMode('standard');
-        
-        // Initialize cameras and microphones on load
-        console.log('Page loaded, initializing devices...');
+
+        // Enumerate cameras/mics up front (prompts for permission)
         refreshCameras();
         refreshMicrophones();
-        
-        // Test if functions are accessible
-        console.log('createRoom function available:', typeof createRoom);
-        console.log('joinRoom function available:', typeof joinRoom);
     </script>
 </body>
 </html>
