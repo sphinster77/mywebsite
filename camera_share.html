@@ -54,6 +54,16 @@
             padding-top: max(20px, env(safe-area-inset-top));
         }
 
+        /* Leave room for the fixed Record / zoom bars at the bottom. */
+        body:has(.rec-bar.active) .main-container,
+        body:has(.main-zoom.active) .main-container {
+            padding-bottom: 180px;
+        }
+
+        body:has(.zoom-controls-section[style*="block"]) .main-container {
+            padding-bottom: 320px;
+        }
+
         .room-section {
             background: rgba(255, 255, 255, 0.1);
             padding: 20px;
@@ -513,30 +523,77 @@
             text-align: right;
         }
 
+        /* ── Per-source zoom panel, pinned to the bottom above the Record bar ── */
         .zoom-controls-section {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
+            display: none;
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: calc(132px + env(safe-area-inset-bottom));
+            width: calc(100% - 32px);
+            max-width: 760px;
+            max-height: 38vh;
+            overflow-y: auto;
+            padding: 12px 14px;
+            background: rgba(0, 0, 0, 0.62);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+            z-index: 947;
         }
 
         .zoom-controls-section h3 {
-            font-size: 16px;
-            margin-bottom: 15px;
+            font-size: 14px;
+            margin-bottom: 12px;
             color: #4facfe;
         }
 
-        /* ── Zoom control under the main video ── */
+        .zoom-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+        }
+
+        .zoom-row + .zoom-row {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .zoom-row-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 0 0 130px;
+        }
+
+        .zoom-row.main .zoom-row-label {
+            color: #4facfe;
+            font-weight: 600;
+        }
+
+        /* ── Single zoom slider, pinned to the bottom above the Record bar ── */
         .main-zoom {
             display: none;
             align-items: center;
             gap: 10px;
-            width: 100%;
-            max-width: 1200px;
-            margin-top: 10px;
+            width: calc(100% - 32px);
+            max-width: 760px;
             padding: 10px 14px;
-            background: rgba(0, 0, 0, 0.35);
-            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.62);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: calc(76px + env(safe-area-inset-bottom));
+            z-index: 948;
         }
 
         .main-zoom.active {
@@ -716,6 +773,15 @@
                 bottom: calc(128px + env(safe-area-inset-bottom));
             }
 
+            body.has-rail .main-zoom {
+                bottom: calc(188px + env(safe-area-inset-bottom));
+            }
+
+            body.has-rail .zoom-controls-section {
+                bottom: calc(244px + env(safe-area-inset-bottom));
+                max-height: 30vh;
+            }
+
             .rec-bar .btn {
                 min-width: 150px;
             }
@@ -887,6 +953,11 @@
             <button class="btn btn-secondary" id="mainZoomReset" onclick="setMainZoom(1)" style="padding: 6px 12px; font-size: 12px;">1×</button>
         </div>
 
+        <div class="zoom-controls-section" id="zoomControlsSection">
+            <h3>🔍 Camera Zoom Controls</h3>
+            <div id="zoomList"></div>
+        </div>
+
         <div class="connected-devices" id="connectedDevices">
             <h3 style="font-size: 16px; margin-bottom: 10px; color: #4facfe;">📱 Connected Devices</h3>
             <div id="deviceList"></div>
@@ -914,11 +985,6 @@
             <div class="multi-mic-section" id="multiMicSection">
                 <h3>🎤 Microphone Management</h3>
                 <div id="micList"></div>
-            </div>
-            
-            <div class="zoom-controls-section" id="zoomControlsSection">
-                <h3>🔍 Camera Zoom Controls</h3>
-                <div id="zoomList"></div>
             </div>
             <div style="margin-top: 10px;">
                 <button class="btn btn-danger" onclick="closeRoom()" style="width: 100%;">
@@ -1099,6 +1165,14 @@
                 syncMainZoomUI(s.zoom);
             }
 
+            // Keep the bottom panel's row for this source in sync.
+            const row = zoomList && zoomList.querySelector('[data-zoom-src="' + id + '"]');
+            if (row) {
+                const sl = row.querySelector('input');
+                if (document.activeElement !== sl) sl.value = String(s.zoom);
+                row.querySelector('.zoom-value').textContent = Math.round(s.zoom * 100) + '%';
+            }
+
             // Ask the real camera to zoom too (hardware zoom where supported).
             if (s.owner === 'me') {
                 const vt = localStream && localStream.getVideoTracks()[0];
@@ -1132,6 +1206,8 @@
             applySourceTransform(videoElement, s.zoom || 1);
             videoElement.play().catch(() => {});
             document.getElementById('videoContainer').classList.add('active');
+            document.getElementById('mainZoom').classList.add('active');
+            renderZoomList();
             showMainZoom(true);
             syncMainZoomUI(s.zoom || 1);
             if (isRecording) wireRecordingAudio();
@@ -1211,6 +1287,8 @@
             Array.from(sourceTiles.children).forEach(tile => {
                 if (!seen.has(tile.dataset.src)) tile.remove();
             });
+
+            renderZoomList();
         }
 
         function generateRoomId() {
@@ -1239,7 +1317,7 @@
             adminControls.classList.add('active');
             screenShareSection.style.display = 'block';
             recordingSection.style.display = 'none';   // replaced by the fixed Record bar
-            zoomControlsSection.style.display = 'none'; // replaced by per-tile zoom sliders
+            zoomControlsSection.style.display = 'none'; // Hidden initially, shown under video when active
             document.getElementById('controls').classList.add('active');
             document.getElementById('recBar').classList.add('active');
             document.getElementById('createRoomBtn').disabled = true;
@@ -1403,6 +1481,8 @@
                 const incoming = streams[0] || new MediaStream([track]);
                 remoteStream = incoming;
                 document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('mainZoom').classList.add('active');
+                renderZoomList();
                 document.getElementById('controls').classList.add('active');
                 document.getElementById('roomSection').classList.add('hidden');
 
@@ -2093,11 +2173,49 @@
             applySourceTransform(videoElement, zoomLevel);
         }
 
-        // The old admin zoom panel is replaced by the single zoom slider under the
-        // main video; keep this as a stub so existing callers don't break.
-        function updateZoomControls() {
-            if (zoomControlsSection) zoomControlsSection.style.display = 'none';
+        // Bottom "Camera Zoom Controls" panel — one slider per live source (admin
+        // only). The single .main-zoom bar below it stays for solo / non-admin use.
+        function renderZoomList() {
+            if (!zoomList || !zoomControlsSection) return;
+            const videoActive = document.getElementById('videoContainer').classList.contains('active');
+            const showPanel = isAdmin && videoActive && sources.size > 0;
+            zoomControlsSection.style.display = showPanel ? 'block' : 'none';
+            if (!showPanel) { zoomList.innerHTML = ''; return; }
+
+            const seen = new Set();
+            sources.forEach((s, id) => {
+                seen.add(id);
+                let row = zoomList.querySelector('[data-zoom-src="' + id + '"]');
+                if (!row) {
+                    row = document.createElement('div');
+                    row.className = 'zoom-row';
+                    row.dataset.zoomSrc = id;
+                    row.innerHTML =
+                        '<span class="zoom-row-label"></span>' +
+                        '<input type="range" class="zoom-slider" min="1" max="10" step="0.1" value="1">' +
+                        '<span class="zoom-value">100%</span>' +
+                        '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;">1×</button>';
+                    const slider = row.querySelector('input');
+                    slider.addEventListener('input', () => setSourceZoom(id, slider.value));
+                    row.querySelector('button').addEventListener('click', () => setSourceZoom(id, 1));
+                    zoomList.appendChild(row);
+                }
+                const z = s.zoom || 1;
+                row.classList.toggle('main', id === mainSourceId);
+                row.querySelector('.zoom-row-label').textContent =
+                    (s.kind === 'screen' ? '🖥️ ' : '📷 ') + s.label + (id === mainSourceId ? ' • MAIN' : '');
+                const slider = row.querySelector('input');
+                if (document.activeElement !== slider) slider.value = String(z);
+                row.querySelector('.zoom-value').textContent = Math.round(z * 100) + '%';
+            });
+
+            Array.from(zoomList.children).forEach(row => {
+                if (!seen.has(row.dataset.zoomSrc)) row.remove();
+            });
         }
+
+        // Back-compat alias for existing callers.
+        function updateZoomControls() { renderZoomList(); }
 
         function closeRoom() {
             if (!isAdmin) {
@@ -2137,6 +2255,8 @@
                 videoElement.muted = true;
                 applySourceTransform(videoElement, viewZoom);
                 document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('mainZoom').classList.add('active');
+                renderZoomList();
                 document.getElementById('controls').classList.add('active');
                 showMainZoom(true);
                 syncMainZoomUI(viewZoom);
@@ -2178,6 +2298,8 @@
                 document.getElementById('shareBtn').textContent = 'Sharing…';
                 document.getElementById('shareBtn').disabled = true;
                 document.getElementById('videoContainer').classList.add('active');
+                document.getElementById('mainZoom').classList.add('active');
+                renderZoomList();
                 document.getElementById('controls').classList.add('active');
                 latencyDisplay.classList.add('active');
                 startLatencyTest();
@@ -2228,6 +2350,8 @@
                 } else {
                     videoElement.style.transform = 'none';
                     showMainZoom(false);
+                    document.getElementById('mainZoom').classList.remove('active');
+                    renderZoomList();
                 }
             }
         }
