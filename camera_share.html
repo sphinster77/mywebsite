@@ -916,7 +916,7 @@
                 <h3 style="font-size: 16px; margin-bottom: 15px; color: #4facfe;">🎮 Quality Mode</h3>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn btn-secondary" id="standardBtn" onclick="setQualityMode('standard')" style="flex: 1; min-width: 120px;">
-                        ⚡ Standard
+                        ⚡ Low Latency
                     </button>
                     <button class="btn btn-secondary" id="hdBtn" onclick="setQualityMode('hd')" style="flex: 1; min-width: 120px;">
                         🎥 HD
@@ -1019,8 +1019,24 @@
                 { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
                 { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
                 { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-            ]
+            ],
+            bundlePolicy: 'max-bundle',   // one transport for audio+video → faster setup, tighter A/V sync
+            rtcpMuxPolicy: 'require',
+            iceCandidatePoolSize: 4       // pre-gather candidates so connecting is quicker
         };
+
+        // How much the receiver is allowed to buffer incoming media before playing
+        // it, in seconds. 0 = lowest possible lag. The SAME value is applied to the
+        // incoming mic audio and camera video so the two stay in step. Bump this a
+        // little (e.g. 0.08) if audio sounds choppy on a poor connection.
+        const PLAYOUT_DELAY_HINT = 0;
+
+        function tuneReceiversForLowLatency(pc) {
+            pc.getReceivers().forEach(r => {
+                try { r.playoutDelayHint = PLAYOUT_DELAY_HINT; } catch (e) {}
+                try { if ('jitterBufferTarget' in r) r.jitterBufferTarget = PLAYOUT_DELAY_HINT * 1000; } catch (e) {}
+            });
+        }
 
         // A stable id for this tab/device, generated once (was regenerated on every
         // call before, which broke self-signal filtering and peer targeting).
@@ -1464,6 +1480,7 @@
                 if (s === 'connected') {
                     showStatus('Peer connected.', 'connected');
                     document.getElementById('roomSection').classList.remove('hidden');
+                    tuneReceiversForLowLatency(pc);
                     latencyDisplay.classList.add('active');
                     startLatencyTest();
                 } else if (s === 'failed') {
@@ -1480,6 +1497,7 @@
             pc.ontrack = ({ track, streams }) => {
                 const incoming = streams[0] || new MediaStream([track]);
                 remoteStream = incoming;
+                tuneReceiversForLowLatency(pc);
                 document.getElementById('videoContainer').classList.add('active');
                 document.getElementById('mainZoom').classList.add('active');
                 renderZoomList();
@@ -1528,18 +1546,32 @@
         }
 
         function applyEncodingParams(rec) {
+            // Low-latency hints on the outgoing tracks: keep frame rate up, treat
+            // audio as speech (short frames, no long look-ahead).
+            rec.pc.getSenders().forEach(s => {
+                if (!s.track) return;
+                if (s.track.kind === 'video') s.track.contentHint = 'motion';
+                if (s.track.kind === 'audio') s.track.contentHint = 'speech';
+            });
+
             const sender = rec.pc.getSenders().find(s => s.track && s.track.kind === 'video');
             if (!sender) return;
             try {
                 const params = sender.getParameters();
                 if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+                // Under congestion, drop resolution before frame rate — smoother,
+                // lower perceived lag than a stuttering high-res picture.
+                params.degradationPreference = 'maintain-framerate';
+                const e = params.encodings[0];
                 if (qualityMode === 'hd') {
-                    params.encodings[0].maxBitrate = 6000000;
-                    params.encodings[0].maxFramerate = 30;
+                    e.maxBitrate = 6000000;
+                    e.maxFramerate = 30;
                 } else {
-                    params.encodings[0].maxBitrate = 2000000;
-                    params.encodings[0].maxFramerate = 20;
+                    e.maxBitrate = 1200000;   // small frames = quick to send = low latency
+                    e.maxFramerate = 30;
                 }
+                e.networkPriority = 'high';
+                e.priority = 'high';
                 sender.setParameters(params).catch(() => {});
             } catch (e) { /* not all browsers allow this */ }
         }
@@ -1562,6 +1594,7 @@
                     await pc.setLocalDescription();
                     sendTo(peerId, 'sdp', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
                 }
+                tuneReceiversForLowLatency(pc);
             } catch (err) {
                 console.error('handleSdp error', err);
             }
@@ -2395,8 +2428,19 @@
         }
 
         function getCameraConstraints() {
+            // Low-latency audio: mono, minimal driver buffering. Echo cancellation
+            // stays on to avoid feedback; it adds only a couple of ms.
+            const audioTune = {
+                echoCancellation: true,
+                noiseSuppression: false,   // noise suppression adds ~20–40 ms of delay
+                autoGainControl: true,
+                channelCount: 1,
+                latency: { ideal: 0 }
+            };
             const baseConstraints = {
-                audio: microphoneDeviceId ? { deviceId: { exact: microphoneDeviceId } } : false,
+                audio: microphoneDeviceId
+                    ? { deviceId: { exact: microphoneDeviceId }, ...audioTune }
+                    : false,
                 video: {
                     deviceId: { exact: cameraDeviceId }
                 }
@@ -2410,11 +2454,12 @@
                     frameRate: { ideal: 30, max: 30 }
                 };
             } else {
+                // Small frames at a high frame rate = the lowest end-to-end lag.
                 baseConstraints.video = {
                     ...baseConstraints.video,
-                    width: { ideal: 640, max: 1280 },
-                    height: { ideal: 480, max: 720 },
-                    frameRate: { ideal: 15, max: 15 }
+                    width: { ideal: 480, max: 640 },
+                    height: { ideal: 270, max: 480 },
+                    frameRate: { ideal: 30, max: 30 }
                 };
             }
 
@@ -2474,7 +2519,7 @@
                 hdBtn.style.background = 'rgba(255, 255, 255, 0.1)';
                 hdBtn.style.color = 'white';
                 document.getElementById('hdInfo').style.display = 'none';
-                showStatus('Standard mode: Optimized for mobile and slower connections', 'info');
+                showStatus('Low-latency mode: 480×270 / 30 fps, minimal buffering — least lag', 'info');
             } else {
                 hdBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
                 hdBtn.style.color = '#1a1a2e';
