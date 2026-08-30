@@ -205,7 +205,7 @@
         /* ── Cards grid ── */
         .cards {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 1.1rem;
             margin-top: 1rem;
         }
@@ -219,8 +219,9 @@
             color: inherit;
             transition: transform 0.18s, box-shadow 0.18s, border-top-color 0.18s;
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
             border-top: 4px solid #3498db;
         }
         .card:hover {
@@ -231,7 +232,17 @@
         .card:active {
             transform: translateY(-2px);
         }
-        .card-icon { font-size: 2rem; line-height: 1; }
+        .card-icon { 
+            font-size: 2.5rem; 
+            line-height: 1; 
+            flex-shrink: 0;
+        }
+        .card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
         .card-title { font-weight: 700; font-size: 1rem; color: var(--accent); }
         .card-desc  { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45; }
 
@@ -422,6 +433,24 @@
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
         }
+
+        /* ── Responsive design for mobile ── */
+        @media (max-width: 600px) {
+            .cards {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+            .card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .card-icon {
+                font-size: 2rem;
+            }
+            .card-content {
+                gap: 0.5rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -456,23 +485,31 @@
         <div class="cards">
             <a class="card" href="rocket_ship.html" onclick="return showCardClick('Rocket Ship')">
                 <div class="card-icon">🚀</div>
-                <div class="card-title">Rocket Ship</div>
-                <div class="card-desc">Build your own paper rocket ship step by step.</div>
+                <div class="card-content">
+                    <div class="card-title">Rocket Ship</div>
+                    <div class="card-desc">Build your own paper rocket ship step by step.</div>
+                </div>
             </a>
             <a class="card" href="paper_airplane.html" onclick="return showCardClick('Paper Airplane')">
                 <div class="card-icon">✈️</div>
-                <div class="card-title">Paper Airplane</div>
-                <div class="card-desc">A simple airplane that actually flies well.</div>
+                <div class="card-content">
+                    <div class="card-title">Paper Airplane</div>
+                    <div class="card-desc">A simple airplane that actually flies well.</div>
+                </div>
             </a>
             <a class="card" href="paper_boat.html" onclick="return showCardClick('Paper Boat')">
                 <div class="card-icon">⛵</div>
-                <div class="card-title">Paper Boat</div>
-                <div class="card-desc">Float it on water — perfect for a rainy day.</div>
+                <div class="card-content">
+                    <div class="card-title">Paper Boat</div>
+                    <div class="card-desc">Float it on water — perfect for a rainy day.</div>
+                </div>
             </a>
             <a class="card" href="working_boomerang.html" onclick="return showCardClick('Boomerang')">
                 <div class="card-icon">🪃</div>
-                <div class="card-title">Boomerang</div>
-                <div class="card-desc">A boomerang that actually comes back to you.</div>
+                <div class="card-content">
+                    <div class="card-title">Boomerang</div>
+                    <div class="card-desc">A boomerang that actually comes back to you.</div>
+                </div>
             </a>
         </div>
     </section>
@@ -482,28 +519,38 @@
         <div class="cards">
             <a class="card" href="zombie_shooter.html" onclick="return showCardClick('Zombie Shooter')">
                 <div class="card-icon">🧟</div>
-                <div class="card-title">Zombie Shooter</div>
-                <div class="card-desc">Shoot zombies before they reach you. Survive the waves!</div>
+                <div class="card-content">
+                    <div class="card-title">Zombie Shooter</div>
+                    <div class="card-desc">Shoot zombies before they reach you. Survive the waves!</div>
+                </div>
             </a>
             <a class="card" href="racing_game.html" onclick="return showCardClick('Racing Game')">
                 <div class="card-icon">🏎️</div>
-                <div class="card-title">Racing Game</div>
-                <div class="card-desc">Dodge traffic and see how far you can go.</div>
+                <div class="card-content">
+                    <div class="card-title">Racing Game</div>
+                    <div class="card-desc">Dodge traffic and see how far you can go.</div>
+                </div>
             </a>
             <a class="card" href="player_game.html" onclick="return showCardClick('2 Player Games')">
                 <div class="card-icon">🎮</div>
-                <div class="card-title">2 Player Games</div>
-                <div class="card-desc">Play Pong, Tank Battle and more with a friend.</div>
+                <div class="card-content">
+                    <div class="card-title">2 Player Games</div>
+                    <div class="card-desc">Play Pong, Tank Battle and more with a friend.</div>
+                </div>
             </a>
             <a class="card" href="virtual_pet.html" onclick="return showCardClick('Virtual Pet')">
                 <div class="card-icon">🐾</div>
-                <div class="card-title">Virtual Pet</div>
-                <div class="card-desc">Feed, play with, and teach tricks to your own virtual pet!</div>
+                <div class="card-content">
+                    <div class="card-title">Virtual Pet</div>
+                    <div class="card-desc">Feed, play with, and teach tricks to your own virtual pet!</div>
+                </div>
             </a>
             <a class="card" href="pacman.html" onclick="return showCardClick('Pac-Man')">
                 <div class="card-icon">👾</div>
-                <div class="card-title">Pac-Man</div>
-                <div class="card-desc">Eat all the dots, avoid the ghosts, and chase the high score!</div>
+                <div class="card-content">
+                    <div class="card-title">Pac-Man</div>
+                    <div class="card-desc">Eat all the dots, avoid the ghosts, and chase the high score!</div>
+                </div>
             </a>
         </div>
     </section>
@@ -522,7 +569,7 @@
 <div class="notification-container" id="notificationContainer"></div>
 
 <!-- ── Tools corner button ── -->
-<button id="tools-corner-btn" onclick="openToolsModal()" title="Tools">⚙️</button>
+<button id="tools-corner-btn" onclick="openToolsModal()" title="Tools" style="display: none;">⚙️</button>
 
 <!-- ── Tools modal ── -->
 <div id="tools-modal" onclick="if(event.target===this)closeToolsModal()">
@@ -543,58 +590,80 @@
         <div id="tools-cards">
             <a class="card" href="video-studio.html" onclick="return showCardClick('Video Studio')">
                 <div class="card-icon">🎬</div>
-                <div class="card-title">Video Studio</div>
-                <div class="card-desc">Record from your webcam, trim clips, and upload directly to YouTube.</div>
+                <div class="card-content">
+                    <div class="card-title">Video Studio</div>
+                    <div class="card-desc">Record from your webcam, trim clips, and upload directly to YouTube.</div>
+                </div>
             </a>
             <a class="card" href="magic_tricks.html" onclick="return showCardClick('Magic Tricks')">
                 <div class="card-icon">✨</div>
-                <div class="card-title">Magic Tricks</div>
-                <div class="card-desc">Film your tricks with sparkle effects, or vanish someone from a photo or live video.</div>
+                <div class="card-content">
+                    <div class="card-title">Magic Tricks</div>
+                    <div class="card-desc">Film your tricks with sparkle effects, or vanish someone from a photo or live video.</div>
+                </div>
             </a>
             <a class="card" href="disco.html" onclick="return showCardClick('Disco Mode')">
                 <div class="card-icon">🪩</div>
-                <div class="card-title">Disco Mode</div>
-                <div class="card-desc">Pick a mic and speaker — your voice becomes the light show.</div>
+                <div class="card-content">
+                    <div class="card-title">Disco Mode</div>
+                    <div class="card-desc">Pick a mic and speaker — your voice becomes the light show.</div>
+                </div>
             </a>
             <a class="card" href="walkie_talkie.html" onclick="return showCardClick('Walkie Talkie')">
                 <div class="card-icon">📡</div>
-                <div class="card-title">Walkie Talkie</div>
-                <div class="card-desc">Hold to record your voice, release to play it back with real radio distortion.</div>
+                <div class="card-content">
+                    <div class="card-title">Walkie Talkie</div>
+                    <div class="card-desc">Hold to record your voice, release to play it back with real radio distortion.</div>
+                </div>
             </a>
             <a class="card" href="booklet.html" onclick="return showCardClick('Book Maker')">
                 <div class="card-icon">📖</div>
-                <div class="card-title">Book Maker</div>
-                <div class="card-desc">Design pages and print them in booklet order — fold each sheet and stack to assemble your book.</div>
+                <div class="card-content">
+                    <div class="card-title">Book Maker</div>
+                    <div class="card-desc">Design pages and print them in booklet order — fold each sheet and stack to assemble your book.</div>
+                </div>
             </a>
             <a class="card" href="presentation.html" onclick="return showCardClick('Presentation Maker')">
                 <div class="card-icon">🎤</div>
-                <div class="card-title">Presentation Maker</div>
-                <div class="card-desc">Describe your topic and AI builds the slides instantly — present, edit, or print them.</div>
+                <div class="card-content">
+                    <div class="card-title">Presentation Maker</div>
+                    <div class="card-desc">Describe your topic and AI builds the slides instantly — present, edit, or print them.</div>
+                </div>
             </a>
             <a class="card" href="presenter.html" onclick="return showCardClick('Presenter')">
                 <div class="card-icon">📽️</div>
-                <div class="card-title">Presenter</div>
-                <div class="card-desc">Edit your slides in Windsurf, then present them here in fullscreen with themes and navigation.</div>
+                <div class="card-content">
+                    <div class="card-title">Presenter</div>
+                    <div class="card-desc">Edit your slides in Windsurf, then present them here in fullscreen with themes and navigation.</div>
+                </div>
             </a>
             <div class="card" onclick="openVideoRec()" style="cursor: pointer;">
                 <div class="card-icon">🎥</div>
-                <div class="card-title">Video Rec</div>
-                <div class="card-desc">Screen sharing and recording with admin/user modes. Share screens and record with mic/camera.</div>
+                <div class="card-content">
+                    <div class="card-title">Video Rec</div>
+                    <div class="card-desc">Screen sharing and recording with admin/user modes. Share screens and record with mic/camera.</div>
+                </div>
             </div>
             <div class="card" onclick="openAlarmMode()" style="cursor: pointer;">
                 <div class="card-icon">🚨</div>
-                <div class="card-title">Alarm Mode</div>
-                <div class="card-desc">Create or join a party, sync alarms across devices with flashing screens and siren sounds.</div>
+                <div class="card-content">
+                    <div class="card-title">Alarm Mode</div>
+                    <div class="card-desc">Create or join a party, sync alarms across devices with flashing screens and siren sounds.</div>
+                </div>
             </div>
             <a class="card" href="screen_share.html" onclick="return showCardClick('Screen Share')">
                 <div class="card-icon">🖥️</div>
-                <div class="card-title">Screen Share</div>
-                <div class="card-desc">Mobile-optimized with gaming mode for ultra-low latency. iOS-friendly with capture card support.</div>
+                <div class="card-content">
+                    <div class="card-title">Screen Share</div>
+                    <div class="card-desc">Mobile-optimized with gaming mode for ultra-low latency. iOS-friendly with capture card support.</div>
+                </div>
             </a>
             <a class="card" href="camera_share.html" onclick="return showCardClick('Camera Share')">
                 <div class="card-icon">📷</div>
-                <div class="card-title">Camera Share</div>
-                <div class="card-desc">Live camera streaming between browser tabs with admin controls, zoom, screen share and recording.</div>
+                <div class="card-content">
+                    <div class="card-title">Camera Share</div>
+                    <div class="card-desc">Live camera streaming between browser tabs with admin controls, zoom, screen share and recording.</div>
+                </div>
             </a>
         </div>
     </div>
@@ -749,9 +818,9 @@ function filterCards() {
     const cards = document.querySelectorAll('.card');
     
     cards.forEach(card => {
-        const title = card.querySelector('.card-title').textContent.toLowerCase();
-        const desc = card.querySelector('.card-desc').textContent.toLowerCase();
-        const icon = card.querySelector('.card-icon').textContent;
+        const title = card.querySelector('.card-title')?.textContent.toLowerCase() || '';
+        const desc = card.querySelector('.card-desc')?.textContent.toLowerCase() || '';
+        const icon = card.querySelector('.card-icon')?.textContent || '';
         
         const matches = title.includes(searchTerm) || desc.includes(searchTerm) || icon.includes(searchTerm);
         card.style.display = matches ? 'flex' : 'none';
