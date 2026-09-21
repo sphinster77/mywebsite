@@ -269,7 +269,7 @@
         <p>Play piano with keyboard numbers • Change octaves & instruments</p>
     </div>
 
-    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8, 9, 0, Q, W, E or click piano keys (realistic sounds)</div>
+    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8 for white keys, A/S/D/F/G for black keys (realistic sounds)</div>
 
     <div class="controls">
         <div class="control-group">
@@ -369,10 +369,12 @@
                         audioContext.resume();
                     }
                     audioEnabled = true;
-                    document.getElementById('status').textContent = 'Audio enabled! Use keys 1-8, 9, 0, Q, W, E or click piano keys to play.';
+                    document.getElementById('status').textContent = 'Audio enabled! Use keys 1-8 for white keys, A/S/D/F/G for black keys.';
                     document.getElementById('status').style.background = 'rgba(46, 204, 113, 0.2)';
                     document.getElementById('status').style.color = '#2ecc71';
+                    console.log('Audio context created:', audioContext);
                 } catch (e) {
+                    console.error('Audio initialization error:', e);
                     document.getElementById('status').textContent = 'Audio not supported in this browser. Please try Chrome or Firefox.';
                     document.getElementById('status').style.background = 'rgba(231, 76, 60, 0.2)';
                     document.getElementById('status').style.color = '#e74c3c';
