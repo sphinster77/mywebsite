@@ -112,6 +112,8 @@
             padding: 20px 10px 10px;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: fit-content;
+            min-width: 400px;
         }
 
         .key {
@@ -141,6 +143,7 @@
             border: 1px solid #ccc;
             margin: 0 2px;
             box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+            position: relative;
         }
 
         .white-key:active, .white-key.active {
@@ -149,8 +152,8 @@
         }
 
         .black-key {
-            width: 35px;
-            height: 110px;
+            width: 30px;
+            height: 100px;
             background: linear-gradient(to bottom, #333 0%, #1a1a1a 100%);
             color: white;
             position: absolute;
@@ -245,8 +248,8 @@
             }
 
             .black-key {
-                width: 28px;
-                height: 90px;
+                width: 25px;
+                height: 80px;
             }
 
             .controls {
@@ -266,7 +269,7 @@
         <p>Play piano with keyboard numbers • Change octaves & instruments</p>
     </div>
 
-    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8 or click piano keys</div>
+    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8, 9, 0, Q, W, E or click piano keys (no ringing)</div>
 
     <div class="controls">
         <div class="control-group">
@@ -306,16 +309,21 @@
 
     <div class="instructions">
         <h3>🎹 How to Play</h3>
-        <p>Use number keys on your keyboard to play notes. Click on piano keys with your mouse or touch.</p>
+        <p>Use number keys and letter keys on your keyboard to play notes. Click on piano keys with your mouse or touch.</p>
         <div class="key-mapping">
-            <div class="key-mapping-item"><kbd>1</kbd> Do</div>
-            <div class="key-mapping-item"><kbd>2</kbd> Re</div>
-            <div class="key-mapping-item"><kbd>3</kbd> Mi</div>
-            <div class="key-mapping-item"><kbd>4</kbd> Fa</div>
-            <div class="key-mapping-item"><kbd>5</kbd> Sol</div>
-            <div class="key-mapping-item"><kbd>6</kbd> La</div>
-            <div class="key-mapping-item"><kbd>7</kbd> Si</div>
-            <div class="key-mapping-item"><kbd>8</kbd> Do+</div>
+            <div class="key-mapping-item"><kbd>1</kbd> C</div>
+            <div class="key-mapping-item"><kbd>2</kbd> C#</div>
+            <div class="key-mapping-item"><kbd>3</kbd> D</div>
+            <div class="key-mapping-item"><kbd>4</kbd> D#</div>
+            <div class="key-mapping-item"><kbd>5</kbd> E</div>
+            <div class="key-mapping-item"><kbd>6</kbd> F</div>
+            <div class="key-mapping-item"><kbd>7</kbd> F#</div>
+            <div class="key-mapping-item"><kbd>8</kbd> G</div>
+            <div class="key-mapping-item"><kbd>9</kbd> G#</div>
+            <div class="key-mapping-item"><kbd>0</kbd> A</div>
+            <div class="key-mapping-item"><kbd>Q</kbd> A#</div>
+            <div class="key-mapping-item"><kbd>W</kbd> B</div>
+            <div class="key-mapping-item"><kbd>E</kbd> C+</div>
         </div>
         <p style="margin-top: 15px;">Use <strong>+/-</strong> buttons or <kbd>Z</kbd>/<kbd>X</kbd> keys to change octaves.</p>
     </div>
@@ -328,25 +336,23 @@
         let volume = 0.7;
         let audioEnabled = false;
 
-        // Simple note frequencies (C4 scale)
+        // Note frequencies (full chromatic scale)
         const noteFrequencies = {
-            'C': 261.63,
-            'D': 293.66,
-            'E': 329.63,
-            'F': 349.23,
-            'G': 392.00,
-            'A': 440.00,
-            'B': 493.88,
-            'C2': 523.25  // High C
+            'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+            'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+            'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88,
+            'C2': 523.25
         };
 
-        // Note names and order
-        const noteOrder = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2'];
+        // Note names and order (with black keys)
+        const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C2'];
 
-        // Simple keyboard mapping
+        // Keyboard mapping (more keys)
         const keyMapping = {
-            '1': 'C', '2': 'D', '3': 'E', '4': 'F', 
-            '5': 'G', '6': 'A', '7': 'B', '8': 'C2'
+            '1': 'C', '2': 'C#', '3': 'D', '4': 'D#',
+            '5': 'E', '6': 'F', '7': 'F#', '8': 'G',
+            '9': 'G#', '0': 'A', 'q': 'A#', 'w': 'B',
+            'e': 'C2'
         };
 
         // Enable audio on first interaction
@@ -358,7 +364,7 @@
                         audioContext.resume();
                     }
                     audioEnabled = true;
-                    document.getElementById('status').textContent = 'Audio enabled! Use keys 1-8 or click piano keys to play.';
+                    document.getElementById('status').textContent = 'Audio enabled! Use keys 1-8, 9, 0, Q, W, E or click piano keys to play.';
                     document.getElementById('status').style.background = 'rgba(46, 204, 113, 0.2)';
                     document.getElementById('status').style.color = '#2ecc71';
                 } catch (e) {
@@ -369,7 +375,7 @@
             }
         }
 
-        // Simple note playing function
+        // Simple note playing function with no ringing
         function playNote(noteName) {
             if (!audioEnabled) {
                 enableAudio();
@@ -387,43 +393,46 @@
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
 
-                // Set instrument sound
+                // Ultra-short duration to eliminate ringing completely
+                const duration = 0.15; // Very short, staccato notes
+
+                // Set instrument sound with instant attack and hard stop
                 switch (currentInstrument) {
                     case 'piano':
                         oscillator.type = 'triangle';
                         gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
                         break;
                     case 'guitar':
                         oscillator.type = 'sawtooth';
                         gainNode.gain.setValueAtTime(volume * 0.5, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.5);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
                         break;
                     case 'ukulele':
                         oscillator.type = 'sine';
                         gainNode.gain.setValueAtTime(volume * 0.7, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration * 0.8);
                         break;
                     case 'bass':
                         oscillator.type = 'sawtooth';
                         oscillator.frequency.setValueAtTime(frequency / 2, audioContext.currentTime);
                         gainNode.gain.setValueAtTime(volume * 0.8, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.2);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
                         break;
                     case 'electric-guitar':
                         oscillator.type = 'square';
                         gainNode.gain.setValueAtTime(volume * 0.4, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration * 1.2);
                         break;
                     default:
                         oscillator.type = 'triangle';
                         gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
                 }
 
                 oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
                 oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 2);
+                oscillator.stop(audioContext.currentTime + duration);
 
                 console.log('Playing:', noteName, 'at', frequency.toFixed(2) + 'Hz');
 
@@ -438,25 +447,44 @@
             const piano = document.getElementById('piano');
             piano.innerHTML = '';
 
-            const keyNumbers = ['1', '2', '3', '4', '5', '6', '7', '8'];
+            const keyMappingArray = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'q', 'w', 'e'];
+            let whiteKeyCounter = 0;
+            const whiteKeyWidth = 54; // 50px + 4px margin
+
+            // Black key positions (which white key index they come after)
+            const blackKeyPositions = {
+                'C#': 0, 'D#': 1, 'F#': 3, 'G#': 4, 'A#': 5
+            };
 
             noteOrder.forEach((note, index) => {
+                const isBlack = note.includes('#');
                 const key = document.createElement('div');
-                key.className = 'key white-key';
+                key.className = isBlack ? 'key black-key' : 'key white-key';
                 key.dataset.note = note;
 
-                key.innerHTML = `
-                    <span class="key-number">${keyNumbers[index]}</span>
-                    <span class="key-name">${note}</span>
-                `;
+                if (!isBlack) {
+                    const keyNumber = keyMappingArray[whiteKeyCounter] || '';
+                    key.innerHTML = `
+                        <span class="key-number">${keyNumber}</span>
+                        <span class="key-name">${note}</span>
+                    `;
+                    piano.appendChild(key);
+                    whiteKeyCounter++;
+                } else {
+                    // Position black key between white keys
+                    const whiteKeyPos = blackKeyPositions[note];
+                    const position = (whiteKeyPos * whiteKeyWidth) + (whiteKeyWidth / 2) - 15; // Center between white keys
+                    key.style.position = 'absolute';
+                    key.style.left = position + 'px';
+                    key.innerHTML = `<span class="key-name">${note}</span>`;
+                    piano.appendChild(key);
+                }
 
                 key.addEventListener('mousedown', () => playNote(note));
                 key.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     playNote(note);
                 });
-
-                piano.appendChild(key);
             });
         }
 
@@ -482,11 +510,11 @@
                 playNote(note);
 
                 // Visual feedback
-                const keys = document.querySelectorAll('.white-key');
+                const allKeys = document.querySelectorAll('.key');
                 const keyIndex = noteOrder.indexOf(note);
-                if (keys[keyIndex]) {
-                    keys[keyIndex].classList.add('active');
-                    setTimeout(() => keys[keyIndex].classList.remove('active'), 200);
+                if (allKeys[keyIndex]) {
+                    allKeys[keyIndex].classList.add('active');
+                    setTimeout(() => allKeys[keyIndex].classList.remove('active'), 200);
                 }
             }
         });
