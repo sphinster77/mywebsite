@@ -269,7 +269,7 @@
         <p>Play piano with keyboard numbers • Change octaves & instruments</p>
     </div>
 
-    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8, 9, 0, Q, W, E or click piano keys (no ringing)</div>
+    <div class="status" id="status">Click anywhere to enable audio, then use keys 1-8, 9, 0, Q, W, E or click piano keys (realistic sounds)</div>
 
     <div class="controls">
         <div class="control-group">
@@ -387,52 +387,26 @@
                 const octaveMultiplier = Math.pow(2, currentOctave - 4);
                 const frequency = baseFreq * octaveMultiplier;
 
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-
-                // Ultra-short duration to eliminate ringing completely
-                const duration = 0.15; // Very short, staccato notes
-
-                // Set instrument sound with instant attack and hard stop
+                // Create more realistic synthesis based on instrument
                 switch (currentInstrument) {
                     case 'piano':
-                        oscillator.type = 'triangle';
-                        gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
+                        playPianoSound(frequency);
                         break;
                     case 'guitar':
-                        oscillator.type = 'sawtooth';
-                        gainNode.gain.setValueAtTime(volume * 0.5, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
+                        playGuitarSound(frequency);
                         break;
                     case 'ukulele':
-                        oscillator.type = 'sine';
-                        gainNode.gain.setValueAtTime(volume * 0.7, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration * 0.8);
+                        playUkuleleSound(frequency);
                         break;
                     case 'bass':
-                        oscillator.type = 'sawtooth';
-                        oscillator.frequency.setValueAtTime(frequency / 2, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(volume * 0.8, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
+                        playBassSound(frequency);
                         break;
                     case 'electric-guitar':
-                        oscillator.type = 'square';
-                        gainNode.gain.setValueAtTime(volume * 0.4, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration * 1.2);
+                        playElectricGuitarSound(frequency);
                         break;
                     default:
-                        oscillator.type = 'triangle';
-                        gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
+                        playPianoSound(frequency);
                 }
-
-                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + duration);
 
                 console.log('Playing:', noteName, 'at', frequency.toFixed(2) + 'Hz');
 
@@ -440,6 +414,196 @@
                 console.error('Error playing note:', error);
                 document.getElementById('status').textContent = 'Error playing sound: ' + error.message;
             }
+        }
+
+        // Realistic piano synthesis with harmonics
+        function playPianoSound(frequency) {
+            const duration = 0.5;
+            const now = audioContext.currentTime;
+
+            // Create multiple oscillators for rich harmonics
+            const harmonics = [1, 2, 3, 4, 5, 6];
+            const harmonicGains = [1.0, 0.5, 0.3, 0.2, 0.1, 0.05];
+
+            harmonics.forEach((harmonic, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequency * harmonic, now);
+                
+                // Piano envelope: fast attack, quick decay, slight sustain
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(harmonicGains[i] * volume * 0.3, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.start(now);
+                osc.stop(now + duration);
+            });
+        }
+
+        // Realistic guitar synthesis
+        function playGuitarSound(frequency) {
+            const duration = 0.8;
+            const now = audioContext.currentTime;
+
+            // String-like synthesis with pluck envelope
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(frequency, now);
+
+            // Filter to shape like a guitar body
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(2000, now);
+            filter.Q.setValueAtTime(1, now);
+
+            // Pluck envelope: fast attack, exponential decay
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        // Realistic ukulele synthesis
+        function playUkuleleSound(frequency) {
+            const duration = 0.6;
+            const now = audioContext.currentTime;
+
+            // Nylon string sound with softer envelope
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, now);
+
+            // Warmer filter for nylon string sound
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1500, now);
+            filter.Q.setValueAtTime(0.5, now);
+
+            // Softer pluck envelope
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.6, now + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        // Realistic bass synthesis
+        function playBassSound(frequency) {
+            const duration = 1.0;
+            const now = audioContext.currentTime;
+
+            // Deep bass with sub oscillator effect
+            const mainOsc = audioContext.createOscillator();
+            const subOsc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const subGain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            // Main oscillator
+            mainOsc.type = 'sawtooth';
+            mainOsc.frequency.setValueAtTime(frequency / 2, now);
+
+            // Sub oscillator an octave lower for depth
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(frequency / 4, now);
+
+            // Low-pass filter for bass character
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, now);
+            filter.Q.setValueAtTime(2, now);
+
+            // Bass envelope with sustain
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.8, now + 0.02);
+            gain.gain.linearRampToValueAtTime(volume * 0.6, now + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            subGain.gain.setValueAtTime(volume * 0.3, now);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            mainOsc.connect(filter);
+            subOsc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            mainOsc.start(now);
+            mainOsc.stop(now + duration);
+            subOsc.start(now);
+            subOsc.stop(now + duration);
+        }
+
+        // Realistic electric guitar synthesis
+        function playElectricGuitarSound(frequency) {
+            const duration = 1.2;
+            const now = audioContext.currentTime;
+
+            // Distorted electric guitar with harmonics
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+            const distortion = audioContext.createWaveShaper();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(frequency, now);
+
+            // Add distortion for electric guitar character
+            distortion.curve = makeDistortionCurve(50);
+            distortion.oversample = 4;
+
+            // High-pass filter for brightness
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(1000, now);
+            filter.Q.setValueAtTime(1, now);
+
+            // Sustained electric guitar envelope
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.3, now + 0.01);
+            gain.gain.linearRampToValueAtTime(volume * 0.25, now + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(distortion);
+            distortion.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        // Create distortion curve for electric guitar
+        function makeDistortionCurve(amount) {
+            const k = typeof amount === 'number' ? amount : 50;
+            const n_samples = 44100;
+            const curve = new Float32Array(n_samples);
+            const deg = Math.PI / 180;
+
+            for (let i = 0; i < n_samples; ++i) {
+                const x = i * 2 / n_samples - 1;
+                curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+            }
+
+            return curve;
+        }
         }
 
         // Generate piano keys
