@@ -280,6 +280,11 @@
                 <option value="ukulele">🪕 Ukulele</option>
                 <option value="bass">🎸 Bass</option>
                 <option value="electric-guitar">⚡ Electric Guitar</option>
+                <option value="organ">🎛️ Organ</option>
+                <option value="flute">🎵 Flute</option>
+                <option value="strings">🎻 Strings</option>
+                <option value="brass">🎺 Brass</option>
+                <option value="synth">🎛️ Synth</option>
             </select>
         </div>
 
@@ -309,21 +314,21 @@
 
     <div class="instructions">
         <h3>🎹 How to Play</h3>
-        <p>Use number keys and letter keys on your keyboard to play notes. Click on piano keys with your mouse or touch.</p>
+        <p>Use number keys for white keys and letter keys for black keys. Click on piano keys with your mouse or touch.</p>
         <div class="key-mapping">
             <div class="key-mapping-item"><kbd>1</kbd> C</div>
-            <div class="key-mapping-item"><kbd>2</kbd> C#</div>
-            <div class="key-mapping-item"><kbd>3</kbd> D</div>
-            <div class="key-mapping-item"><kbd>4</kbd> D#</div>
-            <div class="key-mapping-item"><kbd>5</kbd> E</div>
-            <div class="key-mapping-item"><kbd>6</kbd> F</div>
-            <div class="key-mapping-item"><kbd>7</kbd> F#</div>
-            <div class="key-mapping-item"><kbd>8</kbd> G</div>
-            <div class="key-mapping-item"><kbd>9</kbd> G#</div>
-            <div class="key-mapping-item"><kbd>0</kbd> A</div>
-            <div class="key-mapping-item"><kbd>Q</kbd> A#</div>
-            <div class="key-mapping-item"><kbd>W</kbd> B</div>
-            <div class="key-mapping-item"><kbd>E</kbd> C+</div>
+            <div class="key-mapping-item"><kbd>A</kbd> C#</div>
+            <div class="key-mapping-item"><kbd>2</kbd> D</div>
+            <div class="key-mapping-item"><kbd>S</kbd> D#</div>
+            <div class="key-mapping-item"><kbd>3</kbd> E</div>
+            <div class="key-mapping-item"><kbd>4</kbd> F</div>
+            <div class="key-mapping-item"><kbd>D</kbd> F#</div>
+            <div class="key-mapping-item"><kbd>5</kbd> G</div>
+            <div class="key-mapping-item"><kbd>F</kbd> G#</div>
+            <div class="key-mapping-item"><kbd>6</kbd> A</div>
+            <div class="key-mapping-item"><kbd>G</kbd> A#</div>
+            <div class="key-mapping-item"><kbd>7</kbd> B</div>
+            <div class="key-mapping-item"><kbd>8</kbd> C+</div>
         </div>
         <p style="margin-top: 15px;">Use <strong>+/-</strong> buttons or <kbd>Z</kbd>/<kbd>X</kbd> keys to change octaves.</p>
     </div>
@@ -347,12 +352,12 @@
         // Note names and order (with black keys)
         const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C2'];
 
-        // Keyboard mapping (more keys)
+        // Keyboard mapping (numbers for white keys, letters for black keys)
         const keyMapping = {
-            '1': 'C', '2': 'C#', '3': 'D', '4': 'D#',
-            '5': 'E', '6': 'F', '7': 'F#', '8': 'G',
-            '9': 'G#', '0': 'A', 'q': 'A#', 'w': 'B',
-            'e': 'C2'
+            '1': 'C', 'a': 'C#', '2': 'D', 's': 'D#',
+            '3': 'E', '4': 'F', 'd': 'F#', '5': 'G',
+            'f': 'G#', '6': 'A', 'g': 'A#', '7': 'B',
+            '8': 'C2'
         };
 
         // Enable audio on first interaction
@@ -404,6 +409,21 @@
                     case 'electric-guitar':
                         playElectricGuitarSound(frequency);
                         break;
+                    case 'organ':
+                        playOrganSound(frequency);
+                        break;
+                    case 'flute':
+                        playFluteSound(frequency);
+                        break;
+                    case 'strings':
+                        playStringsSound(frequency);
+                        break;
+                    case 'brass':
+                        playBrassSound(frequency);
+                        break;
+                    case 'synth':
+                        playSynthSound(frequency);
+                        break;
                     default:
                         playPianoSound(frequency);
                 }
@@ -418,12 +438,12 @@
 
         // Realistic piano synthesis with harmonics
         function playPianoSound(frequency) {
-            const duration = 0.5;
+            const duration = 0.6;
             const now = audioContext.currentTime;
 
             // Create multiple oscillators for rich harmonics
-            const harmonics = [1, 2, 3, 4, 5, 6];
-            const harmonicGains = [1.0, 0.5, 0.3, 0.2, 0.1, 0.05];
+            const harmonics = [1, 2, 3, 4, 5, 6, 8, 10];
+            const harmonicGains = [1.0, 0.7, 0.5, 0.3, 0.2, 0.15, 0.1, 0.05];
 
             harmonics.forEach((harmonic, i) => {
                 const osc = audioContext.createOscillator();
@@ -432,9 +452,10 @@
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(frequency * harmonic, now);
                 
-                // Piano envelope: fast attack, quick decay, slight sustain
+                // Realistic piano envelope: fast attack, quick decay, slight sustain
                 gain.gain.setValueAtTime(0, now);
-                gain.gain.linearRampToValueAtTime(harmonicGains[i] * volume * 0.3, now + 0.02);
+                gain.gain.linearRampToValueAtTime(harmonicGains[i] * volume * 0.25, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(harmonicGains[i] * volume * 0.15, now + 0.05);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
                 
                 osc.connect(gain);
@@ -447,7 +468,7 @@
 
         // Realistic guitar synthesis
         function playGuitarSound(frequency) {
-            const duration = 0.8;
+            const duration = 1.0;
             const now = audioContext.currentTime;
 
             // String-like synthesis with pluck envelope
@@ -460,12 +481,13 @@
 
             // Filter to shape like a guitar body
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(2000, now);
-            filter.Q.setValueAtTime(1, now);
+            filter.frequency.setValueAtTime(2500, now);
+            filter.Q.setValueAtTime(1.5, now);
 
             // Pluck envelope: fast attack, exponential decay
             gain.gain.setValueAtTime(0, now);
             gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.01);
+            gain.gain.linearRampToValueAtTime(volume * 0.3, now + 0.05);
             gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
             osc.connect(filter);
@@ -478,7 +500,7 @@
 
         // Realistic ukulele synthesis
         function playUkuleleSound(frequency) {
-            const duration = 0.6;
+            const duration = 0.8;
             const now = audioContext.currentTime;
 
             // Nylon string sound with softer envelope
@@ -491,12 +513,13 @@
 
             // Warmer filter for nylon string sound
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(1500, now);
-            filter.Q.setValueAtTime(0.5, now);
+            filter.frequency.setValueAtTime(2000, now);
+            filter.Q.setValueAtTime(0.8, now);
 
             // Softer pluck envelope
             gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(volume * 0.6, now + 0.015);
+            gain.gain.linearRampToValueAtTime(volume * 0.6, now + 0.02);
+            gain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.05);
             gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
             osc.connect(filter);
@@ -605,12 +628,196 @@
             return curve;
         }
 
+        // Realistic organ synthesis
+        function playOrganSound(frequency) {
+            const duration = 0.8;
+            const now = audioContext.currentTime;
+
+            // Organ with drawbar-like harmonics
+            const harmonics = [1, 2, 3, 4, 6, 8];
+            const harmonicGains = [0.8, 0.6, 0.4, 0.3, 0.2, 0.1];
+
+            harmonics.forEach((harmonic, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequency * harmonic, now);
+                
+                // Organ envelope: fast attack, sustained, quick release
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(harmonicGains[i] * volume * 0.4, now + 0.01);
+                gain.gain.linearRampToValueAtTime(harmonicGains[i] * volume * 0.35, now + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.start(now);
+                osc.stop(now + duration);
+            });
+        }
+
+        // Realistic flute synthesis
+        function playFluteSound(frequency) {
+            const duration = 0.6;
+            const now = audioContext.currentTime;
+
+            // Flute with breath-like characteristics
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const vibrato = audioContext.createOscillator();
+            const vibratoGain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(frequency, now);
+
+            // Add subtle vibrato for realism
+            vibrato.type = 'sine';
+            vibrato.frequency.setValueAtTime(5, now); // 5Hz vibrato
+            vibratoGain.gain.setValueAtTime(3, now); // 3Hz depth
+            vibrato.connect(vibratoGain);
+            vibratoGain.connect(osc.frequency);
+
+            // Breath noise filter
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, now);
+            filter.Q.setValueAtTime(0.5, now);
+
+            // Flute envelope: breathy attack, smooth decay
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+            vibrato.start(now);
+            vibrato.stop(now + duration);
+        }
+
+        // Realistic strings synthesis
+        function playStringsSound(frequency) {
+            const duration = 1.2;
+            const now = audioContext.currentTime;
+
+            // String section with multiple layers
+            const numStrings = 4;
+            for (let i = 0; i < numStrings; i++) {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                const filter = audioContext.createBiquadFilter();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(frequency, now);
+                
+                // Slight detune for richness
+                osc.detune.setValueAtTime((Math.random() - 0.5) * 10, now);
+
+                // Warm filter for strings
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(2500, now);
+                filter.Q.setValueAtTime(0.5, now);
+
+                // Strings envelope: slow attack, long sustain
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(volume * 0.15, now + 0.1);
+                gain.gain.linearRampToValueAtTime(volume * 0.12, now + 0.3);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+            }
+        }
+
+        // Realistic brass synthesis
+        function playBrassSound(frequency) {
+            const duration = 0.8;
+            const now = audioContext.currentTime;
+
+            // Brass with buzzy characteristics
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(frequency, now);
+
+            // Bright filter for brass
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(4000, now);
+            filter.Q.setValueAtTime(2, now);
+
+            // Brass envelope: sharp attack, quick decay
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.02);
+            gain.gain.linearRampToValueAtTime(volume * 0.3, now + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        // Synth lead synthesis
+        function playSynthSound(frequency) {
+            const duration = 0.6;
+            const now = audioContext.currentTime;
+
+            // Modern synth with detuned oscillators
+            const osc1 = audioContext.createOscillator();
+            const osc2 = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(frequency, now);
+            osc1.detune.setValueAtTime(7, now); // Detune +7 cents
+
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(frequency, now);
+            osc2.detune.setValueAtTime(-7, now); // Detune -7 cents
+
+            // Synth filter with resonance
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, now);
+            filter.Q.setValueAtTime(5, now); // High resonance
+
+            // Synth envelope: punchy attack
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.01);
+            gain.gain.linearRampToValueAtTime(volume * 0.3, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc1.start(now);
+            osc1.stop(now + duration);
+            osc2.start(now);
+            osc2.stop(now + duration);
+        }
+
         // Generate piano keys
         function generatePiano() {
             const piano = document.getElementById('piano');
             piano.innerHTML = '';
 
-            const keyMappingArray = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'q', 'w', 'e'];
+            const whiteKeyMapping = ['1', '2', '3', '4', '5', '6', '7', '8'];
+            const blackKeyMapping = { 'C#': 'A', 'D#': 'S', 'F#': 'D', 'G#': 'F', 'A#': 'G' };
             let whiteKeyCounter = 0;
             const whiteKeyWidth = 54; // 50px + 4px margin
 
@@ -626,7 +833,7 @@
                 key.dataset.note = note;
 
                 if (!isBlack) {
-                    const keyNumber = keyMappingArray[whiteKeyCounter] || '';
+                    const keyNumber = whiteKeyMapping[whiteKeyCounter] || '';
                     key.innerHTML = `
                         <span class="key-number">${keyNumber}</span>
                         <span class="key-name">${note}</span>
@@ -639,7 +846,8 @@
                     const position = (whiteKeyPos * whiteKeyWidth) + (whiteKeyWidth / 2) - 15; // Center between white keys
                     key.style.position = 'absolute';
                     key.style.left = position + 'px';
-                    key.innerHTML = `<span class="key-name">${note}</span>`;
+                    const blackKeyLetter = blackKeyMapping[note] || '';
+                    key.innerHTML = `<span class="key-number">${blackKeyLetter}</span><span class="key-name">${note}</span>`;
                     piano.appendChild(key);
                 }
 
