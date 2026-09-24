@@ -381,6 +381,10 @@
             display: none;
         }
 
+        body.chat-open #chat {
+            display: block;
+        }
+
         #chat-messages {
             height: 200px;
             overflow-y: auto;
@@ -644,7 +648,7 @@
                 <span>Players: <span class="player-count" id="player-count">1</span></span>
             </div>
             
-            <div id="chat" style="display: none;">
+            <div id="chat">
                 <div id="chat-messages"></div>
                 <div id="chat-input-container">
                     <input type="text" id="chat-input" placeholder="Type to chat (type 'admin' for admin)">
@@ -717,6 +721,7 @@
 
         // Block types with colors
         const blockTypes = {
+            grass: { color: 0x3CB043, emoji: '🌱' },
             stone: { color: 0x808080, emoji: '🪨' },
             dirt: { color: 0x8B4513, emoji: '🟫' },
             wood: { color: 0x8B4513, emoji: '🪵' },
@@ -753,7 +758,6 @@
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 toggleFullscreen();
             }
-            document.getElementById('chat').style.display = 'block';
             document.getElementById('loading').style.display = 'block';
 
             // Initialize Three.js
@@ -762,6 +766,9 @@
             if (isTablet()) {
                 initTouchControls();
             }
+
+            // Capture the mouse right away (the Start click counts as the required gesture)
+            requestPointerLock();
 
             // Generate world
             setTimeout(() => {
@@ -823,7 +830,10 @@
             // Event listeners
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('pointerlockchange', onPointerLockChange);
-            document.getElementById('canvas').addEventListener('click', requestPointerLock);
+            document.getElementById('canvas').addEventListener('click', () => {
+                if (gameState.chatOpen && !isTablet()) closeChat();
+                else requestPointerLock();
+            });
 
             // Keyboard controls
             document.addEventListener('keydown', onKeyDown);
@@ -847,56 +857,116 @@
             });
         }
 
-        function generateWorld(seed) {
-            // Simple world generation
-            const worldSize = 50;
-            const noise = simpleNoise(seed);
+        // world holds every block's type; blocks holds only the meshes for blocks
+        // that touch air, which keeps the scene small enough to run smoothly
+        let world = {};
+        const blockGeometry = () => blockGeometry.cached || (blockGeometry.cached = new THREE.BoxGeometry(1, 1, 1));
+        const blockMaterials = {};
+        const neighborOffsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
+        function keyOf(x, y, z) {
+            return `${x},${y},${z}`;
+        }
+
+        function hashSeed(seed) {
+            let h = 0;
+            for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) | 0;
+            return h;
+        }
+
+        function generateWorld(seed) {
+            const worldSize = 32;
+            const h = hashSeed(seed);
+            const ox = (h % 1000) / 100;
+            const oz = ((h >> 10) % 1000) / 100;
+
+            world = {};
             for (let x = -worldSize; x < worldSize; x++) {
                 for (let z = -worldSize; z < worldSize; z++) {
-                    const height = Math.floor(noise(x * 0.1, z * 0.1) * 10) + 5;
-                    
+                    const height = Math.max(2, Math.floor(
+                        7 + 3 * Math.sin(x * 0.12 + ox) * Math.cos(z * 0.12 + oz)
+                          + 2 * Math.sin(x * 0.05 - oz) + 1.5 * Math.cos(z * 0.07 + ox)
+                    ));
+
                     for (let y = 0; y <= height; y++) {
                         let blockType = 'stone';
                         if (y === height) blockType = 'grass';
                         else if (y > height - 3) blockType = 'dirt';
-                        
-                        createBlock(x, y, z, blockType);
+                        world[keyOf(x, y, z)] = blockType;
                     }
 
-                    // Add some trees
-                    if (Math.random() < 0.02 && height > 3) {
+                    // Add some trees (not at the spawn point or the world edge)
+                    if (Math.random() < 0.02 && height > 3 && Math.abs(x) > 3 && Math.abs(z) > 3
+                        && Math.abs(x) < worldSize - 3 && Math.abs(z) < worldSize - 3) {
                         createTree(x, height + 1, z);
                     }
                 }
             }
+
+            Object.keys(world).forEach(key => {
+                const [x, y, z] = key.split(',').map(Number);
+                refreshBlock(x, y, z);
+            });
+
+            // Spawn on top of the terrain at the origin
+            let top = 0;
+            while (world[keyOf(0, top + 1, 0)]) top++;
+            player.position.set(0, top + 0.5 + 1 + 0.05, 0);
+            velocityY = 0;
+        }
+
+        function isExposed(x, y, z) {
+            return neighborOffsets.some(([dx, dy, dz]) => y + dy >= 0 && !world[keyOf(x + dx, y + dy, z + dz)]);
+        }
+
+        // Make the mesh for (x,y,z) exist only if the block is there and touches air
+        function refreshBlock(x, y, z) {
+            const key = keyOf(x, y, z);
+            const type = world[key];
+            const mesh = blocks[key];
+
+            if (mesh && (!type || mesh.userData.type !== type)) {
+                scene.remove(mesh);
+                delete blocks[key];
+            }
+            if (type && !blocks[key] && isExposed(x, y, z)) {
+                if (!blockMaterials[type]) {
+                    blockMaterials[type] = new THREE.MeshLambertMaterial({ color: blockTypes[type].color });
+                }
+                const block = new THREE.Mesh(blockGeometry(), blockMaterials[type]);
+                block.position.set(x, y, z);
+                block.userData = { type: type };
+                scene.add(block);
+                blocks[key] = block;
+            } else if (type && blocks[key] && !isExposed(x, y, z)) {
+                scene.remove(blocks[key]);
+                delete blocks[key];
+            }
+        }
+
+        function refreshAround(x, y, z) {
+            refreshBlock(x, y, z);
+            neighborOffsets.forEach(([dx, dy, dz]) => refreshBlock(x + dx, y + dy, z + dz));
         }
 
         function createBlock(x, y, z, type) {
-            const blockType = blockTypes[type];
-            const geometry = new THREE.BoxGeometry(1, 1, 1);
-            const material = new THREE.MeshLambertMaterial({ color: blockType.color });
-            const block = new THREE.Mesh(geometry, material);
-            block.position.set(x, y, z);
-            block.castShadow = true;
-            block.receiveShadow = true;
-            block.userData = { type: type };
-            scene.add(block);
-            blocks[`${x},${y},${z}`] = block;
+            world[keyOf(x, y, z)] = type;
+            refreshAround(x, y, z);
         }
 
         function createTree(x, y, z) {
             // Trunk
             for (let i = 0; i < 4; i++) {
-                createBlock(x, y + i, z, 'wood');
+                world[keyOf(x, y + i, z)] = 'wood';
             }
-            
+
             // Leaves
             for (let dx = -2; dx <= 2; dx++) {
                 for (let dz = -2; dz <= 2; dz++) {
                     for (let dy = 3; dy <= 5; dy++) {
                         if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                        createBlock(x + dx, y + dy, z + dz, 'leaves');
+                        const key = keyOf(x + dx, y + dy, z + dz);
+                        if (!world[key]) world[key] = 'leaves';
                     }
                 }
             }
@@ -993,28 +1063,29 @@
         // Player movement
         const keys = {};
         const moveSpeed = 0.15;
-        const jumpForce = 0.3;
+        const jumpForce = 0.17;
         let velocityY = 0;
         let isJumping = false;
 
         function onKeyDown(event) {
+            // While chatting, keys go to the chat box only
+            if (gameState.chatOpen) {
+                if (event.key === 'Escape') closeChat();
+                return;
+            }
+
             keys[event.key.toLowerCase()] = true;
-            
+
             // Number keys for inventory
             if (event.key >= '1' && event.key <= '9') {
                 const index = parseInt(event.key) - 1;
                 selectInventorySlot(index);
             }
-            
-            // Chat toggle
-            if (event.key.toLowerCase() === 't' && !gameState.chatOpen) {
+
+            // Chat toggle (preventDefault keeps the key from being typed into the box)
+            if (gameState.isRunning && (event.key.toLowerCase() === 't' || event.key === 'Enter')) {
                 event.preventDefault();
                 openChat();
-            }
-            
-            // Close chat with ESC
-            if (event.key === 'Escape' && gameState.chatOpen) {
-                closeChat();
             }
         }
 
@@ -1025,12 +1096,16 @@
         // Chat functions
         function openChat() {
             gameState.chatOpen = true;
-            document.getElementById('chat-input').focus();
+            document.body.classList.add('chat-open');
+            // Stop any held movement keys so the player doesn't keep walking
+            Object.keys(keys).forEach(k => { keys[k] = false; });
             if (document.exitPointerLock) document.exitPointerLock();
+            document.getElementById('chat-input').focus();
         }
 
         function closeChat() {
             gameState.chatOpen = false;
+            document.body.classList.remove('chat-open');
             document.getElementById('chat-input').blur();
             requestPointerLock();
         }
@@ -1060,6 +1135,9 @@
                 
                 input.value = '';
             }
+
+            // Sending (or an empty Enter) closes the chat and returns to the game
+            closeChat();
         }
 
         function addChatMessage(sender, message, type) {
@@ -1164,6 +1242,8 @@
 
         function rotateView(dx, dy, sensitivity = 0.002) {
             player.rotation.y -= dx * sensitivity;
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = player.rotation.y;
             camera.rotation.x -= dy * sensitivity;
             camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
         }
@@ -1182,7 +1262,7 @@
 
             const intersects = raycaster.intersectObjects(Object.values(blocks));
 
-            if (intersects.length > 0) {
+            if (intersects.length > 0 && intersects[0].distance <= 6) {
                 const intersect = intersects[0];
 
                 if (button === 0) {
@@ -1260,11 +1340,8 @@
             bindButton('touch-mine', () => interact(0));
             bindButton('touch-place', () => interact(2));
             bindButton('touch-chat', () => {
-                if (document.body.classList.toggle('chat-open')) {
-                    openChat();
-                } else {
-                    closeChat();
-                }
+                if (gameState.chatOpen) closeChat();
+                else openChat();
             });
 
             // Drag anywhere else on the canvas to look around
@@ -1293,20 +1370,54 @@
 
         function removeBlock(block) {
             const pos = block.position;
-            const key = `${pos.x},${pos.y},${pos.z}`;
-            
-            scene.remove(block);
-            delete blocks[key];
+
+            delete world[keyOf(pos.x, pos.y, pos.z)];
+            refreshAround(pos.x, pos.y, pos.z);
         }
 
         function placeBlock(intersect) {
             const normal = intersect.face.normal;
             const pos = intersect.object.position.clone().add(normal);
-            const key = `${pos.x},${pos.y},${pos.z}`;
-            
-            if (!blocks[key]) {
-                createBlock(pos.x, pos.y, pos.z, gameState.selectedBlock);
+            const x = Math.round(pos.x), y = Math.round(pos.y), z = Math.round(pos.z);
+
+            if (!world[keyOf(x, y, z)] && !playerOccupies(x, y, z)) {
+                createBlock(x, y, z, gameState.selectedBlock);
             }
+        }
+
+        // Physics: the player is a 0.6 wide, ~1.8 tall column; feet = player.position.y - 1
+        function isSolid(x, y, z) {
+            const type = world[keyOf(Math.round(x), Math.round(y), Math.round(z))];
+            return !!type && type !== 'water';
+        }
+
+        const bodyOffsetsXZ = [-0.3, 0.3];
+        const bodyOffsetsY = [0.05, 0.9, 1.75];
+
+        function collides(px, feetY, pz) {
+            for (const dx of bodyOffsetsXZ) {
+                for (const dz of bodyOffsetsXZ) {
+                    for (const dy of bodyOffsetsY) {
+                        if (isSolid(px + dx, feetY + dy, pz + dz)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // True if placing a block at cell (x,y,z) would trap the player inside it
+        function playerOccupies(x, y, z) {
+            const feet = player.position.y - 1;
+            for (const dx of bodyOffsetsXZ) {
+                for (const dz of bodyOffsetsXZ) {
+                    for (const dy of bodyOffsetsY) {
+                        if (Math.round(player.position.x + dx) === x &&
+                            Math.round(feet + dy) === y &&
+                            Math.round(player.position.z + dz) === z) return true;
+                    }
+                }
+            }
+            return false;
         }
 
         function selectInventorySlot(index) {
@@ -1336,29 +1447,45 @@
             direction.clampLength(0, 1);
             direction.applyQuaternion(player.quaternion);
             
-            player.position.x += direction.x * moveSpeed;
-            player.position.z += direction.z * moveSpeed;
-            
+            let feet = player.position.y - 1;
+
+            // Move each axis separately so the player slides along walls
+            const nextX = player.position.x + direction.x * moveSpeed;
+            if (!collides(nextX, feet, player.position.z)) player.position.x = nextX;
+            const nextZ = player.position.z + direction.z * moveSpeed;
+            if (!collides(player.position.x, feet, nextZ)) player.position.z = nextZ;
+
             // Jumping
             if (keys[' '] && !isJumping) {
                 velocityY = jumpForce;
                 isJumping = true;
             }
-            
+
             // Gravity
-            velocityY -= 0.01;
-            player.position.y += velocityY;
-            
-            // Ground collision
-            if (player.position.y < 1) {
-                player.position.y = 1;
+            velocityY = Math.max(velocityY - 0.01, -0.5);
+            const nextFeet = feet + velocityY;
+            if (collides(player.position.x, nextFeet, player.position.z)) {
+                if (velocityY < 0) {
+                    // Landed: rest on top of the block below
+                    feet = Math.round(nextFeet + 0.05) + 0.5;
+                    isJumping = false;
+                }
                 velocityY = 0;
-                isJumping = false;
+            } else {
+                feet = nextFeet;
             }
-            
-            // Update camera position
-            camera.position.copy(player.position);
-            camera.position.y += 1.5;
+            player.position.y = feet + 1;
+
+            // Fell out of the world: back to spawn
+            if (feet < -10) {
+                let top = 0;
+                while (world[keyOf(0, top + 1, 0)]) top++;
+                player.position.set(0, top + 1.55, 0);
+                velocityY = 0;
+            }
+
+            // Update camera position (eyes ~1.6 above the feet)
+            camera.position.set(player.position.x, player.position.y - 1 + 1.6, player.position.z);
             
             // Update HUD
             document.getElementById('position').textContent = 
