@@ -299,6 +299,73 @@
       border-radius: 50%;
     }
 
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      background: white;
+    }
+
+    /* Prompt shown right after approval: getDisplayMedia needs a tap */
+    .share-prompt {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .share-prompt.active {
+      display: flex;
+    }
+
+    .share-prompt-box {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .share-prompt-box h3 {
+      color: #333;
+      margin-bottom: 12px;
+      font-size: 24px;
+    }
+
+    .share-prompt-box p {
+      color: #666;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .share-prompt-box .btn {
+      margin-bottom: 10px;
+    }
+
+    /* Tablet mode: bigger touch targets */
+    body.tablet .btn,
+    body.tablet .controls button {
+      min-height: 64px;
+      font-size: 20px;
+    }
+
+    body.tablet .form-group input,
+    body.tablet .form-group select {
+      padding: 16px;
+      font-size: 20px;
+    }
+
+    body.tablet .form-group label {
+      font-size: 18px;
+    }
+
     /* iPad responsive */
     @media (max-width: 1024px) {
       .screen-share-container {
@@ -352,6 +419,13 @@
       <div class="form-group">
         <label>Your Name</label>
         <input type="text" id="userName" placeholder="Enter your name">
+      </div>
+      <div class="form-group">
+        <label>I'm using</label>
+        <select id="deviceType" onchange="applyDevice(this.value)">
+          <option value="pc">PC</option>
+          <option value="tablet">Tablet</option>
+        </select>
       </div>
       <button class="btn" onclick="joinRoom()">Join Room</button>
     </div>
@@ -410,6 +484,15 @@
     </div>
   </div>
 
+  <div class="share-prompt" id="sharePrompt">
+    <div class="share-prompt-box">
+      <h3>You're in!</h3>
+      <p>The admin can see your screen once you share it. Tick "share audio" when asked so it can be recorded with sound.</p>
+      <button class="btn btn-success" onclick="startSharingFromPrompt()">Share my screen</button>
+      <button class="btn" onclick="closeSharePrompt()">Not now</button>
+    </div>
+  </div>
+
   <div class="recording-indicator" id="recordingIndicator">
     Recording
   </div>
@@ -426,6 +509,28 @@
     let isSharing = false;
     let isApproved = false;
     let isLeaving = false;
+
+    function closeSharePrompt() {
+      document.getElementById('sharePrompt').classList.remove('active');
+    }
+
+    function startSharingFromPrompt() {
+      closeSharePrompt();
+      toggleScreenShare();
+    }
+
+    // PC / tablet choice is remembered, defaulting to tablet on touch-first devices
+    function applyDevice(device) {
+      document.body.classList.toggle('tablet', device === 'tablet');
+      document.getElementById('deviceType').value = device;
+      try { localStorage.setItem('videoRecDevice', device); } catch (e) {}
+    }
+
+    (function initDevice() {
+      let saved = null;
+      try { saved = localStorage.getItem('videoRecDevice'); } catch (e) {}
+      applyDevice(saved || (window.matchMedia('(pointer: coarse)').matches ? 'tablet' : 'pc'));
+    })();
 
     // Check for room code in URL parameter
     window.onload = function() {
@@ -466,6 +571,10 @@
             document.getElementById('mainScreen').classList.add('active');
             document.getElementById('displayRoomCode').textContent = roomCode;
             document.getElementById('displayUserName').textContent = userName;
+            // Screen capture needs a tap, so ask right away instead of leaving it to the user to find
+            if (!isSharing && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+              document.getElementById('sharePrompt').classList.add('active');
+            }
           } else if (data.type === 'rejected') {
             isLeaving = true;
             alert('Your request was rejected by the admin');

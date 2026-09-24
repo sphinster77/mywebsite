@@ -382,6 +382,32 @@
       border-radius: 50%;
     }
 
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      background: white;
+    }
+
+    /* Tablet mode: bigger touch targets */
+    body.tablet .btn,
+    body.tablet .controls button {
+      min-height: 64px;
+      font-size: 20px;
+    }
+
+    body.tablet .form-group input,
+    body.tablet .form-group select {
+      padding: 16px;
+      font-size: 20px;
+    }
+
+    body.tablet .form-group label {
+      font-size: 18px;
+    }
+
     /* iPad responsive */
     @media (max-width: 1024px) {
       .video-container {
@@ -439,6 +465,13 @@
       <div class="form-group">
         <label>Your Name</label>
         <input type="text" id="adminName" placeholder="Enter your name">
+      </div>
+      <div class="form-group">
+        <label>I'm using</label>
+        <select id="deviceType" onchange="applyDevice(this.value)">
+          <option value="pc">PC</option>
+          <option value="tablet">Tablet</option>
+        </select>
       </div>
       <button class="btn" onclick="createRoom()">Create Room</button>
     </div>
@@ -522,12 +555,24 @@
     let screenStream = null;
     let mediaRecorder = null;
     let recordingStream = null;
-    let recordingAudioStream = null;
     let recordedChunks = [];
     let isRecording = false;
     let isCameraEnabled = false;
     let isSharingScreen = false;
     let pendingUsers = {};
+
+    // PC / tablet choice is remembered, defaulting to tablet on touch-first devices
+    function applyDevice(device) {
+      document.body.classList.toggle('tablet', device === 'tablet');
+      document.getElementById('deviceType').value = device;
+      try { localStorage.setItem('videoRecDevice', device); } catch (e) {}
+    }
+
+    (function initDevice() {
+      let saved = null;
+      try { saved = localStorage.getItem('videoRecDevice'); } catch (e) {}
+      applyDevice(saved || (window.matchMedia('(pointer: coarse)').matches ? 'tablet' : 'pc'));
+    })();
 
     function createRoom() {
       roomCode = document.getElementById('roomCode').value.trim();
@@ -782,21 +827,22 @@
           return;
         }
 
-        // Build a separate stream so the live stream is never mutated
-        recordingStream = new MediaStream(mainVideo.srcObject.getVideoTracks());
-
-        // Add audio if available
-        try {
-          recordingAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          recordingAudioStream.getAudioTracks().forEach(track => recordingStream.addTrack(track));
-        } catch (err) {
-          console.log('Could not get audio:', err);
+        // Record the main screen's own video and audio (not the admin's mic).
+        // A separate stream is built so the live stream is never mutated.
+        const mainAudioTracks = mainVideo.srcObject.getAudioTracks().filter(track => track.readyState === 'live');
+        if (!mainAudioTracks.length &&
+            !confirm('The main screen is not sharing any audio (the sharer must tick "share audio"). Record video only?')) {
+          return;
         }
+        recordingStream = new MediaStream([
+          ...mainVideo.srcObject.getVideoTracks(),
+          ...mainAudioTracks
+        ]);
 
         const mimeType = pickRecordingMimeType();
         if (!mimeType) {
           alert('Recording is not supported in this browser.');
-          stopRecordingTracks();
+          recordingStream = null;
           return;
         }
 
@@ -805,7 +851,7 @@
         } catch (err) {
           console.error('Could not start recorder:', err);
           alert('Could not start recording: ' + err.message);
-          stopRecordingTracks();
+          recordingStream = null;
           return;
         }
         recordedChunks = [];
@@ -827,7 +873,7 @@
           a.click();
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 10000);
-          stopRecordingTracks();
+          recordingStream = null;
         };
 
         mediaRecorder.start();
@@ -847,14 +893,6 @@
         recordingIndicator.classList.remove('active');
         sendToApprovedUsers({ type: 'recording-stopped' });
       }
-    }
-
-    function stopRecordingTracks() {
-      if (recordingAudioStream) {
-        recordingAudioStream.getTracks().forEach(track => track.stop());
-        recordingAudioStream = null;
-      }
-      recordingStream = null;
     }
 
     async function toggleScreenShare() {
