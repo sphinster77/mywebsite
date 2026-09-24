@@ -521,6 +521,21 @@
             pointer-events: none;
         }
 
+        /* Popped out into its own window: fill that window */
+        #screen-wall.popped {
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            border: none;
+            border-radius: 0;
+            pointer-events: auto !important;
+        }
+
+        #screen-wall.popped #wall-popout {
+            display: none;
+        }
+
         #wall-header {
             display: flex;
             flex-wrap: wrap;
@@ -852,9 +867,10 @@
                 <div id="wall-header">
                     <span>📺 Screen Wall</span>
                     <span id="rec-status">Not recording</span>
-                    <button id="rec-toggle" onclick="toggleRecording()">⏺ Record main screen</button>
-                    <label><input type="checkbox" id="monitor-audio" onchange="updateMonitor()"> Hear main audio</label>
-                    <button onclick="toggleScreenWall()">Close (Esc)</button>
+                    <button id="rec-toggle">⏺ Record main screen</button>
+                    <label><input type="checkbox" id="monitor-audio"> Hear main audio</label>
+                    <button id="wall-popout" title="Open the screen wall in its own window that you can move anywhere">⧉ Pop out</button>
+                    <button id="wall-close">Close</button>
                 </div>
                 <div id="wall-main">
                     <video id="main-video" autoplay muted playsinline></video>
@@ -2518,7 +2534,7 @@
             tile.className = 'wall-tile';
             tile.append(video, label);
             tile.addEventListener('click', () => setMainScreen(entry.id));
-            document.getElementById('wall-tiles').appendChild(tile);
+            wallPart('wall-tiles').appendChild(tile);
 
             entry.video = video;
             entry.tile = tile;
@@ -2542,8 +2558,8 @@
             // While recording, keep the main id so the recording shows "disconnected" until the admin picks another
             if (mainScreenId === id && !recorder) {
                 mainScreenId = null;
-                document.getElementById('main-video').srcObject = null;
-                document.getElementById('main-label').textContent = 'Click a screen below to make it the main one';
+                wallPart('main-video').srcObject = null;
+                wallPart('main-label').textContent = 'Click a screen below to make it the main one';
             }
         }
 
@@ -2556,8 +2572,8 @@
                 p.tile.classList.toggle('main', p.id === id);
                 if (p.gain) p.gain.gain.value = p.id === id ? 1 : 0; // only the main screen's audio is heard/recorded
             });
-            document.getElementById('main-video').srcObject = entry.stream;
-            document.getElementById('main-label').textContent = `Main screen: ${entry.name}`;
+            wallPart('main-video').srcObject = entry.stream;
+            wallPart('main-label').textContent = `Main screen: ${entry.name}`;
         }
 
         function ensureAudioGraph() {
@@ -2586,12 +2602,84 @@
 
         function updateMonitor() {
             if (audioGraph) {
-                audioGraph.monitor.gain.value = document.getElementById('monitor-audio').checked ? 1 : 0;
+                audioGraph.monitor.gain.value = wallPart('monitor-audio').checked ? 1 : 0;
             }
+        }
+
+        // The wall can live in a separate browser window. We move the same elements over (rather
+        // than rebuilding them) so every video, button and the recorder keep working unchanged.
+        const wallEl = document.getElementById('screen-wall');
+        let wallPopup = null;
+
+        // Look up a part of the wall wherever it currently is (game window or pop-out window)
+        function wallPart(id) {
+            return wallEl.querySelector('#' + id);
+        }
+
+        function initWallControls() {
+            wallPart('rec-toggle').addEventListener('click', toggleRecording);
+            wallPart('monitor-audio').addEventListener('change', updateMonitor);
+            wallPart('wall-close').addEventListener('click', closeScreenWall);
+            wallPart('wall-popout').addEventListener('click', popOutWall);
+            window.addEventListener('pagehide', () => { if (wallPopup) wallPopup.close(); });
+            setInterval(() => { if (wallPopup && wallPopup.closed) dockWall(); }, 1000);
+        }
+
+        // Moving a video between windows pauses it, so restart every video after a move
+        function resumeWallVideos() {
+            const restart = () => wallEl.querySelectorAll('video').forEach(video => {
+                const stream = video.srcObject;
+                video.srcObject = null;
+                video.srcObject = stream;
+                video.play().catch(() => {});
+            });
+            restart();
+            setTimeout(restart, 300);
+        }
+
+        function popOutWall() {
+            if (wallPopup && !wallPopup.closed) {
+                wallPopup.focus();
+                return;
+            }
+
+            const win = window.open('', 'voxel-screen-wall', 'popup=yes,width=1100,height=720');
+            if (!win) {
+                wallPart('rec-status').textContent = 'Pop-up blocked: allow pop-ups for this site and try again';
+                return;
+            }
+
+            if (wallOpen) toggleScreenWall(); // leave the in-game overlay first
+            win.document.title = 'Voxel Screen Wall';
+            document.querySelectorAll('style').forEach(style => win.document.head.appendChild(style.cloneNode(true)));
+            win.document.body.appendChild(win.document.adoptNode(wallEl));
+            wallEl.classList.add('popped');
+            wallPopup = win;
+            resumeWallVideos();
+            win.addEventListener('pagehide', dockWall);
+            win.focus();
+        }
+
+        // The pop-out window was closed: put the wall back into the game page (hidden until reopened)
+        function dockWall() {
+            if (!wallPopup) return;
+            wallPopup = null;
+            wallEl.classList.remove('popped');
+            document.getElementById('ui-overlay').appendChild(document.adoptNode(wallEl));
+            resumeWallVideos();
+        }
+
+        function closeScreenWall() {
+            if (wallPopup && !wallPopup.closed) wallPopup.close();
+            else if (wallOpen) toggleScreenWall();
         }
 
         function toggleScreenWall() {
             if (!gameState.isAdmin) return;
+            if (wallPopup && !wallPopup.closed) { // already in its own window: just bring it forward
+                wallPopup.focus();
+                return;
+            }
 
             wallOpen = !wallOpen;
             document.body.classList.toggle('wall-open', wallOpen);
@@ -2612,7 +2700,7 @@
                 return;
             }
             if (!mainScreenId) {
-                document.getElementById('rec-status').textContent = 'Pick a main screen first';
+                wallPart('rec-status').textContent = 'Pick a main screen first';
                 return;
             }
 
@@ -2633,8 +2721,8 @@
                 clearInterval(recTimer);
                 clearInterval(recDrawTimer);
                 recorder = null;
-                document.getElementById('rec-toggle').textContent = '⏺ Record main screen';
-                const status = document.getElementById('rec-status');
+                wallPart('rec-toggle').textContent = '⏺ Record main screen';
+                const status = wallPart('rec-status');
                 status.textContent = 'Saved recording';
                 status.classList.remove('recording');
 
@@ -2649,11 +2737,11 @@
             recStart = Date.now();
             recTimer = setInterval(() => {
                 const s = Math.floor((Date.now() - recStart) / 1000);
-                document.getElementById('rec-status').textContent =
+                wallPart('rec-status').textContent =
                     `● REC ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
             }, 500);
-            document.getElementById('rec-status').classList.add('recording');
-            document.getElementById('rec-toggle').textContent = '⏹ Stop and save';
+            wallPart('rec-status').classList.add('recording');
+            wallPart('rec-toggle').textContent = '⏹ Stop and save';
             recorder.start(1000);
         }
 
@@ -2773,6 +2861,9 @@
             }
             if (!keepReady) voiceReadyPeers.delete(id);
         }
+
+        // Runs last: it needs the screen wall variables declared above
+        initWallControls();
 
         // Prevent context menu
         document.addEventListener('contextmenu', event => event.preventDefault());
