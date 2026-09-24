@@ -521,6 +521,24 @@
             pointer-events: none;
         }
 
+        /* In the game window the wall can be dragged by its header and resized from the bottom-right corner */
+        #screen-wall:not(.popped) {
+            resize: both;
+            overflow: hidden;
+            min-width: 420px;
+            min-height: 320px;
+            max-width: 98vw;
+            max-height: 98vh;
+        }
+
+        #wall-header {
+            cursor: move;
+        }
+
+        #wall-header button, #wall-header label {
+            cursor: pointer;
+        }
+
         /* Popped out into its own window: fill that window */
         #screen-wall.popped {
             left: 0 !important;
@@ -1773,6 +1791,12 @@
 
             keys[event.key.toLowerCase()] = true;
 
+            // Space is jump: never let it scroll the page or press a focused button
+            if (event.key === ' ') {
+                event.preventDefault();
+                if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
+            }
+
             // Number keys for inventory
             if (event.key >= '1' && event.key <= '9') {
                 const index = parseInt(event.key) - 1;
@@ -2610,6 +2634,7 @@
         // than rebuilding them) so every video, button and the recorder keep working unchanged.
         const wallEl = document.getElementById('screen-wall');
         let wallPopup = null;
+        const wallDrag = { x: 0, y: 0 };   // how far the in-game wall has been dragged from its default spot
 
         // Look up a part of the wall wherever it currently is (game window or pop-out window)
         function wallPart(id) {
@@ -2621,6 +2646,24 @@
             wallPart('monitor-audio').addEventListener('change', updateMonitor);
             wallPart('wall-close').addEventListener('click', closeScreenWall);
             wallPart('wall-popout').addEventListener('click', popOutWall);
+            // Drag the in-game wall by its header (moved with a transform so the closed state stays off-screen)
+            const header = wallPart('wall-header');
+            let drag = null;
+            header.addEventListener('pointerdown', (e) => {
+                if (wallEl.classList.contains('popped') || e.target.closest('button, label, input')) return;
+                drag = { x: e.clientX - wallDrag.x, y: e.clientY - wallDrag.y, id: e.pointerId };
+                try { header.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
+            });
+            header.addEventListener('pointermove', (e) => {
+                if (!drag || e.pointerId !== drag.id) return;
+                wallDrag.x = e.clientX - drag.x;
+                wallDrag.y = e.clientY - drag.y;
+                wallEl.style.transform = `translate(${wallDrag.x}px, ${wallDrag.y}px)`;
+            });
+            const endDrag = () => { drag = null; };
+            header.addEventListener('pointerup', endDrag);
+            header.addEventListener('pointercancel', endDrag);
+
             window.addEventListener('pagehide', () => { if (wallPopup) wallPopup.close(); });
             setInterval(() => { if (wallPopup && wallPopup.closed) dockWall(); }, 1000);
         }
@@ -2654,6 +2697,7 @@
             document.querySelectorAll('style').forEach(style => win.document.head.appendChild(style.cloneNode(true)));
             win.document.body.appendChild(win.document.adoptNode(wallEl));
             wallEl.classList.add('popped');
+            wallEl.style.transform = ''; // the pop-out window fills its own window
             wallPopup = win;
             resumeWallVideos();
             win.addEventListener('pagehide', dockWall);
@@ -2665,6 +2709,7 @@
             if (!wallPopup) return;
             wallPopup = null;
             wallEl.classList.remove('popped');
+            wallEl.style.transform = `translate(${wallDrag.x}px, ${wallDrag.y}px)`;
             document.getElementById('ui-overlay').appendChild(document.adoptNode(wallEl));
             resumeWallVideos();
         }
@@ -2861,6 +2906,13 @@
             }
             if (!keepReady) voiceReadyPeers.delete(id);
         }
+
+        // A clicked button keeps keyboard focus, so pressing Space (jump) or Enter afterwards would
+        // "click" it again (e.g. reopen the screen wall). Drop the focus right after every click.
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest && event.target.closest('button');
+            if (button) button.blur();
+        });
 
         // Runs last: it needs the screen wall variables declared above
         initWallControls();
