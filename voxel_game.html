@@ -497,6 +497,143 @@
             margin-bottom: 5px;
         }
 
+        /* Admin screen wall: live view of every player's screen, one is the "main" one that gets recorded.
+           When closed it is moved off-screen instead of display:none so the videos keep decoding. */
+        #screen-wall {
+            position: fixed;
+            top: 5vh;
+            left: 5vw;
+            width: 90vw;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0,0,0,0.92);
+            border: 2px solid #e74c3c;
+            border-radius: 12px;
+            pointer-events: auto;
+            z-index: 50;
+        }
+
+        body:not(.wall-open) #screen-wall {
+            left: -10000px;
+            pointer-events: none;
+        }
+
+        #wall-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        #wall-header button {
+            width: auto;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        #wall-header label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: normal;
+        }
+
+        #wall-header input {
+            width: auto;
+        }
+
+        #rec-status {
+            color: rgba(255,255,255,0.7);
+            font-variant-numeric: tabular-nums;
+        }
+
+        #rec-status.recording {
+            color: #ff4d4d;
+        }
+
+        #wall-main {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #main-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        #main-label {
+            position: absolute;
+            left: 12px;
+            bottom: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.7);
+            font-size: 0.9rem;
+        }
+
+        #wall-tiles {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            height: 130px;
+            flex-shrink: 0;
+        }
+
+        .wall-tile {
+            position: relative;
+            flex: 0 0 200px;
+            background: #000;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .wall-tile.main {
+            border-color: #f0c030;
+        }
+
+        .wall-tile video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .wall-tile span {
+            position: absolute;
+            left: 6px;
+            bottom: 4px;
+            padding: 2px 8px;
+            border-radius: 5px;
+            background: rgba(0,0,0,0.7);
+            font-size: 0.75rem;
+        }
+
+        #viewer-banner {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 6px 14px;
+            border-radius: 8px;
+            background: rgba(231,76,60,0.85);
+            font-size: 0.8rem;
+            display: none;
+        }
+
         .controls-info p {
             margin: 5px 0;
             color: rgba(255,255,255,0.7);
@@ -569,16 +706,35 @@
                     </div>
 
                     <div class="control-group">
+                        <label>Multiplayer</label>
+                        <select id="net-mode" onchange="updateNetMode()">
+                            <option value="host">Host a new game</option>
+                            <option value="join">Join a friend's game</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Room code</label>
+                        <input type="text" id="room-code" placeholder="Room code" maxlength="20" autocomplete="off">
+                    </div>
+
+                    <div class="control-group" id="admin-pass-group">
+                        <label>Admin password (optional)</label>
+                        <input type="text" id="admin-password" value="2543" placeholder="Leave empty for a random one" autocomplete="off">
+                    </div>
+
+                    <div class="control-group" id="seed-group">
                         <label>World Seed (optional)</label>
                         <input type="text" id="world-seed" placeholder="Random seed">
                     </div>
-                    
-                    <button onclick="startGame()">🎮 Start Game</button>
+
+                    <div id="start-error" style="min-height: 1.2em; margin-bottom: 10px; color: #ff6b6b; font-size: 0.9rem;"></div>
+                    <button id="start-btn" onclick="startGame()">🎮 Start Game</button>
                 </div>
-                
+
                 <div style="text-align: center; color: rgba(255,255,255,0.5); font-size: 0.9rem;">
                     <p>Original voxel game - Not affiliated with any existing games</p>
-                    <p style="margin-top: 10px;">Type "admin" in chat for admin powers</p>
+                    <p style="margin-top: 10px;">Admins: type /admin followed by the server's admin password in chat</p>
                 </div>
             </div>
             
@@ -646,12 +802,13 @@
             
             <div id="multiplayer-info" style="display: none;">
                 <span>Players: <span class="player-count" id="player-count">1</span></span>
+                <span style="margin-left: 15px;">Room: <b id="room-label"></b></span>
             </div>
             
             <div id="chat">
                 <div id="chat-messages"></div>
                 <div id="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="Type to chat (type 'admin' for admin)">
+                    <input type="text" id="chat-input" placeholder="Type to chat (/admin password for admin)">
                     <button id="chat-send">Send</button>
                 </div>
             </div>
@@ -678,6 +835,9 @@
                     <input type="text" id="give-item" placeholder="Item name">
                 </div>
                 <div class="admin-command">
+                    <button onclick="toggleScreenWall()">📺 Screen Wall</button>
+                </div>
+                <div class="admin-command">
                     <button onclick="adminClearChat()">Clear Chat</button>
                 </div>
                 <div class="admin-command">
@@ -686,11 +846,29 @@
                 </div>
             </div>
             
+            <div id="viewer-banner">👁 An admin can see your screen and hear your mic</div>
+
+            <div id="screen-wall">
+                <div id="wall-header">
+                    <span>📺 Screen Wall</span>
+                    <span id="rec-status">Not recording</span>
+                    <button id="rec-toggle" onclick="toggleRecording()">⏺ Record main screen</button>
+                    <label><input type="checkbox" id="monitor-audio" onchange="updateMonitor()"> Hear main audio</label>
+                    <button onclick="toggleScreenWall()">Close (Esc)</button>
+                </div>
+                <div id="wall-main">
+                    <video id="main-video" autoplay muted playsinline></video>
+                    <div id="main-label">Click a screen below to make it the main one</div>
+                </div>
+                <div id="wall-tiles"></div>
+            </div>
+
             <div id="loading" class="loading" style="display: none;">Loading World...</div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script>
         // Game State
         let gameState = {
@@ -710,7 +888,6 @@
 
         // Three.js variables
         let scene, camera, renderer, player;
-        let blocks = {};
         let players = {};
         let isPointerLocked = false;
 
@@ -733,16 +910,42 @@
             glass: { color: 0xADD8E6, emoji: '🔲' }
         };
 
-        // Initialize game
-        function startGame() {
-            const playerName = document.getElementById('player-name').value || 'Player';
+        // Initialize game: connect to the server first, then build the world it tells us about
+        async function startGame() {
             const gameMode = document.getElementById('game-mode').value;
-            const worldSeed = document.getElementById('world-seed').value || generateRandomSeed();
+            const startButton = document.getElementById('start-btn');
+            const startError = document.getElementById('start-error');
 
-            gameState.playerName = playerName;
+            const mode = document.getElementById('net-mode').value;
+            const room = normalizeRoom(document.getElementById('room-code').value);
+            if (!room) {
+                startError.textContent = 'Enter a room code first.';
+                return;
+            }
+
+            startButton.disabled = true;
+            startError.textContent = mode === 'host' ? 'Starting your game...' : 'Connecting to the host...';
+            let welcome;
+            try {
+                welcome = await joinGame({
+                    mode,
+                    room,
+                    name: document.getElementById('player-name').value || 'Player',
+                    seed: document.getElementById('world-seed').value,
+                    adminPassword: document.getElementById('admin-password').value.trim()
+                });
+            } catch (error) {
+                startError.textContent = error.message;
+                startButton.disabled = false;
+                return;
+            }
+            document.getElementById('room-label').textContent = room;
+
+            gameState.playerName = welcome.name;
             gameState.gameMode = gameMode;
             gameState.voiceChatEnabled = true;
             gameState.device = document.getElementById('device-type').value;
+            myId = welcome.id;
 
             // Hide start screen, show game UI
             document.getElementById('start-screen').style.display = 'none';
@@ -772,19 +975,35 @@
 
             // Generate world
             setTimeout(() => {
-                generateWorld(worldSeed);
+                generateWorld(welcome.seed);
                 document.getElementById('loading').style.display = 'none';
                 gameState.isRunning = true;
 
+                welcome.players.forEach(addRemotePlayer);
+                welcome.chat.forEach(m => addChatMessage(m.sender, m.text, m.kind));
+                addChatMessage('System', `Connected to server as ${gameState.playerName}`, 'system');
+                updatePlayerCount();
+
+                // Start handling live messages (the ones that arrived while the world was loading)
+                netReady = true;
+                netQueue.splice(0).forEach(handleServerMessage);
+
                 // Voice chat is always on
                 initVoiceChat();
+                initScreenShare();
 
-                // Connect to single server
-                connectToServer();
+                if (hostMode) {
+                    // The host is always an admin and shares the room code and admin password
+                    gameState.isAdmin = true;
+                    document.getElementById('admin-panel').style.display = 'block';
+                    initAdminScreens();
+                    addChatMessage('System', `You are hosting room "${room}". Friends join with that code, and this page must stay open.`, 'system');
+                    addChatMessage('System', `Admin password for others: ${host.adminPassword} (they type /admin ${host.adminPassword})`, 'system');
+                }
 
                 // Start game loop
                 animate();
-            }, 1000);
+            }, 100);
         }
 
         function initThreeJS() {
@@ -799,8 +1018,8 @@
 
             // Renderer
             renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
 
             // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -808,7 +1027,6 @@
 
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
             directionalLight.position.set(50, 100, 50);
-            directionalLight.castShadow = true;
             scene.add(directionalLight);
 
             // Player
@@ -831,6 +1049,7 @@
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('pointerlockchange', onPointerLockChange);
             document.getElementById('canvas').addEventListener('click', () => {
+                if (wallOpen) return;
                 if (gameState.chatOpen && !isTablet()) closeChat();
                 else requestPointerLock();
             });
@@ -857,12 +1076,93 @@
             });
         }
 
-        // world holds every block's type; blocks holds only the meshes for blocks
-        // that touch air, which keeps the scene small enough to run smoothly
+        // world holds every block's type. It is drawn as one merged mesh per 16x16 chunk that
+        // contains only the faces touching air, so the GPU sees a handful of draw calls
+        // instead of thousands of cubes.
         let world = {};
-        const blockGeometry = () => blockGeometry.cached || (blockGeometry.cached = new THREE.BoxGeometry(1, 1, 1));
-        const blockMaterials = {};
-        const neighborOffsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+        let worldMaxY = 0;
+        const CHUNK = 16;
+        const chunkMeshes = {};
+        const dirtyChunks = new Set();
+        const chunkMaterial = () => chunkMaterial.cached ||
+            (chunkMaterial.cached = new THREE.MeshLambertMaterial({ vertexColors: true }));
+
+        // Per face: normal, the two tangent axes (u x v = normal, so faces wind counter-clockwise
+        // seen from outside) and a brightness factor for cheap baked shading
+        const faces = [
+            { n: [1, 0, 0],  u: [0, 1, 0], v: [0, 0, 1], shade: 0.8 },
+            { n: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0], shade: 0.8 },
+            { n: [0, 1, 0],  u: [0, 0, 1], v: [1, 0, 0], shade: 1.0 },
+            { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1], shade: 0.5 },
+            { n: [0, 0, 1],  u: [1, 0, 0], v: [0, 1, 0], shade: 0.9 },
+            { n: [0, 0, -1], u: [0, 1, 0], v: [1, 0, 0], shade: 0.7 }
+        ];
+        const cornerSigns = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+        const tmpColor = new THREE.Color();
+
+        function markDirty(x, z) {
+            // A block on a chunk edge also changes the faces of the neighbouring chunk
+            [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz]) => {
+                dirtyChunks.add(`${Math.floor((x + dx) / CHUNK)},${Math.floor((z + dz) / CHUNK)}`);
+            });
+        }
+
+        function buildChunk(cx, cz) {
+            const positions = [], normals = [], colors = [], indices = [];
+
+            for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
+                for (let z = cz * CHUNK; z < (cz + 1) * CHUNK; z++) {
+                    for (let y = 0; y <= worldMaxY; y++) {
+                        const type = world[keyOf(x, y, z)];
+                        if (!type) continue;
+
+                        tmpColor.setHex(blockTypes[type].color);
+                        for (const f of faces) {
+                            const [nx, ny, nz] = f.n;
+                            if (y + ny < 0 || world[keyOf(x + nx, y + ny, z + nz)]) continue;
+
+                            const base = positions.length / 3;
+                            for (const [su, sv] of cornerSigns) {
+                                positions.push(
+                                    x + 0.5 * (nx + su * f.u[0] + sv * f.v[0]),
+                                    y + 0.5 * (ny + su * f.u[1] + sv * f.v[1]),
+                                    z + 0.5 * (nz + su * f.u[2] + sv * f.v[2])
+                                );
+                                normals.push(nx, ny, nz);
+                                colors.push(tmpColor.r * f.shade, tmpColor.g * f.shade, tmpColor.b * f.shade);
+                            }
+                            indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+                        }
+                    }
+                }
+            }
+
+            const key = `${cx},${cz}`;
+            if (chunkMeshes[key]) {
+                scene.remove(chunkMeshes[key]);
+                chunkMeshes[key].geometry.dispose();
+                delete chunkMeshes[key];
+            }
+            if (!indices.length) return;
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setIndex(indices);
+            geometry.computeBoundingSphere();
+            const mesh = new THREE.Mesh(geometry, chunkMaterial());
+            scene.add(mesh);
+            chunkMeshes[key] = mesh;
+        }
+
+        function rebuildDirtyChunks() {
+            dirtyChunks.forEach(key => {
+                const [cx, cz] = key.split(',').map(Number);
+                buildChunk(cx, cz);
+            });
+            dirtyChunks.clear();
+        }
 
         function keyOf(x, y, z) {
             return `${x},${y},${z}`;
@@ -874,20 +1174,53 @@
             return h;
         }
 
-        function generateWorld(seed) {
+        // Every player must generate exactly the same terrain from the server's seed, so this uses
+        // only integer hashing and + - * / (identical in every browser) instead of Math.sin & co.
+        function hash01(x, z, h) {
+            let n = Math.imul(x, 374761393) + Math.imul(z, 668265263) + Math.imul(h, 1442695041);
+            n = Math.imul(n ^ (n >>> 13), 1274126177);
+            n ^= n >>> 16;
+            return (n >>> 0) / 4294967296;
+        }
+
+        function valueNoise(x, z, h) {
+            const x0 = Math.floor(x), z0 = Math.floor(z);
+            const fx = x - x0, fz = z - z0;
+            const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+            const a = hash01(x0, z0, h), b = hash01(x0 + 1, z0, h);
+            const c = hash01(x0, z0 + 1, h), d = hash01(x0 + 1, z0 + 1, h);
+            return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
+        }
+
+        function terrainHeight(x, z, h) {
+            const n = 0.6 * valueNoise(x / 20, z / 20, h) +
+                      0.3 * valueNoise(x / 8, z / 8, h + 1) +
+                      0.1 * valueNoise(x / 3, z / 3, h + 2);
+            return 3 + Math.floor(n * 11);
+        }
+
+        // Block changes made by players (from the server) are applied on top of the generated terrain
+        function applyBlockEdit(x, y, z, type) {
+            if (type) {
+                world[keyOf(x, y, z)] = type;
+                worldMaxY = Math.max(worldMaxY, y);
+            } else {
+                delete world[keyOf(x, y, z)];
+            }
+            markDirty(x, z);
+        }
+
+        function generateWorld(seed, edits) {
             const worldSize = 32;
             const h = hashSeed(seed);
-            const ox = (h % 1000) / 100;
-            const oz = ((h >> 10) % 1000) / 100;
 
             world = {};
+            worldMaxY = 0;
             for (let x = -worldSize; x < worldSize; x++) {
                 for (let z = -worldSize; z < worldSize; z++) {
-                    const height = Math.max(2, Math.floor(
-                        7 + 3 * Math.sin(x * 0.12 + ox) * Math.cos(z * 0.12 + oz)
-                          + 2 * Math.sin(x * 0.05 - oz) + 1.5 * Math.cos(z * 0.07 + ox)
-                    ));
+                    const height = terrainHeight(x, z, h);
 
+                    worldMaxY = Math.max(worldMaxY, height + 7); // room for trees
                     for (let y = 0; y <= height; y++) {
                         let blockType = 'stone';
                         if (y === height) blockType = 'grass';
@@ -896,62 +1229,27 @@
                     }
 
                     // Add some trees (not at the spawn point or the world edge)
-                    if (Math.random() < 0.02 && height > 3 && Math.abs(x) > 3 && Math.abs(z) > 3
+                    if (hash01(x, z, h + 3) < 0.02 && height > 3 && Math.abs(x) > 3 && Math.abs(z) > 3
                         && Math.abs(x) < worldSize - 3 && Math.abs(z) < worldSize - 3) {
                         createTree(x, height + 1, z);
                     }
                 }
             }
 
-            Object.keys(world).forEach(key => {
-                const [x, y, z] = key.split(',').map(Number);
-                refreshBlock(x, y, z);
-            });
+            (edits || []).forEach(([x, y, z, type]) => applyBlockEdit(x, y, z, type));
+
+            for (let cx = -worldSize / CHUNK; cx < worldSize / CHUNK; cx++) {
+                for (let cz = -worldSize / CHUNK; cz < worldSize / CHUNK; cz++) {
+                    dirtyChunks.add(`${cx},${cz}`);
+                }
+            }
+            rebuildDirtyChunks();
 
             // Spawn on top of the terrain at the origin
             let top = 0;
             while (world[keyOf(0, top + 1, 0)]) top++;
             player.position.set(0, top + 0.5 + 1 + 0.05, 0);
             velocityY = 0;
-        }
-
-        function isExposed(x, y, z) {
-            return neighborOffsets.some(([dx, dy, dz]) => y + dy >= 0 && !world[keyOf(x + dx, y + dy, z + dz)]);
-        }
-
-        // Make the mesh for (x,y,z) exist only if the block is there and touches air
-        function refreshBlock(x, y, z) {
-            const key = keyOf(x, y, z);
-            const type = world[key];
-            const mesh = blocks[key];
-
-            if (mesh && (!type || mesh.userData.type !== type)) {
-                scene.remove(mesh);
-                delete blocks[key];
-            }
-            if (type && !blocks[key] && isExposed(x, y, z)) {
-                if (!blockMaterials[type]) {
-                    blockMaterials[type] = new THREE.MeshLambertMaterial({ color: blockTypes[type].color });
-                }
-                const block = new THREE.Mesh(blockGeometry(), blockMaterials[type]);
-                block.position.set(x, y, z);
-                block.userData = { type: type };
-                scene.add(block);
-                blocks[key] = block;
-            } else if (type && blocks[key] && !isExposed(x, y, z)) {
-                scene.remove(blocks[key]);
-                delete blocks[key];
-            }
-        }
-
-        function refreshAround(x, y, z) {
-            refreshBlock(x, y, z);
-            neighborOffsets.forEach(([dx, dy, dz]) => refreshBlock(x + dx, y + dy, z + dz));
-        }
-
-        function createBlock(x, y, z, type) {
-            world[keyOf(x, y, z)] = type;
-            refreshAround(x, y, z);
         }
 
         function createTree(x, y, z) {
@@ -972,92 +1270,469 @@
             }
         }
 
-        // Simple server simulation using localStorage
-        const serverId = 'voxel-game-server-1';
-        let serverData = {
-            players: {},
-            chat: [],
-            worldState: {}
-        };
+        // ===== Multiplayer: one player hosts, the others join with a room code =====
+        // There is no dedicated server. The host's browser runs the game's "server" (world, players,
+        // chat, admin rights) and everyone else connects to it directly over WebRTC data channels
+        // (PeerJS only introduces them to each other, like walkie_talkie.html). The host keeps the
+        // page open for as long as the game should run. Messages between a client and the host are
+        // the same whether you host or join: we send our actions, and apply what the host sends back.
+        let netConn = null;        // joiners: the connection to the host
+        let hostMode = false;
+        let localConn = null;      // host: the host player's own loopback connection
+        let pendingJoin = null;
+        let myId = null;
+        let netReady = false;
+        const netQueue = [];
+        const remotePlayers = {};
 
-        function connectToServer() {
-            // Load existing server data
-            const savedData = localStorage.getItem(serverId);
-            if (savedData) {
-                serverData = JSON.parse(savedData);
+        function normalizeRoom(raw) {
+            return String(raw || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20);
+        }
+
+        function randomRoomCode() {
+            const letters = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alike characters
+            let code = '';
+            for (let i = 0; i < 6; i++) code += letters[Math.floor(Math.random() * letters.length)];
+            return code;
+        }
+
+        // Identifies this browser to the host so a ban sticks (stored locally, not personal data)
+        function clientToken() {
+            try {
+                let token = localStorage.getItem('voxel-client-token');
+                if (!token) {
+                    token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+                    localStorage.setItem('voxel-client-token', token);
+                }
+                return token;
+            } catch (e) {
+                return 'anonymous';
             }
-            
-            // Add current player to server
-            serverData.players[gameState.playerName] = {
-                position: { x: 0, y: 20, z: 0 },
-                health: gameState.health,
-                hunger: gameState.hunger,
-                isAdmin: gameState.isAdmin,
-                joinTime: Date.now()
-            };
-            
-            saveServerData();
-            updatePlayerCount();
-            
-            // Listen for server updates
-            window.addEventListener('storage', handleServerUpdate);
-            
-            addChatMessage('System', `Connected to server as ${gameState.playerName}`, 'system');
         }
 
-        function saveServerData() {
-            localStorage.setItem(serverId, JSON.stringify(serverData));
+        // The first message from the host answers our join: `welcome` (or `error`). After that,
+        // messages wait in netQueue until the world is built, then go straight to handleServerMessage.
+        function onServerMessage(msg) {
+            if (pendingJoin) {
+                const join = pendingJoin;
+                if (msg.type === 'welcome') { pendingJoin = null; join.resolve(msg); }
+                else if (msg.type === 'error') { pendingJoin = null; join.reject(new Error(msg.message)); }
+                return;
+            }
+            if (netReady) handleServerMessage(msg);
+            else netQueue.push(msg);
         }
 
-        function handleServerUpdate(event) {
-            if (event.key === serverId) {
-                serverData = JSON.parse(event.newValue);
-                updatePlayerCount();
-                syncChat();
+        function joinGame({ mode, room, name, seed, adminPassword }) {
+            return new Promise((resolve, reject) => {
+                if (typeof Peer === 'undefined') {
+                    return reject(new Error('Could not load the connection library. Check your internet connection.'));
+                }
+
+                const timeout = setTimeout(() => fail('Could not connect. Check the room code and your internet connection.'), 15000);
+                const fail = (message) => {
+                    if (!pendingJoin) return;
+                    pendingJoin = null;
+                    clearTimeout(timeout);
+                    reject(new Error(message));
+                };
+                pendingJoin = {
+                    resolve: (welcome) => { clearTimeout(timeout); resolve(welcome); },
+                    reject: (error) => { clearTimeout(timeout); reject(error); }
+                };
+
+                const peerOptions = { config: { iceServers: rtcConfig.iceServers }, debug: 0 };
+                const token = clientToken();
+                hostMode = mode === 'host';
+
+                if (hostMode) {
+                    hostSetup(room, adminPassword);
+                    const peer = new Peer('voxel-' + room, peerOptions);
+                    peer.on('open', () => {
+                        localConn = { isLoopback: true, open: true };
+                        hostHandle(localConn, { type: 'join', name, seed, token });
+                    });
+                    peer.on('connection', (conn) => {
+                        conn.on('data', (data) => hostHandle(conn, data));
+                        conn.on('close', () => hostDrop(conn));
+                        conn.on('error', () => hostDrop(conn));
+                    });
+                    peer.on('disconnected', () => peer.reconnect()); // lost the introduction service; existing players stay connected
+                    peer.on('error', (err) => {
+                        if (err.type === 'unavailable-id') fail(`Room "${room}" is already being hosted. Pick another code, or switch to "Join".`);
+                        else fail(`Could not start the game (${err.type}).`);
+                    });
+                } else {
+                    const peer = new Peer(undefined, peerOptions);
+                    peer.on('open', () => {
+                        netConn = peer.connect('voxel-' + room, { reliable: true, serialization: 'json' });
+                        netConn.on('open', () => netConn.send({ type: 'join', name, seed, token }));
+                        netConn.on('data', onServerMessage);
+                        netConn.on('close', () => {
+                            fail('The host closed the game.');
+                            if (gameState.isRunning) showDisconnected('The host closed the game. Refresh the page to host or join another.');
+                        });
+                        netConn.on('error', () => fail('The connection to the host failed.'));
+                    });
+                    peer.on('error', (err) => {
+                        if (err.type === 'peer-unavailable') fail(`No game found with room code "${room}". Check the code, and that the host has the game open.`);
+                        else fail(`Connection problem (${err.type}).`);
+                    });
+                }
+            });
+        }
+
+        function netSend(message) {
+            if (hostMode) hostHandle(localConn, message);
+            else if (netConn && netConn.open) netConn.send(message);
+        }
+
+        // ===== Host: the game server, running inside the host's browser =====
+        const HOST_BLOCK_TYPES = new Set(['grass', 'stone', 'dirt', 'wood', 'leaves', 'sand', 'water', 'crystal', 'metal', 'glass']);
+        const HOST_LIMITS = { worldRadius: 80, maxHeight: 100, maxEdits: 200000, maxPlayers: 16, chatHistory: 50, editBatch: 3000 };
+        const host = { room: '', seed: null, seedLocked: false, adminPassword: '', edits: new Map(),
+                       players: new Map(), bannedTokens: new Set(), chat: [], nextId: 1, saveTimer: null };
+
+        function hostSetup(room, adminPassword) {
+            host.room = room;
+            host.adminPassword = adminPassword || Math.random().toString(36).slice(2, 8);
+            host.generatedPassword = !adminPassword;
+
+            // Bring back the world from the last time this room was hosted in this browser
+            try {
+                const saved = JSON.parse(localStorage.getItem('voxel-world-' + room));
+                if (saved && saved.seed) {
+                    host.seed = saved.seed;
+                    host.seedLocked = true;
+                    Object.entries(saved.edits || {}).forEach(([key, type]) => host.edits.set(key, type));
+                }
+            } catch (e) { /* nothing saved yet */ }
+        }
+
+        function hostScheduleSave() {
+            if (host.saveTimer) return;
+            host.saveTimer = setTimeout(() => {
+                host.saveTimer = null;
+                try {
+                    localStorage.setItem('voxel-world-' + host.room,
+                        JSON.stringify({ seed: host.seed, edits: Object.fromEntries(host.edits) }));
+                } catch (e) { /* storage full or blocked: the world just won't survive a restart */ }
+            }, 2000);
+        }
+
+        function hostSend(conn, message) {
+            if (conn.isLoopback) setTimeout(() => onServerMessage(message), 0);
+            else if (conn.open) conn.send(message);
+        }
+
+        function hostBroadcast(message, except) {
+            host.players.forEach(p => { if (p !== except) hostSend(p.conn, message); });
+        }
+
+        function hostChat(sender, text, kind) {
+            host.chat.push({ sender, text, kind });
+            if (host.chat.length > HOST_LIMITS.chatHistory) host.chat.shift();
+            hostBroadcast({ type: 'chat', sender, text, kind });
+        }
+
+        function hostPublic(p) {
+            return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, ry: p.ry, admin: p.admin };
+        }
+
+        function hostCleanName(raw) {
+            const name = String(raw || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20) || 'Player';
+            const taken = (n) => [...host.players.values()].some(p => p.name.toLowerCase() === n.toLowerCase());
+            let candidate = name;
+            for (let i = 2; taken(candidate); i++) candidate = `${name.slice(0, 17)} ${i}`;
+            return candidate;
+        }
+
+        function hostFindByName(name) {
+            const wanted = String(name || '').trim().toLowerCase();
+            return [...host.players.values()].find(p => p.name.toLowerCase() === wanted);
+        }
+
+        function hostKick(target, reason) {
+            hostSend(target.conn, { type: 'kicked', reason });
+            setTimeout(() => { if (target.conn.close) target.conn.close(); hostDrop(target.conn); }, 200);
+        }
+
+        function hostDrop(conn) {
+            const p = conn.player;
+            if (!p || !host.players.has(p.id)) return;
+            host.players.delete(p.id);
+            hostBroadcast({ type: 'left', id: p.id, name: p.name });
+            hostChat('System', `${p.name} left`, 'system');
+        }
+
+        function hostHandle(conn, msg) {
+            if (!msg || typeof msg.type !== 'string') return;
+
+            // Basic flood protection: at most 300 messages per second per connection
+            const now = Date.now();
+            if (!conn.budgetReset || now - conn.budgetReset > 1000) { conn.budgetReset = now; conn.budget = 300; conn.blockBudget = 30; }
+            if (--conn.budget < 0) return;
+
+            // ----- join -----
+            if (!conn.player) {
+                if (msg.type !== 'join') return;
+                const token = String(msg.token || '').slice(0, 64);
+                if (host.bannedTokens.has(token)) {
+                    hostSend(conn, { type: 'error', message: 'You are banned from this game.' });
+                    return;
+                }
+                if (host.players.size >= HOST_LIMITS.maxPlayers) {
+                    hostSend(conn, { type: 'error', message: 'This game is full.' });
+                    return;
+                }
+                if (!host.seedLocked) {
+                    host.seed = String(msg.seed || '').trim().slice(0, 40) || Math.random().toString(36).slice(2, 10);
+                    host.seedLocked = true;
+                    hostScheduleSave();
+                }
+
+                const player = { id: String(host.nextId++), name: hostCleanName(msg.name), conn, token,
+                                 x: 0, y: 20, z: 0, ry: 0, admin: !!conn.isLoopback };
+                conn.player = player;
+                hostSend(conn, {
+                    type: 'welcome', id: player.id, name: player.name, seed: host.seed, admin: player.admin,
+                    players: [...host.players.values()].map(hostPublic), chat: host.chat
+                });
+                // Saved block changes follow in batches so no single message gets too large
+                const all = [...host.edits].map(([key, t]) => [...key.split(',').map(Number), t]);
+                for (let i = 0; i < all.length; i += HOST_LIMITS.editBatch) {
+                    hostSend(conn, { type: 'edits', list: all.slice(i, i + HOST_LIMITS.editBatch) });
+                }
+                host.players.set(player.id, player);
+                hostBroadcast({ type: 'joined', player: hostPublic(player) }, player);
+                hostChat('System', `${player.name} joined`, 'system');
+                return;
+            }
+
+            const player = conn.player;
+            switch (msg.type) {
+                case 'move':
+                    if ([msg.x, msg.y, msg.z, msg.ry].every(n => typeof n === 'number' && Number.isFinite(n))) {
+                        player.x = msg.x; player.y = msg.y; player.z = msg.z; player.ry = msg.ry;
+                        hostBroadcast({ type: 'move', id: player.id, x: msg.x, y: msg.y, z: msg.z, ry: msg.ry }, player);
+                    }
+                    break;
+
+                case 'block': {
+                    const { x, y, z, t } = msg;
+                    const validPos = [x, y, z].every(Number.isInteger) && Math.abs(x) <= HOST_LIMITS.worldRadius &&
+                        Math.abs(z) <= HOST_LIMITS.worldRadius && y >= 0 && y <= HOST_LIMITS.maxHeight;
+                    if (!validPos || !(t === null || HOST_BLOCK_TYPES.has(t)) || --conn.blockBudget < 0) break;
+                    if (host.edits.size >= HOST_LIMITS.maxEdits && !host.edits.has(`${x},${y},${z}`)) break;
+
+                    host.edits.set(`${x},${y},${z}`, t);
+                    hostScheduleSave();
+                    hostBroadcast({ type: 'block', x, y, z, t }, player);
+                    break;
+                }
+
+                case 'chat': {
+                    const text = String(msg.text || '').trim().slice(0, 200);
+                    if (!text) break;
+
+                    // `/admin <password>` is checked here and never shown to other players
+                    if (/^\/admin(\s|$)/i.test(text)) {
+                        if (player.admin) {
+                            hostSend(conn, { type: 'admin', ok: true, message: 'You are already an admin.' });
+                        } else if (text.slice(6).trim() === host.adminPassword) {
+                            player.admin = true;
+                            hostSend(conn, { type: 'admin', ok: true, message: 'You are now an admin.' });
+                            hostChat('System', `${player.name} is now an admin`, 'system');
+                        } else {
+                            hostSend(conn, { type: 'admin', ok: false, message: 'Wrong admin password.' });
+                        }
+                        break;
+                    }
+                    hostChat(player.name, text, player.admin ? 'admin' : 'player');
+                    break;
+                }
+
+                case 'cmd': {
+                    if (!player.admin) break;
+                    const target = hostFindByName(msg.target);
+                    const notFound = () => hostSend(conn, { type: 'chat', sender: 'System', text: 'Player not found.', kind: 'system' });
+
+                    if (msg.action === 'kick' || msg.action === 'ban') {
+                        if (!target || target === player) return notFound();
+                        if (target.conn.isLoopback) {
+                            hostSend(conn, { type: 'chat', sender: 'System', text: 'The host cannot be removed.', kind: 'system' });
+                            break;
+                        }
+                        if (msg.action === 'ban') host.bannedTokens.add(target.token);
+                        hostChat('System', `${target.name} was ${msg.action === 'ban' ? 'banned' : 'kicked'} by ${player.name}`, 'system');
+                        hostKick(target, msg.action === 'ban' ? 'You were banned by an admin.' : 'You were kicked by an admin.');
+                    } else if (msg.action === 'teleport') {
+                        if (!target) return notFound();
+                        hostSend(conn, { type: 'teleport', x: target.x, y: target.y, z: target.z });
+                    } else if (msg.action === 'announce') {
+                        const text = String(msg.text || '').trim().slice(0, 200);
+                        if (text) hostChat('ANNOUNCEMENT', text, 'system');
+                    } else if (msg.action === 'clear') {
+                        host.chat.length = 0;
+                        hostBroadcast({ type: 'clearchat' });
+                    }
+                    break;
+                }
+
+                // Relays the connection setup for voice chat and the screen wall. The sender's id is
+                // stamped here, and only admins may ask to view screens ('who') or send view offers.
+                case 'sig': {
+                    const data = msg.data;
+                    if (!data || typeof data !== 'object') break;
+                    if (data.kind === 'screen' && (data.type === 'who' || data.type === 'offer') && !player.admin) break;
+
+                    const out = { type: 'sig', from: player.id, data };
+                    if (msg.to) {
+                        const dest = host.players.get(String(msg.to));
+                        if (dest) hostSend(dest.conn, out);
+                    } else {
+                        hostBroadcast(out, player);
+                    }
+                    break;
+                }
+            }
+        }
+
+        let disconnectedShown = false;
+        function showDisconnected(text) {
+            if (disconnectedShown) return; // e.g. keep the "you were kicked" reason when the socket then closes
+            disconnectedShown = true;
+            gameState.isRunning = false;
+            if (document.exitPointerLock) document.exitPointerLock();
+            const box = document.getElementById('loading');
+            box.textContent = text;
+            box.style.display = 'block';
+        }
+
+        function handleServerMessage(msg) {
+            switch (msg.type) {
+                case 'joined':
+                    addRemotePlayer(msg.player);
+                    updatePlayerCount();
+                    announceVoiceTo(msg.player.id);
+                    break;
+                case 'left':
+                    removeRemotePlayer(msg.id);
+                    updatePlayerCount();
+                    removeScreenPeer(msg.id);
+                    removeVoicePeer(msg.id);
+                    break;
+                case 'move': {
+                    const p = remotePlayers[msg.id];
+                    if (p) { p.target.set(msg.x, msg.y, msg.z); p.ry = msg.ry; }
+                    break;
+                }
+                case 'block':
+                    applyBlockEdit(msg.x, msg.y, msg.z, msg.t);
+                    break;
+                case 'edits':
+                    msg.list.forEach(([x, y, z, t]) => applyBlockEdit(x, y, z, t));
+                    break;
+                case 'chat':
+                    addChatMessage(msg.sender, msg.text, msg.kind);
+                    break;
+                case 'clearchat':
+                    document.getElementById('chat-messages').innerHTML = '';
+                    addChatMessage('System', 'Chat cleared by admin', 'system');
+                    break;
+                case 'admin':
+                    addChatMessage('System', msg.message, 'system');
+                    if (msg.ok && !gameState.isAdmin) {
+                        gameState.isAdmin = true;
+                        document.getElementById('admin-panel').style.display = 'block';
+                        initAdminScreens();
+                    }
+                    break;
+                case 'teleport':
+                    player.position.set(msg.x, msg.y, msg.z);
+                    velocityY = 0;
+                    break;
+                case 'kicked':
+                    showDisconnected(msg.reason);
+                    break;
+                case 'sig':
+                    if (msg.data && msg.data.kind === 'voice') {
+                        handleVoiceSignal(msg.from, msg.data);
+                    } else if (msg.data && msg.data.kind === 'screen') {
+                        handleScreenSignal(Object.assign({ from: msg.from }, msg.data));
+                    }
+                    break;
             }
         }
 
         function updatePlayerCount() {
-            const playerCount = Object.keys(serverData.players).length;
-            document.getElementById('player-count').textContent = playerCount;
+            document.getElementById('player-count').textContent = Object.keys(remotePlayers).length + 1;
         }
 
-        function syncChat() {
-            // Sync chat messages from server
-            if (serverData.chat && serverData.chat.length > 0) {
-                const chatMessages = document.getElementById('chat-messages');
-                const currentMessages = chatMessages.innerHTML;
-                
-                serverData.chat.forEach(msg => {
-                    if (!currentMessages.includes(msg.text)) {
-                        addChatMessage(msg.sender, msg.text, msg.type);
-                    }
-                });
-            }
+        // Other players: a coloured body and a floating name tag that glide towards the last position received
+        function addRemotePlayer(info) {
+            if (info.id === myId || remotePlayers[info.id]) return;
+
+            let hue = 0;
+            for (const c of info.name) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 1.8, 0.8),
+                new THREE.MeshLambertMaterial({ color: new THREE.Color(`hsl(${hue}, 70%, 55%)`) })
+            );
+            group.add(body);
+
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 256;
+            labelCanvas.height = 64;
+            const c2d = labelCanvas.getContext('2d');
+            c2d.fillStyle = 'rgba(0,0,0,0.6)';
+            c2d.fillRect(0, 0, 256, 64);
+            c2d.fillStyle = '#fff';
+            c2d.font = 'bold 30px sans-serif';
+            c2d.textAlign = 'center';
+            c2d.textBaseline = 'middle';
+            c2d.fillText(info.name, 128, 34, 240);
+            const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(labelCanvas) }));
+            label.scale.set(2, 0.5, 1);
+            label.position.y = 1.5;
+            group.add(label);
+
+            group.position.set(info.x, info.y, info.z);
+            scene.add(group);
+            remotePlayers[info.id] = { id: info.id, name: info.name, group, target: new THREE.Vector3(info.x, info.y, info.z), ry: info.ry || 0 };
         }
 
-        function broadcastChat(sender, message, type) {
-            if (!serverData.chat) serverData.chat = [];
-            serverData.chat.push({ sender, text: message, type, timestamp: Date.now() });
-            
-            // Keep only last 50 messages
-            if (serverData.chat.length > 50) {
-                serverData.chat = serverData.chat.slice(-50);
-            }
-            
-            saveServerData();
+        function removeRemotePlayer(id) {
+            const p = remotePlayers[id];
+            if (!p) return;
+            scene.remove(p.group);
+            p.group.traverse(o => {
+                if (o.geometry) o.geometry.dispose();
+                if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+            });
+            delete remotePlayers[id];
         }
 
-        // Simple noise function for terrain generation
-        function simpleNoise(seed) {
-            return function(x, z) {
-                const val = Math.sin(x * seed + z * seed) * Math.cos(x * seed - z * seed);
-                return val;
-            };
+        function updateRemotePlayers() {
+            Object.values(remotePlayers).forEach(p => {
+                p.group.position.lerp(p.target, 0.25);
+                p.group.rotation.y = p.ry;
+            });
         }
 
-        function generateRandomSeed() {
-            return Math.random().toString(36).substring(7);
+        // Tell the server where we are (10 times a second, only when something changed)
+        let lastSentMove = '';
+        let lastMoveTime = 0;
+        function sendMovement(now) {
+            if (now - lastMoveTime < 100) return;
+            lastMoveTime = now;
+            const p = player.position;
+            const state = `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)},${player.rotation.y.toFixed(2)}`;
+            if (state === lastSentMove) return;
+            lastSentMove = state;
+            netSend({ type: 'move', x: p.x, y: p.y, z: p.z, ry: player.rotation.y });
         }
 
         // Player movement
@@ -1068,6 +1743,12 @@
         let isJumping = false;
 
         function onKeyDown(event) {
+            // The screen wall swallows all keys except Esc, which closes it
+            if (wallOpen) {
+                if (event.key === 'Escape') toggleScreenWall();
+                return;
+            }
+
             // While chatting, keys go to the chat box only
             if (gameState.chatOpen) {
                 if (event.key === 'Escape') closeChat();
@@ -1115,24 +1796,8 @@
             const message = input.value.trim();
             
             if (message) {
-                addChatMessage(gameState.playerName, message, 'player');
-                broadcastChat(gameState.playerName, message, 'player');
-                
-                // Check for admin command
-                if (message.toLowerCase() === 'admin') {
-                    if (!gameState.isAdmin) {
-                        gameState.isAdmin = true;
-                        serverData.players[gameState.playerName].isAdmin = true;
-                        saveServerData();
-                        addChatMessage('System', `${gameState.playerName} is now an admin!`, 'system');
-                        broadcastChat('System', `${gameState.playerName} is now an admin!`, 'system');
-                        document.getElementById('admin-panel').style.display = 'block';
-                    } else {
-                        addChatMessage('System', 'You are already an admin!', 'system');
-                        broadcastChat('System', 'You are already an admin!', 'system');
-                    }
-                }
-                
+                // The server shows the message to everyone (including us) and handles /admin <password>
+                netSend({ type: 'chat', text: message });
                 input.value = '';
             }
 
@@ -1158,53 +1823,27 @@
         }
 
         // Admin functions
+        // Admin actions are checked again by the server, so only real admins can use them
         function adminTeleport() {
             const targetName = document.getElementById('teleport-target').value;
-            if (targetName && gameState.isAdmin) {
-                addChatMessage('Admin', `Teleporting to ${targetName}...`, 'admin');
-                // In a real multiplayer game, this would teleport to the target player
-                addChatMessage('System', `Teleported to ${targetName}`, 'system');
-            }
+            if (targetName && gameState.isAdmin) netSend({ type: 'cmd', action: 'teleport', target: targetName });
         }
 
         function adminKick() {
             const targetName = document.getElementById('kick-target').value;
-            if (targetName && gameState.isAdmin) {
-                addChatMessage('Admin', `Kicking ${targetName}...`, 'admin');
-                broadcastChat('Admin', `Kicking ${targetName}...`, 'admin');
-                addChatMessage('System', `${targetName} has been kicked from the server`, 'system');
-                broadcastChat('System', `${targetName} has been kicked from the server`, 'system');
-                
-                // Remove player from server
-                if (serverData.players[targetName]) {
-                    delete serverData.players[targetName];
-                    saveServerData();
-                }
-            }
+            if (targetName && gameState.isAdmin) netSend({ type: 'cmd', action: 'kick', target: targetName });
         }
 
         function adminBan() {
             const targetName = document.getElementById('ban-target').value;
-            if (targetName && gameState.isAdmin) {
-                addChatMessage('Admin', `Banning ${targetName}...`, 'admin');
-                broadcastChat('Admin', `Banning ${targetName}...`, 'admin');
-                addChatMessage('System', `${targetName} has been banned from the server`, 'system');
-                broadcastChat('System', `${targetName} has been banned from the server`, 'system');
-                
-                // Remove player from server
-                if (serverData.players[targetName]) {
-                    delete serverData.players[targetName];
-                    saveServerData();
-                }
-            }
+            if (targetName && gameState.isAdmin) netSend({ type: 'cmd', action: 'ban', target: targetName });
         }
 
         function adminGodMode() {
             if (gameState.isAdmin) {
                 gameState.godMode = !gameState.godMode;
                 addChatMessage('Admin', `God mode ${gameState.godMode ? 'enabled' : 'disabled'}`, 'admin');
-                broadcastChat('Admin', `God mode ${gameState.godMode ? 'enabled' : 'disabled'}`, 'admin');
-                
+
                 if (gameState.godMode) {
                     gameState.health = 1000;
                     gameState.hunger = 1000;
@@ -1212,32 +1851,27 @@
             }
         }
 
+        // Selects that block type for yourself (blocks are unlimited, so there is nothing to hand out)
         function adminGiveItem() {
-            const itemName = document.getElementById('give-item').value;
-            if (itemName && gameState.isAdmin) {
-                addChatMessage('Admin', `Giving ${itemName} to all players...`, 'admin');
-                broadcastChat('Admin', `Giving ${itemName} to all players...`, 'admin');
-                addChatMessage('System', `All players received ${itemName}`, 'system');
-                broadcastChat('System', `All players received ${itemName}`, 'system');
+            const itemName = document.getElementById('give-item').value.trim().toLowerCase();
+            if (!itemName || !gameState.isAdmin) return;
+
+            const index = [...document.querySelectorAll('.inventory-slot')].findIndex(s => s.dataset.block === itemName);
+            if (index >= 0) {
+                selectInventorySlot(index);
+                addChatMessage('System', `Selected ${itemName}`, 'system');
+            } else {
+                addChatMessage('System', `Unknown item "${itemName}"`, 'system');
             }
         }
 
         function adminClearChat() {
-            if (gameState.isAdmin) {
-                document.getElementById('chat-messages').innerHTML = '';
-                serverData.chat = [];
-                saveServerData();
-                addChatMessage('System', 'Chat cleared by admin', 'system');
-                broadcastChat('System', 'Chat cleared by admin', 'system');
-            }
+            if (gameState.isAdmin) netSend({ type: 'cmd', action: 'clear' });
         }
 
         function adminAnnounce() {
             const message = document.getElementById('announce-message').value;
-            if (message && gameState.isAdmin) {
-                addChatMessage('ANNOUNCEMENT', message, 'system');
-                broadcastChat('ANNOUNCEMENT', message, 'system');
-            }
+            if (message && gameState.isAdmin) netSend({ type: 'cmd', action: 'announce', text: message });
         }
 
         function rotateView(dx, dy, sensitivity = 0.002) {
@@ -1256,20 +1890,13 @@
 
         // button 0 = mine, button 2 = place (matches mouse buttons)
         function interact(button) {
-            // Raycast to find block
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const hit = raycastVoxel(6);
+            if (!hit) return;
 
-            const intersects = raycaster.intersectObjects(Object.values(blocks));
-
-            if (intersects.length > 0 && intersects[0].distance <= 6) {
-                const intersect = intersects[0];
-
-                if (button === 0) {
-                    removeBlock(intersect.object);
-                } else if (button === 2) {
-                    placeBlock(intersect);
-                }
+            if (button === 0) {
+                removeBlock(hit);
+            } else if (button === 2) {
+                placeBlock(hit);
             }
         }
 
@@ -1368,21 +1995,50 @@
             canvas.addEventListener('pointercancel', endLook);
         }
 
-        function removeBlock(block) {
-            const pos = block.position;
-
-            delete world[keyOf(pos.x, pos.y, pos.z)];
-            refreshAround(pos.x, pos.y, pos.z);
+        // Block changes apply locally straight away and are sent to the server, which shares them
+        function removeBlock(hit) {
+            applyBlockEdit(hit.x, hit.y, hit.z, null);
+            netSend({ type: 'block', x: hit.x, y: hit.y, z: hit.z, t: null });
         }
 
-        function placeBlock(intersect) {
-            const normal = intersect.face.normal;
-            const pos = intersect.object.position.clone().add(normal);
-            const x = Math.round(pos.x), y = Math.round(pos.y), z = Math.round(pos.z);
+        function placeBlock(hit) {
+            const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
 
-            if (!world[keyOf(x, y, z)] && !playerOccupies(x, y, z)) {
-                createBlock(x, y, z, gameState.selectedBlock);
+            if (y >= 0 && !world[keyOf(x, y, z)] && !playerOccupies(x, y, z)) {
+                applyBlockEdit(x, y, z, gameState.selectedBlock);
+                netSend({ type: 'block', x, y, z, t: gameState.selectedBlock });
             }
+        }
+
+        // Walk a ray from the camera through the voxel grid (blocks are centred on integers,
+        // so shift by 0.5 to make each block span [n, n+1)). Returns the first solid block hit
+        // and the face normal, or null if nothing is within reach.
+        function raycastVoxel(maxDist) {
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const o = [camera.position.x + 0.5, camera.position.y + 0.5, camera.position.z + 0.5];
+            const d = [dir.x, dir.y, dir.z];
+            const cell = o.map(Math.floor);
+            const step = d.map(v => (v > 0 ? 1 : -1));
+            const tDelta = d.map(v => (v === 0 ? Infinity : Math.abs(1 / v)));
+            const tMax = d.map((v, i) => {
+                if (v === 0) return Infinity;
+                return (v > 0 ? cell[i] + 1 - o[i] : o[i] - cell[i]) / Math.abs(v);
+            });
+            const normal = [0, 0, 0];
+
+            for (let t = 0; t <= maxDist;) {
+                if (world[keyOf(cell[0], cell[1], cell[2])]) {
+                    return { x: cell[0], y: cell[1], z: cell[2], nx: normal[0], ny: normal[1], nz: normal[2] };
+                }
+                const axis = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+                t = tMax[axis];
+                cell[axis] += step[axis];
+                tMax[axis] += tDelta[axis];
+                normal[0] = normal[1] = normal[2] = 0;
+                normal[axis] = -step[axis];
+            }
+            return null;
         }
 
         // Physics: the player is a 0.6 wide, ~1.8 tall column; feet = player.position.y - 1
@@ -1449,6 +2105,9 @@
             
             let feet = player.position.y - 1;
 
+            // Another player may have built a block on top of us: climb out of it
+            for (let i = 0; i < 8 && collides(player.position.x, feet, player.position.z); i++) feet += 1;
+
             // Move each axis separately so the player slides along walls
             const nextX = player.position.x + direction.x * moveSpeed;
             if (!collides(nextX, feet, player.position.z)) player.position.x = nextX;
@@ -1464,13 +2123,20 @@
             // Gravity
             velocityY = Math.max(velocityY - 0.01, -0.5);
             const nextFeet = feet + velocityY;
-            if (collides(player.position.x, nextFeet, player.position.z)) {
-                if (velocityY < 0) {
-                    // Landed: rest on top of the block below
-                    feet = Math.round(nextFeet + 0.05) + 0.5;
+            if (velocityY < 0) {
+                // Falling: probe just under the feet, and if there is a block, rest exactly on top of it
+                const probeY = nextFeet - 0.01;
+                const onBlock = bodyOffsetsXZ.some(dx => bodyOffsetsXZ.some(dz =>
+                    isSolid(player.position.x + dx, probeY, player.position.z + dz)));
+                if (onBlock) {
+                    feet = Math.round(probeY) + 0.5;
+                    velocityY = 0;
                     isJumping = false;
+                } else {
+                    feet = nextFeet;
                 }
-                velocityY = 0;
+            } else if (collides(player.position.x, nextFeet, player.position.z)) {
+                velocityY = 0; // bumped a ceiling
             } else {
                 feet = nextFeet;
             }
@@ -1488,8 +2154,23 @@
             camera.position.set(player.position.x, player.position.y - 1 + 1.6, player.position.z);
             
             // Update HUD
-            document.getElementById('position').textContent = 
-                `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
+            setHudText('position',
+                `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`);
+        }
+
+        // Touching the DOM every frame forces layout work, so only write when the value changed
+        const hudCache = {};
+        function setHudText(id, text) {
+            if (hudCache[id] === text) return;
+            hudCache[id] = text;
+            document.getElementById(id).textContent = text;
+        }
+
+        function setHudWidth(id, percent) {
+            const width = Math.round(percent) + '%';
+            if (hudCache[id] === width) return;
+            hudCache[id] = width;
+            document.getElementById(id).style.width = width;
         }
 
         function updateSurvival() {
@@ -1512,8 +2193,8 @@
             // Update HUD
             const displayHealth = gameState.godMode ? 100 : gameState.health;
             const displayHunger = gameState.godMode ? 100 : gameState.hunger;
-            document.getElementById('health-bar').style.width = displayHealth + '%';
-            document.getElementById('hunger-bar').style.width = displayHunger + '%';
+            setHudWidth('health-bar', displayHealth);
+            setHudWidth('hunger-bar', displayHunger);
         }
 
         // Voice chat
@@ -1531,6 +2212,7 @@
                 document.getElementById('voice-toggle').textContent = 'Mute';
                 document.getElementById('voice-toggle').classList.add('active');
                 startVoiceTransmission();
+                announceVoiceReady();
 
                 console.log('Voice chat initialized - always on');
             } catch (error) {
@@ -1539,6 +2221,7 @@
                 indicator.classList.add('inactive');
                 status.textContent = 'Mic unavailable';
                 document.getElementById('voice-toggle').textContent = 'Retry';
+                announceVoiceReady(); // we can still listen to everyone else
             }
         }
 
@@ -1610,7 +2293,9 @@
         function requestPointerLock() {
             // Touch devices have no pointer lock; the canvas listens for touches instead
             if (isTablet()) return;
-            document.getElementById('canvas').requestPointerLock();
+            // The browser refuses this without a recent click; the player can click the game to lock the mouse
+            const request = document.getElementById('canvas').requestPointerLock();
+            if (request && request.catch) request.catch(() => {});
         }
 
         function onPointerLockChange() {
@@ -1630,13 +2315,463 @@
             if (gameState.isRunning) {
                 updatePlayer();
                 updateSurvival();
+                updateRemotePlayers();
+                sendMovement(performance.now());
+                rebuildDirtyChunks();
                 renderer.render(scene, camera);
             }
         }
 
+        // Host by default with a fresh room code; a link like voxel_game.html?room=abc123 opens "Join" with the code filled in
+        function updateNetMode() {
+            const hosting = document.getElementById('net-mode').value === 'host';
+            document.getElementById('admin-pass-group').style.display = hosting ? 'block' : 'none';
+            document.getElementById('seed-group').style.display = hosting ? 'block' : 'none';
+            document.getElementById('start-btn').textContent = hosting ? '🎮 Host Game' : '🎮 Join Game';
+        }
+
+        (function initNetForm() {
+            const linkedRoom = normalizeRoom(new URLSearchParams(location.search).get('room'));
+            document.getElementById('net-mode').value = linkedRoom ? 'join' : 'host';
+            document.getElementById('room-code').value = linkedRoom || randomRoomCode();
+            updateNetMode();
+        })();
+
         // Preselect tablet on touch-first devices (the player can still change it)
         if (window.matchMedia('(pointer: coarse)').matches) {
             document.getElementById('device-type').value = 'tablet';
+        }
+
+        // ===== Screen sharing and the admin screen wall =====
+        // Every player streams their game view (plus mic) to any admin over WebRTC. The game server
+        // only relays the connection setup messages ("signalling"); the video itself goes
+        // directly between the players' browsers. Same public STUN/TURN helpers as camera_share.html.
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+                { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+            ]
+        };
+        const viewerConns = {};   // player side: admin id -> RTCPeerConnection
+        const screenPeers = {};   // admin side: player id -> { id, name, pc, stream, video, tile, gain }
+        let localShare = null;
+        let wallOpen = false;
+        let mainScreenId = null;
+        let audioGraph = null;
+        let recorder = null;
+        let recTimer = null;
+        let recDrawTimer = null;
+        let recStart = 0;
+        let recCanvas = null;
+
+        // Screen-share signalling goes through the server, which stamps our id as the sender
+        // and only lets admins send 'who' / 'offer'. `to` picks one player; leave it out for everyone.
+        function send(message) {
+            const { to, ...data } = message;
+            netSend({ type: 'sig', to, data: Object.assign({ kind: 'screen' }, data) });
+        }
+
+        function getShareStream() {
+            if (!localShare) {
+                localShare = new MediaStream();
+                document.getElementById('canvas').captureStream(30).getVideoTracks()
+                    .forEach(track => localShare.addTrack(track));
+            }
+            // The mic may only become available after the first call
+            if (mediaStream) {
+                mediaStream.getAudioTracks().forEach(track => {
+                    if (!localShare.getTracks().includes(track)) localShare.addTrack(track);
+                });
+            }
+            return localShare;
+        }
+
+        function handleScreenSignal(msg) {
+            if (msg.type === 'who') announcePresence();
+            else if (msg.type === 'hello' && gameState.isAdmin) connectToPlayer(msg.from, msg.name);
+            else if (msg.type === 'offer') answerViewer(msg);
+            else if (msg.type === 'answer' && screenPeers[msg.from]) acceptAnswer(msg);
+            else if (msg.type === 'ice') handleIce(msg);
+        }
+
+        function initScreenShare() {
+            // Hidden tabs don't get animation frames; keep the shared picture ticking over slowly
+            setInterval(() => {
+                if (document.hidden && gameState.isRunning) renderer.render(scene, camera);
+            }, 250);
+
+            window.addEventListener('beforeunload', (e) => {
+                if (recorder) { e.preventDefault(); e.returnValue = ''; }
+            });
+
+            announcePresence();
+        }
+
+        function announcePresence() {
+            send({ type: 'hello', name: gameState.playerName });
+        }
+
+        function handleIce(msg) {
+            const pc = viewerConns[msg.from] || (screenPeers[msg.from] && screenPeers[msg.from].pc);
+            if (!pc) return;
+            if (pc.remoteDescription) {
+                pc.addIceCandidate(msg.candidate).catch(() => {});
+            } else {
+                (pc.queuedIce = pc.queuedIce || []).push(msg.candidate);
+            }
+        }
+
+        function flushIce(pc) {
+            (pc.queuedIce || []).forEach(candidate => pc.addIceCandidate(candidate).catch(() => {}));
+            pc.queuedIce = [];
+        }
+
+        // Player side: answer an admin's request to view this screen
+        async function answerViewer(msg) {
+            if (viewerConns[msg.from]) viewerConns[msg.from].close();
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            viewerConns[msg.from] = pc;
+
+            const stream = getShareStream();
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            pc.onicecandidate = (e) => {
+                if (e.candidate) send({ type: 'ice', to: msg.from, candidate: e.candidate.toJSON() });
+            };
+            pc.onconnectionstatechange = () => {
+                if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+                    pc.close();
+                    if (viewerConns[msg.from] === pc) delete viewerConns[msg.from];
+                    updateViewerBanner();
+                }
+            };
+
+            await pc.setRemoteDescription(msg.sdp);
+            flushIce(pc);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            send({ type: 'answer', to: msg.from, sdp: { type: answer.type, sdp: answer.sdp } });
+            updateViewerBanner();
+        }
+
+        function updateViewerBanner() {
+            document.getElementById('viewer-banner').style.display =
+                Object.keys(viewerConns).length ? 'block' : 'none';
+        }
+
+        // Admin side
+        function initAdminScreens() {
+            if (!screenPeers.self) addScreenPeer({
+                id: 'self', name: `${gameState.playerName} (you)`, pc: null, stream: getShareStream()
+            });
+            send({ type: 'who' });
+        }
+
+        async function connectToPlayer(id, name) {
+            if (screenPeers[id]) {
+                screenPeers[id].name = name;
+                screenPeers[id].tile.querySelector('span').textContent = name;
+                return;
+            }
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            const entry = addScreenPeer({ id, name, pc, stream: new MediaStream() });
+
+            pc.addTransceiver('video', { direction: 'recvonly' });
+            pc.addTransceiver('audio', { direction: 'recvonly' });
+            pc.ontrack = (e) => {
+                entry.stream.addTrack(e.track);
+                if (e.track.kind === 'audio') connectEntryAudio(entry, e.track);
+            };
+            pc.onicecandidate = (e) => {
+                if (e.candidate) send({ type: 'ice', to: id, candidate: e.candidate.toJSON() });
+            };
+            pc.onconnectionstatechange = () => {
+                if (['failed', 'closed'].includes(pc.connectionState)) removeScreenPeer(id);
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            send({ type: 'offer', to: id, sdp: { type: offer.type, sdp: offer.sdp } });
+        }
+
+        async function acceptAnswer(msg) {
+            const pc = screenPeers[msg.from].pc;
+            await pc.setRemoteDescription(msg.sdp);
+            flushIce(pc);
+        }
+
+        function addScreenPeer(entry) {
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.srcObject = entry.stream;
+
+            const label = document.createElement('span');
+            label.textContent = entry.name;
+
+            const tile = document.createElement('div');
+            tile.className = 'wall-tile';
+            tile.append(video, label);
+            tile.addEventListener('click', () => setMainScreen(entry.id));
+            document.getElementById('wall-tiles').appendChild(tile);
+
+            entry.video = video;
+            entry.tile = tile;
+            screenPeers[entry.id] = entry;
+
+            // Our own tile has its mic track from the start; remote tracks connect in ontrack
+            entry.stream.getAudioTracks().forEach(track => connectEntryAudio(entry, track));
+            if (!mainScreenId) setMainScreen(entry.id);
+            return entry;
+        }
+
+        function removeScreenPeer(id) {
+            const entry = screenPeers[id];
+            if (!entry || id === 'self') return;
+
+            if (entry.pc) entry.pc.close();
+            if (entry.gain) entry.gain.disconnect();
+            entry.tile.remove();
+            delete screenPeers[id];
+
+            // While recording, keep the main id so the recording shows "disconnected" until the admin picks another
+            if (mainScreenId === id && !recorder) {
+                mainScreenId = null;
+                document.getElementById('main-video').srcObject = null;
+                document.getElementById('main-label').textContent = 'Click a screen below to make it the main one';
+            }
+        }
+
+        function setMainScreen(id) {
+            const entry = screenPeers[id];
+            if (!entry) return;
+
+            mainScreenId = id;
+            Object.values(screenPeers).forEach(p => {
+                p.tile.classList.toggle('main', p.id === id);
+                if (p.gain) p.gain.gain.value = p.id === id ? 1 : 0; // only the main screen's audio is heard/recorded
+            });
+            document.getElementById('main-video').srcObject = entry.stream;
+            document.getElementById('main-label').textContent = `Main screen: ${entry.name}`;
+        }
+
+        function ensureAudioGraph() {
+            audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+            audioContext.resume();
+            if (!audioGraph) {
+                const monitor = audioContext.createGain();
+                monitor.connect(audioContext.destination);
+                audioGraph = { recDest: audioContext.createMediaStreamDestination(), monitor };
+                updateMonitor();
+            }
+            return audioGraph;
+        }
+
+        function connectEntryAudio(entry, track) {
+            const graph = ensureAudioGraph();
+            const source = audioContext.createMediaStreamSource(new MediaStream([track]));
+            const gain = audioContext.createGain();
+            gain.gain.value = mainScreenId === entry.id ? 1 : 0;
+            source.connect(gain);
+            gain.connect(graph.recDest);
+            // Never play our own mic back to ourselves
+            if (entry.id !== 'self') gain.connect(graph.monitor);
+            entry.gain = gain;
+        }
+
+        function updateMonitor() {
+            if (audioGraph) {
+                audioGraph.monitor.gain.value = document.getElementById('monitor-audio').checked ? 1 : 0;
+            }
+        }
+
+        function toggleScreenWall() {
+            if (!gameState.isAdmin) return;
+
+            wallOpen = !wallOpen;
+            document.body.classList.toggle('wall-open', wallOpen);
+            if (wallOpen) {
+                Object.keys(keys).forEach(k => { keys[k] = false; });
+                if (document.exitPointerLock) document.exitPointerLock();
+                send({ type: 'who' });
+            } else {
+                requestPointerLock();
+            }
+        }
+
+        // Recording: a canvas redraws whichever screen is currently "main", so switching the main
+        // screen mid-recording just changes what gets drawn and which player's audio is unmuted.
+        function toggleRecording() {
+            if (recorder) {
+                recorder.stop();
+                return;
+            }
+            if (!mainScreenId) {
+                document.getElementById('rec-status').textContent = 'Pick a main screen first';
+                return;
+            }
+
+            recCanvas = document.createElement('canvas');
+            recCanvas.width = 1280;
+            recCanvas.height = 720;
+            const out = new MediaStream([
+                ...recCanvas.captureStream(30).getVideoTracks(),
+                ...ensureAudioGraph().recDest.stream.getAudioTracks()
+            ]);
+            const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+                .find(type => MediaRecorder.isTypeSupported(type));
+            const chunks = [];
+
+            recorder = new MediaRecorder(out, mimeType ? { mimeType } : undefined);
+            recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+            recorder.onstop = () => {
+                clearInterval(recTimer);
+                clearInterval(recDrawTimer);
+                recorder = null;
+                document.getElementById('rec-toggle').textContent = '⏺ Record main screen';
+                const status = document.getElementById('rec-status');
+                status.textContent = 'Saved recording';
+                status.classList.remove('recording');
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+                link.download = `voxel-recording-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+            };
+
+            recDrawTimer = setInterval(drawRecordingFrame, 1000 / 30);
+            recStart = Date.now();
+            recTimer = setInterval(() => {
+                const s = Math.floor((Date.now() - recStart) / 1000);
+                document.getElementById('rec-status').textContent =
+                    `● REC ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+            }, 500);
+            document.getElementById('rec-status').classList.add('recording');
+            document.getElementById('rec-toggle').textContent = '⏹ Stop and save';
+            recorder.start(1000);
+        }
+
+        function drawRecordingFrame() {
+            const ctx = recCanvas.getContext('2d');
+            const entry = screenPeers[mainScreenId];
+            const video = entry && entry.video;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, recCanvas.width, recCanvas.height);
+            if (video && video.videoWidth) {
+                const scale = Math.min(recCanvas.width / video.videoWidth, recCanvas.height / video.videoHeight);
+                const w = video.videoWidth * scale, h = video.videoHeight * scale;
+                ctx.drawImage(video, (recCanvas.width - w) / 2, (recCanvas.height - h) / 2, w, h);
+            } else {
+                ctx.fillStyle = '#fff';
+                ctx.font = '32px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Screen unavailable', recCanvas.width / 2, recCanvas.height / 2);
+                ctx.textAlign = 'start';
+            }
+            ctx.font = '22px sans-serif';
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(12, recCanvas.height - 46, 320, 34);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(entry ? entry.name : 'Disconnected', 22, recCanvas.height - 22);
+        }
+
+        // ===== Voice chat: every pair of players gets a direct audio connection =====
+        // Of each pair, the player with the lower id makes the offer, once both have announced
+        // that their microphone is sorted out (granted or not), so nobody negotiates twice at once.
+        const voicePeers = {};          // id -> { pc, audio }
+        const voiceReadyPeers = new Set();
+        let voiceReady = false;
+
+        function vsend(data, to) {
+            netSend({ type: 'sig', to, data: Object.assign({ kind: 'voice' }, data) });
+        }
+
+        function announceVoiceReady() {
+            voiceReady = true;
+            vsend({ type: 'ready' });
+            voiceReadyPeers.forEach(maybeStartVoice);
+        }
+
+        // A player just joined: tell them we are ready (they missed our earlier broadcast)
+        function announceVoiceTo(id) {
+            if (voiceReady) vsend({ type: 'ready' }, id);
+        }
+
+        function maybeStartVoice(id) {
+            if (voiceReady && Number(myId) < Number(id)) startVoice(id);
+        }
+
+        function createVoicePeer(id) {
+            removeVoicePeer(id, true);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            const audio = document.createElement('audio');
+            audio.autoplay = true;
+            document.body.appendChild(audio);
+
+            const micTracks = mediaStream ? mediaStream.getAudioTracks() : [];
+            micTracks.forEach(track => pc.addTrack(track, mediaStream));
+            pc.ontrack = (e) => {
+                audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+                audio.play().catch(() => {});
+            };
+            pc.onicecandidate = (e) => {
+                if (e.candidate) vsend({ type: 'ice', candidate: e.candidate.toJSON() }, id);
+            };
+
+            voicePeers[id] = { pc, audio, hasMic: micTracks.length > 0 };
+            return voicePeers[id];
+        }
+
+        async function startVoice(id) {
+            const peer = createVoicePeer(id);
+            if (!peer.hasMic) peer.pc.addTransceiver('audio', { direction: 'recvonly' });
+
+            const offer = await peer.pc.createOffer();
+            await peer.pc.setLocalDescription(offer);
+            vsend({ type: 'offer', sdp: { type: offer.type, sdp: offer.sdp } }, id);
+        }
+
+        async function answerVoice(from, data) {
+            const peer = createVoicePeer(from);
+            await peer.pc.setRemoteDescription(data.sdp);
+            flushIce(peer.pc);
+            const answer = await peer.pc.createAnswer();
+            await peer.pc.setLocalDescription(answer);
+            vsend({ type: 'answer', sdp: { type: answer.type, sdp: answer.sdp } }, from);
+        }
+
+        function handleVoiceSignal(from, data) {
+            const peer = voicePeers[from];
+            if (data.type === 'ready') {
+                voiceReadyPeers.add(from);
+                maybeStartVoice(from);
+            } else if (data.type === 'offer') {
+                answerVoice(from, data).catch(err => console.warn('Voice answer failed:', err));
+            } else if (data.type === 'answer' && peer) {
+                peer.pc.setRemoteDescription(data.sdp).then(() => flushIce(peer.pc)).catch(() => {});
+            } else if (data.type === 'ice' && peer) {
+                if (peer.pc.remoteDescription) peer.pc.addIceCandidate(data.candidate).catch(() => {});
+                else (peer.pc.queuedIce = peer.pc.queuedIce || []).push(data.candidate);
+            }
+        }
+
+        function removeVoicePeer(id, keepReady) {
+            const peer = voicePeers[id];
+            if (peer) {
+                peer.pc.close();
+                peer.audio.srcObject = null;
+                peer.audio.remove();
+                delete voicePeers[id];
+            }
+            if (!keepReady) voiceReadyPeers.delete(id);
         }
 
         // Prevent context menu
