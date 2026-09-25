@@ -187,6 +187,18 @@
             transition: all 0.2s;
         }
 
+        .inventory-slot {
+            position: relative;
+        }
+
+        .slot-count {
+            position: absolute;
+            right: 4px;
+            bottom: 1px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
         .inventory-slot:hover {
             border-color: #f0c030;
             background: rgba(255,255,255,0.2);
@@ -785,6 +797,10 @@
                     </div>
                 </div>
                 <div class="hud-item">
+                    <div class="hud-label">Seeds</div>
+                    <div class="hud-value" id="seed-hud">0</div>
+                </div>
+                <div class="hud-item">
                     <div class="hud-label">Position</div>
                     <div class="hud-value" id="position">0, 0, 0</div>
                 </div>
@@ -800,6 +816,7 @@
                 <div class="inventory-slot" data-block="crystal" title="Crystal">💎</div>
                 <div class="inventory-slot" data-block="metal" title="Metal">⚙️</div>
                 <div class="inventory-slot" data-block="glass" title="Glass">🔲</div>
+                <div class="inventory-slot" data-block="seed" title="Seeds: plant on grass or dirt and a tree grows (key 0)">🌱<span id="seed-count" class="slot-count">0</span></div>
             </div>
             
             <div id="voice-chat" style="display: none;">
@@ -913,6 +930,7 @@
             health: 100,
             hunger: 100,
             selectedBlock: 'stone',
+            seeds: 0,
             voiceChatEnabled: true,
             voiceChatMuted: false,
             isAdmin: false,
@@ -933,6 +951,7 @@
         // Block types with colors
         const blockTypes = {
             grass: { color: 0x3CB043, emoji: '🌱' },
+            sapling: { color: 0x7CCF5A, emoji: '🌱' },
             stone: { color: 0x808080, emoji: '🪨' },
             dirt: { color: 0x8B4513, emoji: '🟫' },
             wood: { color: 0x8B4513, emoji: '🪵' },
@@ -1044,7 +1063,7 @@
             // Scene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.Fog(0x87CEEB, 50, 150);
+            scene.fog = new THREE.Fog(0x87CEEB, 40, VIEW_RADIUS * CHUNK - 8); // hides where the loaded world ends
 
             // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -1070,14 +1089,6 @@
             const playerMesh = new THREE.Mesh(playerGeometry, playerMaterial);
             player.add(playerMesh);
             scene.add(player);
-
-            // Ground plane
-            const groundGeometry = new THREE.PlaneGeometry(200, 200);
-            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2;
-            ground.position.y = -0.5;
-            scene.add(ground);
 
             // Event listeners
             window.addEventListener('resize', onWindowResize);
@@ -1110,14 +1121,21 @@
             });
         }
 
-        // world holds every block's type. It is drawn as one merged mesh per 16x16 chunk that
-        // contains only the faces touching air, so the GPU sees a handful of draw calls
-        // instead of thousands of cubes.
-        let world = {};
-        let worldMaxY = 0;
+        // The world is endless. Terrain is a pure function of the seed, generated in 16x16 chunks
+        // around the player as they move and forgotten again when they walk away. Only the changes
+        // players make are stored (editsByChunk) and they are re-applied whenever a chunk is
+        // generated again. Each chunk is drawn as one merged mesh with only the faces touching air.
         const CHUNK = 16;
+        const VIEW_RADIUS = 6;                 // chunks drawn in every direction (96 blocks)
+        const chunks = new Map();              // "cx,cz" -> { heights: Int16Array, trees: Map("x,y,z" -> type), topY }
+        const editsByChunk = new Map();        // "cx,cz" -> Map("x,y,z" -> type, or null for a removed block)
         const chunkMeshes = {};
+        const builtChunks = new Set();         // chunks whose mesh exists (it can be empty)
         const dirtyChunks = new Set();
+        const genQueue = [];                   // chunks still to generate, nearest first
+        let worldSeedHash = 0;
+        let streamChunkX = null;
+        let streamChunkZ = null;
         const chunkMaterial = () => chunkMaterial.cached ||
             (chunkMaterial.cached = new THREE.MeshLambertMaterial({ vertexColors: true }));
 
@@ -1141,19 +1159,77 @@
             });
         }
 
+        function removeChunkMesh(key) {
+            const mesh = chunkMeshes[key];
+            if (mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                delete chunkMeshes[key];
+            }
+        }
+
         function buildChunk(cx, cz) {
+            const key = `${cx},${cz}`;
+            const chunk = chunks.get(key);
+            removeChunkMesh(key);
+            if (!chunk) {
+                builtChunks.delete(key);
+                return;
+            }
+            builtChunks.add(key);
+
+            // Faces look one block into the neighbouring chunks, so gather their surface heights
+            // (and any trees / player edits) once up front instead of asking getBlock for every block
+            const x0 = cx * CHUNK, z0 = cz * CHUNK;
+            const pad = new Int16Array((CHUNK + 2) * (CHUNK + 2));
+            for (let pz = 0; pz < CHUNK + 2; pz++) {
+                for (let px = 0; px < CHUNK + 2; px++) {
+                    const x = x0 - 1 + px, z = z0 - 1 + pz;
+                    const ncx = Math.floor(x / CHUNK), ncz = Math.floor(z / CHUNK);
+                    const nb = chunks.get(chunkKey(ncx, ncz));
+                    pad[pz * (CHUNK + 2) + px] = nb ? nb.heights[(z - ncz * CHUNK) * CHUNK + (x - ncx * CHUNK)]
+                                                    : terrainHeight(x, z, worldSeedHash);
+                }
+            }
+            const localEdits = new Map(), localTrees = new Map();
+            let sparseTop = -1;
+            for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nk = chunkKey(cx + dx, cz + dz);
+                const nb = chunks.get(nk);
+                if (nb) {
+                    nb.trees.forEach((type, k) => localTrees.set(k, type));
+                    sparseTop = Math.max(sparseTop, nb.topY);
+                }
+                const nbEdits = editsByChunk.get(nk);
+                if (nbEdits) nbEdits.forEach((type, k) => localEdits.set(k, type));
+            }
+            const blockAt = (x, y, z) => {
+                if (y < 0) return null;
+                if (localEdits.size) {
+                    const edited = localEdits.get(x + ',' + y + ',' + z);
+                    if (edited !== undefined) return edited;
+                }
+                const h = pad[(z - z0 + 1) * (CHUNK + 2) + (x - x0 + 1)];
+                if (y <= h) return y === h ? 'grass' : (y > h - 3 ? 'dirt' : 'stone');
+                if (y > sparseTop) return null;
+                return localTrees.get(x + ',' + y + ',' + z) || null;
+            };
+
             const positions = [], normals = [], colors = [], indices = [];
 
-            for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
-                for (let z = cz * CHUNK; z < (cz + 1) * CHUNK; z++) {
-                    for (let y = 0; y <= worldMaxY; y++) {
-                        const type = world[keyOf(x, y, z)];
+            for (let lz = 0; lz < CHUNK; lz++) {
+                for (let lx = 0; lx < CHUNK; lx++) {
+                    const x = x0 + lx, z = z0 + lz;
+                    // Above the surface only trees and player-built blocks can exist
+                    const yMax = chunk.colTop[lz * CHUNK + lx];
+                    for (let y = 0; y <= yMax; y++) {
+                        const type = blockAt(x, y, z);
                         if (!type) continue;
 
                         tmpColor.setHex(blockTypes[type].color);
                         for (const f of faces) {
                             const [nx, ny, nz] = f.n;
-                            if (y + ny < 0 || world[keyOf(x + nx, y + ny, z + nz)]) continue;
+                            if (y + ny < 0 || blockAt(x + nx, y + ny, z + nz)) continue;
 
                             const base = positions.length / 3;
                             for (const [su, sv] of cornerSigns) {
@@ -1171,12 +1247,6 @@
                 }
             }
 
-            const key = `${cx},${cz}`;
-            if (chunkMeshes[key]) {
-                scene.remove(chunkMeshes[key]);
-                chunkMeshes[key].geometry.dispose();
-                delete chunkMeshes[key];
-            }
             if (!indices.length) return;
 
             const geometry = new THREE.BufferGeometry();
@@ -1190,12 +1260,166 @@
             chunkMeshes[key] = mesh;
         }
 
-        function rebuildDirtyChunks() {
-            dirtyChunks.forEach(key => {
+        // Rebuild a few changed chunks per frame, nearest to the player first (a block you just
+        // placed is always in the nearest chunk, so it shows up immediately)
+        function rebuildDirtyChunks(limit = 2) {
+            if (!dirtyChunks.size) return;
+            const pcx = Math.floor(player.position.x / CHUNK), pcz = Math.floor(player.position.z / CHUNK);
+            const list = [...dirtyChunks].map(key => {
                 const [cx, cz] = key.split(',').map(Number);
-                buildChunk(cx, cz);
-            });
-            dirtyChunks.clear();
+                return { key, cx, cz, dist: (cx - pcx) ** 2 + (cz - pcz) ** 2 };
+            }).sort((a, b) => a.dist - b.dist);
+
+            for (const c of list.slice(0, limit)) {
+                dirtyChunks.delete(c.key);
+                buildChunk(c.cx, c.cz);
+            }
+        }
+
+        function chunkKey(cx, cz) {
+            return cx + ',' + cz;
+        }
+
+        // The block at a position: a player's edit if there is one, else what the terrain and trees
+        // generate there. Returns the type name, or null for air. Works for chunks that are not
+        // loaded too (terrain only), so physics never falls through the world while chunks stream in.
+        function getBlock(x, y, z) {
+            if (y < 0) return null;
+            const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+            const ck = cx + ',' + cz;
+
+            const edits = editsByChunk.get(ck);
+            if (edits) {
+                const edited = edits.get(x + ',' + y + ',' + z);
+                if (edited !== undefined) return edited; // null = the block was removed
+            }
+
+            const chunk = chunks.get(ck);
+            const height = chunk ? chunk.heights[(z - cz * CHUNK) * CHUNK + (x - cx * CHUNK)]
+                                 : terrainHeight(x, z, worldSeedHash);
+            if (y <= height) return y === height ? 'grass' : (y > height - 3 ? 'dirt' : 'stone');
+            if (chunk && chunk.trees.size) return chunk.trees.get(x + ',' + y + ',' + z) || null;
+            return null;
+        }
+
+        // Where a tree's trunk starts in this column (0 = no tree). Trees are a fixed function of the
+        // seed, not random, so every player sees the same forest.
+        function treeBase(x, z) {
+            if (hash01(x, z, worldSeedHash + 3) >= 0.02 || Math.abs(x) <= 3 || Math.abs(z) <= 3) return 0;
+            const height = terrainHeight(x, z, worldSeedHash);
+            return height > 3 ? height + 1 : 0;
+        }
+
+        function generateChunk(cx, cz) {
+            const x0 = cx * CHUNK, z0 = cz * CHUNK;
+            const heights = new Int16Array(CHUNK * CHUNK);
+            for (let lz = 0; lz < CHUNK; lz++) {
+                for (let lx = 0; lx < CHUNK; lx++) {
+                    heights[lz * CHUNK + lx] = terrainHeight(x0 + lx, z0 + lz, worldSeedHash);
+                }
+            }
+
+            // Look 2 blocks past the chunk edge for trees, since their leaves reach into this chunk.
+            // Wood always wins over leaves, so the result doesn't depend on the order trees are added.
+            // colTop is the highest block in each column (the drawing loop stops there).
+            const trees = new Map();
+            const colTop = Int16Array.from(heights);
+            let topY = 0;
+            const inside = (x, z) => x >= x0 && x < x0 + CHUNK && z >= z0 && z < z0 + CHUNK;
+            const raise = (x, y, z) => {
+                const i = (z - z0) * CHUNK + (x - x0);
+                if (y > colTop[i]) colTop[i] = y;
+                if (y > topY) topY = y;
+            };
+            for (let x = x0 - 2; x < x0 + CHUNK + 2; x++) {
+                for (let z = z0 - 2; z < z0 + CHUNK + 2; z++) {
+                    const base = treeBase(x, z);
+                    if (!base) continue;
+
+                    if (inside(x, z)) {
+                        for (let i = 0; i < 4; i++) {
+                            trees.set(keyOf(x, base + i, z), 'wood');
+                            raise(x, base + i, z);
+                        }
+                    }
+                    for (let dx = -2; dx <= 2; dx++) {
+                        for (let dz = -2; dz <= 2; dz++) {
+                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+                            if (!inside(x + dx, z + dz)) continue;
+                            for (let dy = 3; dy <= 5; dy++) {
+                                const key = keyOf(x + dx, base + dy, z + dz);
+                                if (!trees.has(key)) trees.set(key, 'leaves');
+                                raise(x + dx, base + dy, z + dz);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const edits = editsByChunk.get(chunkKey(cx, cz));
+            if (edits) {
+                for (const [key, type] of edits) {
+                    if (!type) continue;
+                    const [ex, ey, ez] = key.split(',').map(Number);
+                    raise(ex, ey, ez);
+                }
+            }
+            chunks.set(chunkKey(cx, cz), { heights, colTop, trees, topY });
+        }
+
+        // (Chunks store: heights = surface height per column, colTop = highest block per column,
+        // trees = generated tree blocks, topY = highest block in the chunk.)
+
+        // A chunk can be drawn once it and its four neighbours exist (otherwise its edge faces
+        // would show, as the neighbour looks like empty space)
+        function tryQueueMesh(cx, cz) {
+            const key = chunkKey(cx, cz);
+            if (builtChunks.has(key) || dirtyChunks.has(key)) return;
+            if (Math.max(Math.abs(cx - streamChunkX), Math.abs(cz - streamChunkZ)) > VIEW_RADIUS) return;
+            const neighbours = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+            if (neighbours.every(([dx, dz]) => chunks.has(chunkKey(cx + dx, cz + dz)))) dirtyChunks.add(key);
+        }
+
+        // The player entered a new chunk: forget far away chunks and line up the ones that are missing
+        function planStreaming(pcx, pcz) {
+            streamChunkX = pcx;
+            streamChunkZ = pcz;
+
+            for (const key of [...chunks.keys()]) {
+                const [cx, cz] = key.split(',').map(Number);
+                const dist = Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz));
+                if (dist > VIEW_RADIUS + 1) {
+                    removeChunkMesh(key);
+                    builtChunks.delete(key);
+                    dirtyChunks.delete(key);
+                }
+                if (dist > VIEW_RADIUS + 3) chunks.delete(key);
+            }
+
+            genQueue.length = 0;
+            for (let dx = -(VIEW_RADIUS + 1); dx <= VIEW_RADIUS + 1; dx++) {
+                for (let dz = -(VIEW_RADIUS + 1); dz <= VIEW_RADIUS + 1; dz++) {
+                    if (!chunks.has(chunkKey(pcx + dx, pcz + dz))) genQueue.push([pcx + dx, pcz + dz, dx * dx + dz * dz]);
+                }
+            }
+            genQueue.sort((a, b) => a[2] - b[2]);
+
+            for (let dx = -VIEW_RADIUS; dx <= VIEW_RADIUS; dx++) {
+                for (let dz = -VIEW_RADIUS; dz <= VIEW_RADIUS; dz++) tryQueueMesh(pcx + dx, pcz + dz);
+            }
+        }
+
+        // Called every frame: generate the nearest missing chunks (two per frame keeps it smooth)
+        function updateStreaming(px, pz) {
+            const pcx = Math.floor(px / CHUNK), pcz = Math.floor(pz / CHUNK);
+            if (pcx !== streamChunkX || pcz !== streamChunkZ) planStreaming(pcx, pcz);
+
+            for (let i = 0; i < 2 && genQueue.length; i++) {
+                const [cx, cz] = genQueue.shift();
+                if (chunks.has(chunkKey(cx, cz))) continue;
+                generateChunk(cx, cz);
+                [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz]) => tryQueueMesh(cx + dx, cz + dz));
+            }
         }
 
         function keyOf(x, y, z) {
@@ -1235,73 +1459,47 @@
 
         // Block changes made by players (from the server) are applied on top of the generated terrain
         function applyBlockEdit(x, y, z, type) {
-            if (type) {
-                world[keyOf(x, y, z)] = type;
-                worldMaxY = Math.max(worldMaxY, y);
-            } else {
-                delete world[keyOf(x, y, z)];
+            const ck = chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK));
+            let edits = editsByChunk.get(ck);
+            if (!edits) editsByChunk.set(ck, edits = new Map());
+            edits.set(keyOf(x, y, z), type || null);
+
+            const chunk = chunks.get(ck);
+            if (chunk && type) {
+                const i = (z - Math.floor(z / CHUNK) * CHUNK) * CHUNK + (x - Math.floor(x / CHUNK) * CHUNK);
+                chunk.colTop[i] = Math.max(chunk.colTop[i], y);
+                chunk.topY = Math.max(chunk.topY, y);
             }
             markDirty(x, z);
         }
 
-        function generateWorld(seed, edits) {
-            const worldSize = 32;
-            const h = hashSeed(seed);
+        function generateWorld(seed) {
+            worldSeedHash = hashSeed(seed);
+            chunks.clear();
+            editsByChunk.clear();
+            Object.keys(chunkMeshes).forEach(removeChunkMesh);
+            builtChunks.clear();
+            dirtyChunks.clear();
+            genQueue.length = 0;
+            streamChunkX = streamChunkZ = null;
+            player.position.set(0, 20, 0);
 
-            world = {};
-            worldMaxY = 0;
-            for (let x = -worldSize; x < worldSize; x++) {
-                for (let z = -worldSize; z < worldSize; z++) {
-                    const height = terrainHeight(x, z, h);
-
-                    worldMaxY = Math.max(worldMaxY, height + 7); // room for trees
-                    for (let y = 0; y <= height; y++) {
-                        let blockType = 'stone';
-                        if (y === height) blockType = 'grass';
-                        else if (y > height - 3) blockType = 'dirt';
-                        world[keyOf(x, y, z)] = blockType;
-                    }
-
-                    // Add some trees (not at the spawn point or the world edge)
-                    if (hash01(x, z, h + 3) < 0.02 && height > 3 && Math.abs(x) > 3 && Math.abs(z) > 3
-                        && Math.abs(x) < worldSize - 3 && Math.abs(z) < worldSize - 3) {
-                        createTree(x, height + 1, z);
-                    }
-                }
+            // Build the area around the spawn point right now so there is ground to stand on;
+            // everything further out streams in as the game runs
+            for (let cx = -3; cx <= 3; cx++) {
+                for (let cz = -3; cz <= 3; cz++) generateChunk(cx, cz);
             }
-
-            (edits || []).forEach(([x, y, z, type]) => applyBlockEdit(x, y, z, type));
-
-            for (let cx = -worldSize / CHUNK; cx < worldSize / CHUNK; cx++) {
-                for (let cz = -worldSize / CHUNK; cz < worldSize / CHUNK; cz++) {
-                    dirtyChunks.add(`${cx},${cz}`);
-                }
+            for (let cx = -2; cx <= 2; cx++) {
+                for (let cz = -2; cz <= 2; cz++) dirtyChunks.add(chunkKey(cx, cz));
             }
-            rebuildDirtyChunks();
+            rebuildDirtyChunks(Infinity);
+            planStreaming(0, 0);
 
             // Spawn on top of the terrain at the origin
             let top = 0;
-            while (world[keyOf(0, top + 1, 0)]) top++;
+            while (getBlock(0, top + 1, 0)) top++;
             player.position.set(0, top + 0.5 + 1 + 0.05, 0);
             velocityY = 0;
-        }
-
-        function createTree(x, y, z) {
-            // Trunk
-            for (let i = 0; i < 4; i++) {
-                world[keyOf(x, y + i, z)] = 'wood';
-            }
-
-            // Leaves
-            for (let dx = -2; dx <= 2; dx++) {
-                for (let dz = -2; dz <= 2; dz++) {
-                    for (let dy = 3; dy <= 5; dy++) {
-                        if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                        const key = keyOf(x + dx, y + dy, z + dz);
-                        if (!world[key]) world[key] = 'leaves';
-                    }
-                }
-            }
         }
 
         // ===== Multiplayer: one player hosts, the others join with a room code =====
@@ -1422,8 +1620,8 @@
         }
 
         // ===== Host: the game server, running inside the host's browser =====
-        const HOST_BLOCK_TYPES = new Set(['grass', 'stone', 'dirt', 'wood', 'leaves', 'sand', 'water', 'crystal', 'metal', 'glass']);
-        const HOST_LIMITS = { worldRadius: 80, maxHeight: 100, maxEdits: 200000, maxPlayers: 16, chatHistory: 50, editBatch: 3000 };
+        const HOST_BLOCK_TYPES = new Set(['grass', 'stone', 'dirt', 'wood', 'leaves', 'sand', 'water', 'crystal', 'metal', 'glass', 'sapling']);
+        const HOST_LIMITS = { worldRadius: 1000000, maxHeight: 100, maxEdits: 200000, maxPlayers: 16, chatHistory: 50, editBatch: 3000 };
         const host = { room: '', seed: null, seedLocked: false, adminPassword: '', edits: new Map(),
                        players: new Map(), bannedTokens: new Set(), chat: [], nextId: 1, saveTimer: null };
 
@@ -1504,7 +1702,7 @@
 
             // Basic flood protection: at most 300 messages per second per connection
             const now = Date.now();
-            if (!conn.budgetReset || now - conn.budgetReset > 1000) { conn.budgetReset = now; conn.budget = 300; conn.blockBudget = 30; }
+            if (!conn.budgetReset || now - conn.budgetReset > 1000) { conn.budgetReset = now; conn.budget = 300; conn.blockBudget = 150; }
             if (--conn.budget < 0) return;
 
             // ----- join -----
@@ -1798,9 +1996,8 @@
             }
 
             // Number keys for inventory
-            if (event.key >= '1' && event.key <= '9') {
-                const index = parseInt(event.key) - 1;
-                selectInventorySlot(index);
+            if (event.key.length === 1 && event.key >= '0' && event.key <= '9') {
+                selectInventorySlot((parseInt(event.key) + 9) % 10); // 1-9 are slots 1-9, 0 is slot 10
             }
 
             // Chat toggle (preventDefault keeps the key from being typed into the box)
@@ -2035,18 +2232,135 @@
             canvas.addEventListener('pointercancel', endLook);
         }
 
-        // Block changes apply locally straight away and are sent to the server, which shares them
+        // Block changes apply locally straight away and are sent to the host, which shares them
+        function setBlock(x, y, z, type) {
+            applyBlockEdit(x, y, z, type);
+            netSend({ type: 'block', x, y, z, t: type });
+        }
+
         function removeBlock(hit) {
-            applyBlockEdit(hit.x, hit.y, hit.z, null);
-            netSend({ type: 'block', x: hit.x, y: hit.y, z: hit.z, t: null });
+            const type = getBlock(hit.x, hit.y, hit.z);
+            setBlock(hit.x, hit.y, hit.z, null);
+
+            if (type === 'wood') scheduleLeafDecay(hit.x, hit.y, hit.z);
+            else if (type === 'leaves' && Math.random() < 0.2) dropSeed(hit.x, hit.y, hit.z);
         }
 
         function placeBlock(hit) {
             const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
+            if (y < 0 || getBlock(x, y, z) || playerOccupies(x, y, z)) return;
 
-            if (y >= 0 && !world[keyOf(x, y, z)] && !playerOccupies(x, y, z)) {
-                applyBlockEdit(x, y, z, gameState.selectedBlock);
-                netSend({ type: 'block', x, y, z, t: gameState.selectedBlock });
+            if (gameState.selectedBlock === 'seed') {
+                // A seed can only be planted on top of grass or dirt, and becomes a sapling that grows into a tree
+                const below = getBlock(x, y - 1, z);
+                if (gameState.seeds < 1 || hit.ny !== 1 || (below !== 'grass' && below !== 'dirt')) return;
+                addSeeds(-1);
+                setBlock(x, y, z, 'sapling');
+                setTimeout(() => growTree(x, y, z), 15000 + Math.random() * 10000);
+                return;
+            }
+            setBlock(x, y, z, gameState.selectedBlock);
+        }
+
+        // ----- Leaves, seeds and trees -----
+        const LEAF_SUPPORT_RADIUS = 3;   // leaves need a tree trunk within this many blocks
+        const seedDrops = [];
+        let seedGeometry = null;
+        let seedMaterial = null;
+
+        function hasWoodNear(x, y, z) {
+            const r = LEAF_SUPPORT_RADIUS;
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dz = -r; dz <= r; dz++) {
+                        if (getBlock(x + dx, y + dy, z + dz) === 'wood') return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Cutting a trunk block: leaves nearby that have no wood left wither away one by one over the
+        // next few seconds. This runs on the player who cut the wood; everyone else sees the leaves vanish.
+        function scheduleLeafDecay(wx, wy, wz) {
+            const r = LEAF_SUPPORT_RADIUS;
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dz = -r; dz <= r; dz++) {
+                        const x = wx + dx, y = wy + dy, z = wz + dz;
+                        if (getBlock(x, y, z) === 'leaves' && !hasWoodNear(x, y, z)) {
+                            setTimeout(() => decayLeaf(x, y, z), 500 + Math.random() * 5000);
+                        }
+                    }
+                }
+            }
+        }
+
+        function decayLeaf(x, y, z) {
+            // It may already be gone, or wood may have been placed next to it in the meantime
+            if (getBlock(x, y, z) !== 'leaves' || hasWoodNear(x, y, z)) return;
+            setBlock(x, y, z, null);
+            if (Math.random() < 0.3) dropSeed(x, y, z);
+        }
+
+        function addSeeds(amount) {
+            gameState.seeds = Math.max(0, (gameState.seeds || 0) + amount);
+            setHudText('seed-hud', String(gameState.seeds));
+            setHudText('seed-count', String(gameState.seeds));
+        }
+
+        // A dropped seed is a small spinning item that falls to the ground and is collected by walking
+        // over it. Only the player who caused the drop sees it, and it disappears after 90 seconds.
+        function dropSeed(x, y, z) {
+            seedGeometry = seedGeometry || new THREE.BoxGeometry(0.25, 0.25, 0.25);
+            seedMaterial = seedMaterial || new THREE.MeshLambertMaterial({ color: 0xC9A227 });
+            const mesh = new THREE.Mesh(seedGeometry, seedMaterial);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            seedDrops.push({ mesh, vy: 0.06, born: performance.now() });
+        }
+
+        function updateSeedDrops() {
+            const now = performance.now();
+            for (let i = seedDrops.length - 1; i >= 0; i--) {
+                const drop = seedDrops[i];
+                const p = drop.mesh.position;
+
+                // Fall until resting on top of a block
+                drop.vy = Math.max(drop.vy - 0.008, -0.3);
+                const nextY = p.y + drop.vy;
+                if (drop.vy < 0 && isSolid(p.x, nextY - 0.15, p.z)) {
+                    p.y = Math.round(nextY - 0.15) + 0.5 + 0.13;
+                    drop.vy = 0;
+                } else {
+                    p.y = nextY;
+                }
+                drop.mesh.rotation.y += 0.05;
+
+                const near = Math.hypot(player.position.x - p.x, player.position.z - p.z) < 1.4 &&
+                             Math.abs(player.position.y - p.y) < 2.2;
+                if (near || now - drop.born > 90000 || p.y < -20) {
+                    scene.remove(drop.mesh);
+                    seedDrops.splice(i, 1);
+                    if (near) addSeeds(1);
+                }
+            }
+        }
+
+        function growTree(x, y, z) {
+            if (getBlock(x, y, z) !== 'sapling') return; // it was dug up
+            for (let i = 1; i <= 3; i++) {
+                if (getBlock(x, y + i, z)) { setTimeout(() => growTree(x, y, z), 10000); return; } // no room yet, try again later
+            }
+
+            for (let i = 0; i < 4; i++) setBlock(x, y + i, z, 'wood');
+            for (let dx = -2; dx <= 2; dx++) {
+                for (let dz = -2; dz <= 2; dz++) {
+                    if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+                    for (let dy = 3; dy <= 5; dy++) {
+                        if (!getBlock(x + dx, y + dy, z + dz)) setBlock(x + dx, y + dy, z + dz, 'leaves');
+                    }
+                }
             }
         }
 
@@ -2068,7 +2382,7 @@
             const normal = [0, 0, 0];
 
             for (let t = 0; t <= maxDist;) {
-                if (world[keyOf(cell[0], cell[1], cell[2])]) {
+                if (getBlock(cell[0], cell[1], cell[2])) {
                     return { x: cell[0], y: cell[1], z: cell[2], nx: normal[0], ny: normal[1], nz: normal[2] };
                 }
                 const axis = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
@@ -2083,7 +2397,7 @@
 
         // Physics: the player is a 0.6 wide, ~1.8 tall column; feet = player.position.y - 1
         function isSolid(x, y, z) {
-            const type = world[keyOf(Math.round(x), Math.round(y), Math.round(z))];
+            const type = getBlock(Math.round(x), Math.round(y), Math.round(z));
             return !!type && type !== 'water';
         }
 
@@ -2185,7 +2499,7 @@
             // Fell out of the world: back to spawn
             if (feet < -10) {
                 let top = 0;
-                while (world[keyOf(0, top + 1, 0)]) top++;
+                while (getBlock(0, top + 1, 0)) top++;
                 player.position.set(0, top + 1.55, 0);
                 velocityY = 0;
             }
@@ -2356,7 +2670,9 @@
                 updatePlayer();
                 updateSurvival();
                 updateRemotePlayers();
+                updateSeedDrops();
                 sendMovement(performance.now());
+                updateStreaming(player.position.x, player.position.z);
                 rebuildDirtyChunks();
                 renderer.render(scene, camera);
             }
