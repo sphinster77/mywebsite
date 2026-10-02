@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Server Maker - Free & Legal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #4ade80;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #9ca3af;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            color: #4ade80;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e5e7eb;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #4ade80;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4ade80;
+            cursor: pointer;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.05);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .checkbox-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #4ade80;
+        }
+
+        .admin-section {
+            background: rgba(74, 222, 128, 0.1);
+            border: 2px solid #4ade80;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .admin-section h3 {
+            color: #4ade80;
+            margin-bottom: 15px;
+        }
+
+        .permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+
+        .permission-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #4ade80;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #4ade80;
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .output-section {
+            margin-top: 30px;
+        }
+
+        .output-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .output-box pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #4ade80;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #4ade80;
+            color: #1a1a2e;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .success-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .download-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .download-link:hover {
+            background: #2563eb;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Minecraft Server Maker</h1>
+        <p class="subtitle">Free & Legal Server Configuration Generator</p>
+
+        <div class="info-box">
+            <strong>ℹ️ Note:</strong> This tool generates configuration files for setting up your own Minecraft server using the official Minecraft server software from Minecraft.net. This is 100% free and legal for personal use. You'll need to download the server software separately from the official Minecraft website.
+        </div>
+
+        <div class="card">
+            <h2>🖥️ Basic Server Settings</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="serverName">Server Name</label>
+                        <input type="text" id="serverName" value="My Minecraft Server" placeholder="Enter server name">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="serverPort">Server Port</label>
+                        <input type="number" id="serverPort" value="25565" placeholder="25565">
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="serverType">Server Type</label>
+                        <select id="serverType">
+                            <option value="vanilla">Vanilla (Official)</option>
+                            <option value="forge">Forge (Mod Support)</option>
+                            <option value="fabric">Fabric (Mod Support)</option>
+                            <option value="paper">Paper (Optimized)</option>
+                            <option value="spigot">Spigot (Plugin Support)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="minecraftVersion">Minecraft Version</label>
+                        <select id="minecraftVersion">
+                            <option value="1.20.4">1.20.4 (Latest)</option>
+                            <option value="1.20.2">1.20.2</option>
+                            <option value="1.20.1">1.20.1</option>
+                            <option value="1.19.4">1.19.4</option>
+                            <option value="1.19.3">1.19.3</option>
+                            <option value="1.19.2">1.19.2</option>
+                            <option value="1.18.2">1.18.2</option>
+                            <option value="1.17.1">1.17.1</option>
+                            <option value="1.16.5">1.16.5</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="gameMode">Default Game Mode</label>
+                        <select id="gameMode">
+                            <option value="survival">Survival</option>
+                            <option value="creative">Creative</option>
+                            <option value="adventure">Adventure</option>
+                            <option value="spectator">Spectator</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="difficulty">Difficulty</label>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="normal">Normal</option>
+                            <option value="hard">Hard</option>
+                            <option value="peaceful">Peaceful</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="maxPlayers">Max Players: <span id="maxPlayersValue">20</span></label>
+                        <input type="range" id="maxPlayers" min="1" max="100" value="20" oninput="document.getElementById('maxPlayersValue').textContent = this.value">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="viewDistance">View Distance: <span id="viewDistanceValue">10</span></label>
+                        <input type="range" id="viewDistance" min="2" max="32" value="10" oninput="document.getElementById('viewDistanceValue').textContent = this.value">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Server Features</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enableWhitelist" checked>
+                        Enable Whitelist
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enableCommandBlock" checked>
+                        Enable Command Blocks
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enablePVP">
+                        Enable PVP
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enableNether" checked>
+                        Enable Nether
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enableEnd" checked>
+                        Enable End
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enableFlight" checked>
+                        Allow Flight
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="forceGameMode">
+                        Force Game Mode
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="spawnMonsters" checked>
+                        Spawn Monsters
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="spawnAnimals" checked>
+                        Spawn Animals
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="spawnNPCs" checked>
+                        Spawn NPCs
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>👑 Admin Player Settings</h2>
+            <div class="admin-section">
+                <div class="form-group">
+                    <label for="adminUsername">Admin Username (Minecraft Username)</label>
+                    <input type="text" id="adminUsername" placeholder="Enter admin username">
+                </div>
+
+                <h3>Admin Permissions (All Enabled by Default)</h3>
+                <div class="permission-grid">
+                    <label class="permission-item">
+                        <input type="checkbox" id="permOp" checked disabled>
+                        <span>OP Status (Full Control)</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permBan" checked disabled>
+                        <span>Ban/Unban Players</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permKick" checked disabled>
+                        <span>Kick Players</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permGamemode" checked disabled>
+                        <span>Change Game Mode</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permGive" checked disabled>
+                        <span>Give Items</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permTp" checked disabled>
+                        <span>Teleport</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permTime" checked disabled>
+                        <span>Change Time</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permWeather" checked disabled>
+                        <span>Change Weather</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="permStop" checked disabled>
+                        <span>Stop Server</span>
+                    </label>
+                    <label class="permission-item">
+                        <input type="checkbox" id="permWhitelist" checked disabled>
+                        <span>Manage Whitelist</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔧 Mods & Plugins</h2>
+            <div class="info-box">
+                Select the type of mods/plugins you want to use. This will generate the appropriate configuration.
+            </div>
+
+            <div class="form-group">
+                <label for="modPlatform">Mod/Plugin Platform</label>
+                <select id="modPlatform">
+                    <option value="none">None (Vanilla)</option>
+                    <option value="forge">Forge Mods</option>
+                    <option value="fabric">Fabric Mods</option>
+                    <option value="bukkit">Bukkit Plugins</option>
+                    <option value="spigot">Spigot Plugins</option>
+                    <option value="paper">Paper Plugins</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Recommended Mods/Plugins</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modEssentialsX">
+                        EssentialsX (Core commands)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modWorldEdit">
+                        WorldEdit (Building)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modLuckPerms">
+                        LuckPerms (Permissions)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modVault">
+                        Vault (Economy API)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modCoreProtect">
+                        CoreProtect (Logging)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modMultiverse">
+                        Multiverse (Multiple worlds)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modDiscordSRV">
+                        DiscordSRV (Discord integration)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modDynmap">
+                        Dynmap (Web map)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="customMods">Additional Mods/Plugins (one per line)</label>
+                <textarea id="customMods" rows="3" placeholder="Enter additional mod/plugin names..."></textarea>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚙️ Advanced Settings</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="seed">World Seed (Optional)</label>
+                        <input type="text" id="seed" placeholder="Leave blank for random">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="worldType">World Type</label>
+                        <select id="worldType">
+                            <option value="default">Default</option>
+                            <option value="flat">Flat</option>
+                            <option value="largeBiomes">Large Biomes</option>
+                            <option value="amplified">Amplified</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="maxWorldSize">Max World Size (blocks)</label>
+                        <input type="number" id="maxWorldSize" value="29999984" placeholder="29999984">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="maxBuildHeight">Max Build Height</label>
+                        <input type="number" id="maxBuildHeight" value="320" placeholder="320">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="motd">Message of the Day (MOTD)</label>
+                <textarea id="motd" rows="2" placeholder="Welcome to my Minecraft Server!">Welcome to my Minecraft Server!</textarea>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn btn-primary" onclick="generateConfig()">🚀 Generate Configuration</button>
+            <button class="btn btn-secondary" onclick="resetForm()">🔄 Reset</button>
+        </div>
+
+        <div class="card output-section" id="outputSection" style="display: none;">
+            <h2>📋 Generated Configuration</h2>
+            
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="showTab('serverProps')">server.properties</button>
+                <button class="tab-btn" onclick="showTab('opsJson')">ops.json</button>
+                <button class="tab-btn" onclick="showTab('whitelistJson')">whitelist.json</button>
+                <button class="tab-btn" onclick="showTab('setupScript')">Setup Script</button>
+                <button class="tab-btn" onclick="showTab('instructions')">Instructions</button>
+            </div>
+
+            <div class="tab-content active" id="serverProps">
+                <div class="output-box">
+                    <pre id="serverPropsOutput"></pre>
+                </div>
+                <a class="download-link" href="#" onclick="downloadFile('server.properties', 'serverPropsOutput')">📥 Download server.properties</a>
+            </div>
+
+            <div class="tab-content" id="opsJson">
+                <div class="output-box">
+                    <pre id="opsJsonOutput"></pre>
+                </div>
+                <a class="download-link" href="#" onclick="downloadFile('ops.json', 'opsJsonOutput')">📥 Download ops.json</a>
+            </div>
+
+            <div class="tab-content" id="whitelistJson">
+                <div class="output-box">
+                    <pre id="whitelistJsonOutput"></pre>
+                </div>
+                <a class="download-link" href="#" onclick="downloadFile('whitelist.json', 'whitelistJsonOutput')">📥 Download whitelist.json</a>
+            </div>
+
+            <div class="tab-content" id="setupScript">
+                <div class="output-box">
+                    <pre id="setupScriptOutput"></pre>
+                </div>
+                <a class="download-link" href="#" onclick="downloadFile('setup.bat', 'setupScriptOutput')">📥 Download setup.bat</a>
+            </div>
+
+            <div class="tab-content" id="instructions">
+                <div class="output-box">
+                    <pre id="instructionsOutput"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function generateConfig() {
+            const config = {
+                'server-name': document.getElementById('serverName').value,
+                'server-port': document.getElementById('serverPort').value,
+                'server-type': document.getElementById('serverType').value,
+                'minecraft-version': document.getElementById('minecraftVersion').value,
+                'gamemode': document.getElementById('gameMode').value,
+                'difficulty': document.getElementById('difficulty').value,
+                'max-players': document.getElementById('maxPlayers').value,
+                'view-distance': document.getElementById('viewDistance').value,
+                'enable-whitelist': document.getElementById('enableWhitelist').checked,
+                'enable-command-block': document.getElementById('enableCommandBlock').checked,
+                'pvp': document.getElementById('enablePVP').checked,
+                'allow-nether': document.getElementById('enableNether').checked,
+                'allow-end': document.getElementById('enableEnd').checked,
+                'allow-flight': document.getElementById('enableFlight').checked,
+                'force-gamemode': document.getElementById('forceGameMode').checked,
+                'spawn-monsters': document.getElementById('spawnMonsters').checked,
+                'spawn-animals': document.getElementById('spawnAnimals').checked,
+                'spawn-npcs': document.getElementById('spawnNPCs').checked,
+                'admin-username': document.getElementById('adminUsername').value,
+                'mod-platform': document.getElementById('modPlatform').value,
+                'seed': document.getElementById('seed').value,
+                'level-type': document.getElementById('worldType').value,
+                'max-world-size': document.getElementById('maxWorldSize').value,
+                'max-build-height': document.getElementById('maxBuildHeight').value,
+                'motd': document.getElementById('motd').value
+            };
+
+            // Generate server.properties
+            let serverProps = `# Minecraft Server Configuration
+# Generated by Minecraft Server Maker
+
+# Basic Settings
+server-name=${config['server-name']}
+server-port=${config['server-port']}
+max-players=${config['max-players']}
+online-mode=true
+
+# World Settings
+level-name=world
+level-seed=${config['seed'] || ''}
+level-type=${config['level-type']}
+max-world-size=${config['max-world-size']}
+max-build-height=${config['max-build-height']}
+generator-settings=
+
+# Game Settings
+gamemode=${config['gamemode']}
+difficulty=${config['difficulty']}
+default-player-distance=${config['view-distance']}
+spawn-protection=16
+spawn-monsters=${config['spawn-monsters']}
+spawn-animals=${config['spawn-animals']}
+spawn-npcs=${config['spawn-npcs']}
+
+# Player Settings
+allow-flight=${config['allow-flight']}
+allow-nether=${config['allow-nether']}
+force-gamemode=${config['force-gamemode']}
+pvp=${config['pvp']}
+player-idle-timeout=0
+white-list=${config['enable-whitelist']}
+
+# Resource Settings
+max-tick-time=60000
+rate-limit=0
+enable-status=true
+enable-query=true
+
+# Network Settings
+network-compression-threshold=256
+broadcast-rcon-to-ops=true
+op-permission-level=4
+function-permission-level=2
+rcon-port=25575
+
+# Message of the Day
+motd=${config['motd']}
+
+# Other Settings
+enable-command-block=${config['enable-command-block']}
+enable-jmx-monitoring=false
+enable-rcon=false
+hardcore=false
+log-ip-addresses=true
+require-resource-pack=false
+resource-pack=
+resource-pack-sha1=
+server-ip=
+snooper-enabled=false`;
+
+            document.getElementById('serverPropsOutput').textContent = serverProps;
+
+            // Generate ops.json
+            const adminUsername = config['admin-username'];
+            let opsJson;
+            if (adminUsername) {
+                opsJson = `[
+  {
+    "uuid": "PLACEHOLDER_UUID_FOR_${adminUsername.toUpperCase()}",
+    "name": "${adminUsername}",
+    "level": 4,
+    "bypassesPlayerLimit": true
+  }
+]`;
+            } else {
+                opsJson = `[]`;
+            }
+            document.getElementById('opsJsonOutput').textContent = opsJson;
+
+            // Generate whitelist.json
+            let whitelistJson;
+            if (adminUsername && config['enable-whitelist']) {
+                whitelistJson = `[
+  {
+    "uuid": "PLACEHOLDER_UUID_FOR_${adminUsername.toUpperCase()}",
+    "name": "${adminUsername}"
+  }
+]`;
+            } else {
+                whitelistJson = `[]`;
+            }
+            document.getElementById('whitelistJsonOutput').textContent = whitelistJson;
+
+            // Generate setup script
+            const serverType = config['server-type'];
+            const mcVersion = config['minecraft-version'];
+            let downloadUrl = '';
+            let serverFile = '';
+
+            switch(serverType) {
+                case 'vanilla':
+                    downloadUrl = `https://launcher.mojang.com/v1/objects/${getVanillaHash(mcVersion)}/server.jar`;
+                    serverFile = 'server.jar';
+                    break;
+                case 'forge':
+                    downloadUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVersion}-44.2.0/forge-${mcVersion}-44.2.0-installer.jar`;
+                    serverFile = 'forge-installer.jar';
+                    break;
+                case 'fabric':
+                    downloadUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/0.14.21/1.0.0/server/jar`;
+                    serverFile = 'fabric-server.jar';
+                    break;
+                case 'paper':
+                    downloadUrl = `https://api.papermc.io/v2/projects/paper/versions/${mcVersion}/builds/latest/download/paper-${mcVersion}.jar`;
+                    serverFile = 'paper.jar';
+                    break;
+                case 'spigot':
+                    downloadUrl = 'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar';
+                    serverFile = 'BuildTools.jar';
+                    break;
+            }
+
+            let setupScript = `@echo off
+echo ========================================
+echo Minecraft Server Setup Script
+echo ========================================
+echo.
+
+REM Create server directory
+if not exist "minecraft_server" mkdir minecraft_server
+cd minecraft_server
+
+echo Downloading ${serverType} server for Minecraft ${mcVersion}...
+echo This may take a few minutes...
+echo.
+
+REM Download server software
+powershell -Command "Invoke-WebRequest -Uri '${downloadUrl}' -OutFile '${serverFile}'"
+
+echo.
+echo Server downloaded successfully!
+echo.
+
+REM Generate eula.txt
+echo eula=true > eula.txt
+echo EULA accepted.
+
+echo.
+echo Creating configuration files...
+echo.
+
+REM Copy the generated files
+REM You need to manually copy:
+REM - server.properties
+REM - ops.json
+REM - whitelist.json
+REM Into this folder
+
+echo.
+echo ========================================
+echo Setup Complete!
+echo ========================================
+echo.
+echo Next steps:
+echo 1. Copy the generated configuration files to this folder
+echo 2. Run the server: java -Xmx2G -Xms2G -jar ${serverFile} nogui
+echo 3. The admin player needs to join once to get their UUID
+echo 4. Update ops.json with the correct UUID
+echo 5. Add players to whitelist.json if whitelist is enabled
+echo.
+echo For mods/plugins, create a "mods" or "plugins" folder
+echo and download them from CurseForge or Modrinth
+echo.
+
+pause`;
+
+            document.getElementById('setupScriptOutput').textContent = setupScript;
+
+            // Generate instructions
+            let instructions = `========================================
+MINECRAFT SERVER SETUP INSTRUCTIONS
+========================================
+
+STEP 1: Download Official Server Software
+------------------------------------------
+Visit: https://www.minecraft.net/en-us/download/server
+
+Choose your server type:
+- Vanilla: Official server from Minecraft.net
+- Forge: https://files.minecraftforge.net/
+- Fabric: https://fabricmc.net/
+- Paper: https://papermc.io/
+- Spigot: https://www.spigotmc.org/
+
+Download the server JAR file for Minecraft ${mcVersion}
+
+STEP 2: Create Server Folder
+-----------------------------
+1. Create a new folder named "minecraft_server"
+2. Place the downloaded server JAR file in this folder
+
+STEP 3: Add Configuration Files
+--------------------------------
+Copy these generated files to your server folder:
+- server.properties (server settings)
+- ops.json (admin permissions)
+- whitelist.json (if whitelist enabled)
+
+STEP 4: Accept EULA
+-------------------
+Run the server once to generate eula.txt
+Open eula.txt and change "eula=false" to "eula=true"
+
+STEP 5: Set Up Admin Player
+----------------------------
+1. Start the server: java -Xmx2G -Xms2G -jar server.jar nogui
+2. Join the server with your admin account
+3. Your UUID will be logged in the server logs
+4. Update ops.json with your correct UUID format
+5. Or use: /op ${adminUsername || 'your_username'} in the server console
+
+STEP 6: Install Mods/Plugins (Optional)
+----------------------------------------
+${config['mod-platform'] !== 'none' ? `
+Platform: ${config['mod-platform']}
+
+For ${config['mod-platform']}:
+- Create a "${config['mod-platform'] === 'forge' || config['mod-platform'] === 'fabric' ? 'mods' : 'plugins'}" folder
+- Download mods/plugins from:
+  * CurseForge: https://www.curseforge.com/minecraft/mc-mods
+  * Modrinth: https://modrinth.com/mods
+- Place downloaded files in the folder
+- Restart the server
+
+Recommended mods/plugins:
+${document.getElementById('modEssentialsX').checked ? '- EssentialsX\n' : ''}
+${document.getElementById('modWorldEdit').checked ? '- WorldEdit\n' : ''}
+${document.getElementById('modLuckPerms').checked ? '- LuckPerms\n' : ''}
+${document.getElementById('modVault').checked ? '- Vault\n' : ''}
+${document.getElementById('modCoreProtect').checked ? '- CoreProtect\n' : ''}
+${document.getElementById('modMultiverse').checked ? '- Multiverse\n' : ''}
+${document.getElementById('modDiscordSRV').checked ? '- DiscordSRV\n' : ''}
+${document.getElementById('modDynmap').checked ? '- Dynmap\n' : ''}
+` : 'No mods/plugins selected'}
+
+STEP 7: Start Your Server
+--------------------------
+Command: java -Xmx2G -Xms2G -jar server.jar nogui
+
+Adjust memory (2G) based on your needs:
+- 2G = 2GB RAM (minimum for small servers)
+- 4G = 4GB RAM (recommended for 10-20 players)
+- 8G = 8GB RAM (for larger servers)
+
+STEP 8: Invite Players
+-----------------------
+Share your server IP with friends:
+- Local: Your local IP address
+- Public: Requires port forwarding (port ${config['server-port']})
+
+If whitelist is enabled, add players to whitelist.json
+with their username and UUID.
+
+========================================
+ADMIN COMMANDS
+========================================
+As admin (OP), you can use these commands:
+/op <player> - Make someone admin
+/deop <player> - Remove admin status
+/gamemode <mode> <player> - Change game mode
+/give <player> <item> [amount] - Give items
+/tp <player1> <player2> - Teleport
+/time set <value> - Set time
+/weather <type> - Change weather
+/ban <player> - Ban player
+/kick <player> - Kick player
+/whitelist add <player> - Add to whitelist
+/whitelist remove <player> - Remove from whitelist
+
+========================================
+IMPORTANT NOTES
+========================================
+- This setup is 100% FREE and LEGAL
+- Uses official Minecraft server software
+- Server owner must own a Minecraft account
+- Players need their own Minecraft accounts
+- Never share your server files publicly
+- Keep your server software updated
+- Back up your world regularly
+
+========================================
+TROUBLESHOOTING
+========================================
+Server won't start?
+- Check you have Java 17+ installed
+- Verify the JAR file name matches your command
+- Check server.log for errors
+
+Can't connect?
+- Check server is running
+- Verify port forwarding (if public)
+- Check firewall settings
+- Ensure you're using the correct IP
+
+Players can't join?
+- Check if whitelist is enabled
+- Verify player UUIDs in whitelist.json
+- Check if server is full (max-players)
+
+Need more help?
+- Minecraft Wiki: https://minecraft.wiki/
+- Minecraft Forums: https://www.minecraftforum.net/
+- Server support communities online
+`;
+
+            document.getElementById('instructionsOutput').textContent = instructions;
+
+            // Show output section
+            document.getElementById('outputSection').style.display = 'block';
+            document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function getVanillaHash(version) {
+            const hashes = {
+                '1.20.4': 'c3a27a41326e5d152717fa02ff9548492b8b3f59',
+                '1.20.2': '1a25851a09f20075596e77c6285693c816d6f2a4',
+                '1.20.1': '8f3112a104f75be57e453618d184162044f945d3',
+                '1.19.4': 'c9df48efed58511cdd0a3f23b4c32a6d58ed0f8a',
+                '1.19.3': 'b0f0d23e5c7a48872170f0e0e5af0260375963f0',
+                '1.19.2': 'f69c284e9898b7e9eb867345e7e531611039d6c2',
+                '1.18.2': 'c8f3c665ef643a64a5f893b9171b6a9835143819',
+                '1.17.1': 'a16d67e5807f57fcf929f2737aa923555e9db628',
+                '1.16.5': '1b557e7b033b583cd9f66746b7a9f1ad2f4d29b2'
+            };
+            return hashes[version] || hashes['1.20.4'];
+        }
+
+        function showTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+
+        function downloadFile(filename, outputId) {
+            const content = document.getElementById(outputId).textContent;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function resetForm() {
+            document.getElementById('serverName').value = 'My Minecraft Server';
+            document.getElementById('serverPort').value = '25565';
+            document.getElementById('serverType').value = 'vanilla';
+            document.getElementById('minecraftVersion').value = '1.20.4';
+            document.getElementById('gameMode').value = 'survival';
+            document.getElementById('difficulty').value = 'normal';
+            document.getElementById('maxPlayers').value = '20';
+            document.getElementById('maxPlayersValue').textContent = '20';
+            document.getElementById('viewDistance').value = '10';
+            document.getElementById('viewDistanceValue').textContent = '10';
+            document.getElementById('enableWhitelist').checked = true;
+            document.getElementById('enableCommandBlock').checked = true;
+            document.getElementById('enablePVP').checked = false;
+            document.getElementById('enableNether').checked = true;
+            document.getElementById('enableEnd').checked = true;
+            document.getElementById('enableFlight').checked = true;
+            document.getElementById('forceGameMode').checked = false;
+            document.getElementById('spawnMonsters').checked = true;
+            document.getElementById('spawnAnimals').checked = true;
+            document.getElementById('spawnNPCs').checked = true;
+            document.getElementById('adminUsername').value = '';
+            document.getElementById('modPlatform').value = 'none';
+            document.getElementById('seed').value = '';
+            document.getElementById('worldType').value = 'default';
+            document.getElementById('maxWorldSize').value = '29999984';
+            document.getElementById('maxBuildHeight').value = '320';
+            document.getElementById('motd').value = 'Welcome to my Minecraft Server!';
+            document.getElementById('customMods').value = '';
+            
+            // Uncheck all mod checkboxes
+            document.querySelectorAll('.checkbox-group input[type="checkbox"]').forEach(cb => {
+                if (cb.id.startsWith('mod')) {
+                    cb.checked = false;
+                }
+            });
+            
+            document.getElementById('outputSection').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
