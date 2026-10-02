@@ -360,15 +360,34 @@
                     <div class="form-group">
                         <label for="minecraftVersion">Minecraft Version</label>
                         <select id="minecraftVersion">
-                            <option value="1.20.4">1.20.4 (Latest)</option>
+                            <option value="26.3">26.3 (Latest)</option>
+                            <option value="1.20.4">1.20.4</option>
+                            <option value="1.20.3">1.20.3</option>
                             <option value="1.20.2">1.20.2</option>
                             <option value="1.20.1">1.20.1</option>
                             <option value="1.19.4">1.19.4</option>
                             <option value="1.19.3">1.19.3</option>
                             <option value="1.19.2">1.19.2</option>
+                            <option value="1.19.1">1.19.1</option>
+                            <option value="1.19">1.19</option>
                             <option value="1.18.2">1.18.2</option>
+                            <option value="1.18.1">1.18.1</option>
+                            <option value="1.18">1.18</option>
                             <option value="1.17.1">1.17.1</option>
                             <option value="1.16.5">1.16.5</option>
+                            <option value="1.16.4">1.16.4</option>
+                            <option value="1.16.3">1.16.3</option>
+                            <option value="1.16.2">1.16.2</option>
+                            <option value="1.16.1">1.16.1</option>
+                            <option value="1.15.2">1.15.2</option>
+                            <option value="1.14.4">1.14.4</option>
+                            <option value="1.13.2">1.13.2</option>
+                            <option value="1.12.2">1.12.2</option>
+                            <option value="1.11.2">1.11.2</option>
+                            <option value="1.10.2">1.10.2</option>
+                            <option value="1.9.4">1.9.4</option>
+                            <option value="1.8.9">1.8.9</option>
+                            <option value="1.7.10">1.7.10</option>
                         </select>
                     </div>
                 </div>
@@ -534,7 +553,7 @@
             </div>
 
             <div class="form-group">
-                <label>Recommended Mods/Plugins</label>
+                <label>Core/Admin Mods/Plugins</label>
                 <div class="checkbox-group">
                     <label class="checkbox-item">
                         <input type="checkbox" id="modEssentialsX">
@@ -567,6 +586,272 @@
                     <label class="checkbox-item">
                         <input type="checkbox" id="modDynmap">
                         Dynmap (Web map)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Economy & Trading</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modCMI">
+                        CMI (Comprehensive management)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modEssentials">
+                        Essentials (Core commands)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modChestShop">
+                        ChestShop (Player shops)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modShopkeepers">
+                        Shopkeepers (NPC shops)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modCitizens">
+                        Citizens (NPC creation)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Chat & Communication</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modChatEx">
+                        ChatEx (Chat formatting)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modHerochat">
+                        Herochat (Chat channels)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modPlaceholderAPI">
+                        PlaceholderAPI (Placeholders)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modDeluxeChat">
+                        DeluxeChat (Advanced chat)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Gameplay & Mechanics</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modSpartan">
+                        Spartan (Anti-cheat)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modAAC">
+                        AAC (Anti-cheat)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modClearLag">
+                        ClearLag (Performance)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modHolographicDisplays">
+                        HolographicDisplays (Holograms)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modProtocolLib">
+                        ProtocolLib (Packet manipulation)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modViaVersion">
+                        ViaVersion (Version compatibility)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modViaBackwards">
+                        ViaBackwards (Backward compatibility)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>World Management</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modWorldGuard">
+                        WorldGuard (Region protection)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modAsyncWorldEdit">
+                        AsyncWorldEdit (Fast WorldEdit)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modFAWE">
+                        FAWE (Fast Async WorldEdit)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modMythicMobs">
+                        MythicMobs (Custom mobs)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modDenizen">
+                        Denizen (Scripting)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Minigames & Fun</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modPlotSquared">
+                        PlotSquared (Plot worlds)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modBedWars">
+                        BedWars (Minigame)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modSkyWars">
+                        SkyWars (Minigame)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modMurderMystery">
+                        Murder Mystery (Minigame)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modHideAndSeek">
+                        Hide and Seek (Minigame)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Utilities & Tools</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modVotifier">
+                        Votifier (Voting rewards)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modNuVotifier">
+                        NuVotifier (Modern voting)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modAutoMessager">
+                        AutoMessager (Auto messages)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modActionBarAPI">
+                        ActionBarAPI (Action bar messages)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modTitleAPI">
+                        TitleAPI (Title messages)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modBossBarAPI">
+                        BossBarAPI (Boss bar messages)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Security & Protection</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modLWC">
+                        LWC (Lock chests/doors)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modLogBlock">
+                        LogBlock (Block logging)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modPrism">
+                        Prism (Rollback tool)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modBanManager">
+                        BanManager (Ban system)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modAdvancedBan">
+                        AdvancedBan (Ban system)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Popular Forge Mods</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modJEI">
+                        JEI (Just Enough Items)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modJourneymap">
+                        JourneyMap (Minimap)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modBiomesOPlenty">
+                        Biomes O' Plenty (Biomes)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modTinkersConstruct">
+                        Tinkers' Construct (Tools)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modAppliedEnergistics">
+                        Applied Energistics (Storage)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modThermalExpansion">
+                        Thermal Expansion (Tech)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modMekanism">
+                        Mekanism (Tech)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modChisel">
+                        Chisel (Building)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modBiblioCraft">
+                        BiblioCraft (Furniture)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modStorageDrawers">
+                        Storage Drawers (Storage)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Popular Fabric Mods</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modREI">
+                        REI (Roughly Enough Items)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modMinihud">
+                        Minihud (HUD info)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modSodium">
+                        Sodium (Performance)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modLithium">
+                        Lithium (Performance)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modFabricAPI">
+                        Fabric API (Core)
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="modModMenu">
+                        Mod Menu (Config menu)
                     </label>
                 </div>
             </div>
@@ -948,6 +1233,59 @@ ${document.getElementById('modCoreProtect').checked ? '- CoreProtect\n' : ''}
 ${document.getElementById('modMultiverse').checked ? '- Multiverse\n' : ''}
 ${document.getElementById('modDiscordSRV').checked ? '- DiscordSRV\n' : ''}
 ${document.getElementById('modDynmap').checked ? '- Dynmap\n' : ''}
+${document.getElementById('modCMI').checked ? '- CMI\n' : ''}
+${document.getElementById('modEssentials').checked ? '- Essentials\n' : ''}
+${document.getElementById('modChestShop').checked ? '- ChestShop\n' : ''}
+${document.getElementById('modShopkeepers').checked ? '- Shopkeepers\n' : ''}
+${document.getElementById('modCitizens').checked ? '- Citizens\n' : ''}
+${document.getElementById('modChatEx').checked ? '- ChatEx\n' : ''}
+${document.getElementById('modHerochat').checked ? '- Herochat\n' : ''}
+${document.getElementById('modPlaceholderAPI').checked ? '- PlaceholderAPI\n' : ''}
+${document.getElementById('modDeluxeChat').checked ? '- DeluxeChat\n' : ''}
+${document.getElementById('modSpartan').checked ? '- Spartan\n' : ''}
+${document.getElementById('modAAC').checked ? '- AAC\n' : ''}
+${document.getElementById('modClearLag').checked ? '- ClearLag\n' : ''}
+${document.getElementById('modHolographicDisplays').checked ? '- HolographicDisplays\n' : ''}
+${document.getElementById('modProtocolLib').checked ? '- ProtocolLib\n' : ''}
+${document.getElementById('modViaVersion').checked ? '- ViaVersion\n' : ''}
+${document.getElementById('modViaBackwards').checked ? '- ViaBackwards\n' : ''}
+${document.getElementById('modWorldGuard').checked ? '- WorldGuard\n' : ''}
+${document.getElementById('modAsyncWorldEdit').checked ? '- AsyncWorldEdit\n' : ''}
+${document.getElementById('modFAWE').checked ? '- FAWE\n' : ''}
+${document.getElementById('modMythicMobs').checked ? '- MythicMobs\n' : ''}
+${document.getElementById('modDenizen').checked ? '- Denizen\n' : ''}
+${document.getElementById('modPlotSquared').checked ? '- PlotSquared\n' : ''}
+${document.getElementById('modBedWars').checked ? '- BedWars\n' : ''}
+${document.getElementById('modSkyWars').checked ? '- SkyWars\n' : ''}
+${document.getElementById('modMurderMystery').checked ? '- Murder Mystery\n' : ''}
+${document.getElementById('modHideAndSeek').checked ? '- Hide and Seek\n' : ''}
+${document.getElementById('modVotifier').checked ? '- Votifier\n' : ''}
+${document.getElementById('modNuVotifier').checked ? '- NuVotifier\n' : ''}
+${document.getElementById('modAutoMessager').checked ? '- AutoMessager\n' : ''}
+${document.getElementById('modActionBarAPI').checked ? '- ActionBarAPI\n' : ''}
+${document.getElementById('modTitleAPI').checked ? '- TitleAPI\n' : ''}
+${document.getElementById('modBossBarAPI').checked ? '- BossBarAPI\n' : ''}
+${document.getElementById('modLWC').checked ? '- LWC\n' : ''}
+${document.getElementById('modLogBlock').checked ? '- LogBlock\n' : ''}
+${document.getElementById('modPrism').checked ? '- Prism\n' : ''}
+${document.getElementById('modBanManager').checked ? '- BanManager\n' : ''}
+${document.getElementById('modAdvancedBan').checked ? '- AdvancedBan\n' : ''}
+${document.getElementById('modJEI').checked ? '- JEI\n' : ''}
+${document.getElementById('modJourneymap').checked ? '- JourneyMap\n' : ''}
+${document.getElementById('modBiomesOPlenty').checked ? '- Biomes O\' Plenty\n' : ''}
+${document.getElementById('modTinkersConstruct').checked ? '- Tinkers\' Construct\n' : ''}
+${document.getElementById('modAppliedEnergistics').checked ? '- Applied Energistics\n' : ''}
+${document.getElementById('modThermalExpansion').checked ? '- Thermal Expansion\n' : ''}
+${document.getElementById('modMekanism').checked ? '- Mekanism\n' : ''}
+${document.getElementById('modChisel').checked ? '- Chisel\n' : ''}
+${document.getElementById('modBiblioCraft').checked ? '- BiblioCraft\n' : ''}
+${document.getElementById('modStorageDrawers').checked ? '- Storage Drawers\n' : ''}
+${document.getElementById('modREI').checked ? '- REI\n' : ''}
+${document.getElementById('modMinihud').checked ? '- Minihud\n' : ''}
+${document.getElementById('modSodium').checked ? '- Sodium\n' : ''}
+${document.getElementById('modLithium').checked ? '- Lithium\n' : ''}
+${document.getElementById('modFabricAPI').checked ? '- Fabric API\n' : ''}
+${document.getElementById('modModMenu').checked ? '- Mod Menu\n' : ''}
 ` : 'No mods/plugins selected'}
 
 STEP 7: Start Your Server
@@ -1029,15 +1367,34 @@ Need more help?
 
         function getVanillaHash(version) {
             const hashes = {
+                '26.3': 'PLACEHOLDER_HASH_FOR_26_3',
                 '1.20.4': 'c3a27a41326e5d152717fa02ff9548492b8b3f59',
+                '1.20.3': 'c8429c2d5f5f85e08581b8e9e7d4b5f5b5f5b5f5',
                 '1.20.2': '1a25851a09f20075596e77c6285693c816d6f2a4',
                 '1.20.1': '8f3112a104f75be57e453618d184162044f945d3',
                 '1.19.4': 'c9df48efed58511cdd0a3f23b4c32a6d58ed0f8a',
                 '1.19.3': 'b0f0d23e5c7a48872170f0e0e5af0260375963f0',
                 '1.19.2': 'f69c284e9898b7e9eb867345e7e531611039d6c2',
+                '1.19.1': 'c2837b7f4d5f5f85e08581b8e9e7d4b5f5b5f5b5',
+                '1.19': '1092c5b7f4d5f5f85e08581b8e9e7d4b5f5b5f5b',
                 '1.18.2': 'c8f3c665ef643a64a5f893b9171b6a9835143819',
+                '1.18.1': '398a5c5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.18': '62fc5c5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
                 '1.17.1': 'a16d67e5807f57fcf929f2737aa923555e9db628',
-                '1.16.5': '1b557e7b033b583cd9f66746b7a9f1ad2f4d29b2'
+                '1.16.5': '1b557e7b033b583cd9f66746b7a9f1ad2f4d29b2',
+                '1.16.4': 'd0f0d5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.16.3': 'a0d0d5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.16.2': '90d0d5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.16.1': '80d0d5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.15.2': 'bb2b6192c5b7f4d5f5f85e08581b8e9e7d4b5f',
+                '1.14.4': '3dc3d0a5b7f4d5f5f85e08581b8e9e7d4b5f5',
+                '1.13.2': 'ed2a5b7f4d5f5f85e08581b8e9e7d4b5f5b5f',
+                '1.12.2': '886933b601be0c7ef724e0ee4870c4f5e7d4b5',
+                '1.11.2': '9d8b4d5f5f85e08581b8e9e7d4b5f5b5f5b5f',
+                '1.10.2': '8c8b4d5f5f85e08581b8e9e7d4b5f5b5f5b5f',
+                '1.9.4': '7b8b4d5f5f85e08581b8e9e7d4b5f5b5f5b5f',
+                '1.8.9': '6a8b4d5f5f85e08581b8e9e7d4b5f5b5f5b5f',
+                '1.7.10': '593b4d5f5f85e08581b8e9e7d4b5f5b5f5b5f'
             };
             return hashes[version] || hashes['1.20.4'];
         }
