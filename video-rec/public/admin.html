@@ -473,6 +473,13 @@
           <option value="tablet">Tablet</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>Microphone</label>
+        <select id="microphoneSelect" onchange="selectMicrophone(this.value)">
+          <option value="">Default Microphone</option>
+        </select>
+        <button class="btn" style="margin-top: 10px; padding: 8px 12px; font-size: 14px;" onclick="refreshMicrophones()">🔄 Refresh Microphones</button>
+      </div>
       <button class="btn" onclick="createRoom()">Create Room</button>
     </div>
   </div>
@@ -504,6 +511,7 @@
       <button class="btn btn-success" id="shareScreenBtn" onclick="toggleScreenShare()">Share Screen</button>
       <button class="btn" id="recordBtn" onclick="toggleRecording()">Start Recording</button>
       <button class="btn" id="cameraBtn" onclick="toggleCamera()">Enable Camera</button>
+      <button class="btn" id="micBtn" onclick="toggleMicrophone()">Enable Microphone</button>
       <button class="btn" onclick="showAirPlayHelp()">AirPlay Help</button>
     </div>
 
@@ -553,13 +561,17 @@
     let mainPeerId = null;
     let cameraStream = null;
     let screenStream = null;
+    let microphoneStream = null;
     let mediaRecorder = null;
     let recordingStream = null;
     let recordedChunks = [];
     let isRecording = false;
     let isCameraEnabled = false;
+    let isMicrophoneEnabled = false;
     let isSharingScreen = false;
     let pendingUsers = {};
+    let selectedMicrophoneId = null;
+    let microphoneDevices = [];
 
     // PC / tablet choice is remembered, defaulting to tablet on touch-first devices
     function applyDevice(device) {
@@ -573,6 +585,58 @@
       try { saved = localStorage.getItem('videoRecDevice'); } catch (e) {}
       applyDevice(saved || (window.matchMedia('(pointer: coarse)').matches ? 'tablet' : 'pc'));
     })();
+
+    // Microphone functions
+    async function refreshMicrophones() {
+      try {
+        // Request permission to access audio devices
+        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        tempStream.getTracks().forEach(track => track.stop());
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        
+        microphoneDevices = audioInputs;
+        const select = document.getElementById('microphoneSelect');
+        select.innerHTML = '<option value="">Default Microphone</option>';
+        
+        audioInputs.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          option.textContent = device.label || `Microphone ${index + 1}`;
+          select.appendChild(option);
+        });
+        
+        // Restore selected microphone if available
+        if (selectedMicrophoneId) {
+          const stillExists = audioInputs.some(device => device.deviceId === selectedMicrophoneId);
+          if (stillExists) {
+            select.value = selectedMicrophoneId;
+          } else {
+            selectedMicrophoneId = null;
+          }
+        }
+        
+        console.log(`Found ${audioInputs.length} microphone(s)`);
+      } catch (error) {
+        console.error('Error accessing microphones:', error);
+        alert('Could not access microphones. Please allow microphone access in your browser settings.');
+      }
+    }
+
+    function selectMicrophone(deviceId) {
+      selectedMicrophoneId = deviceId || null;
+      console.log('Selected microphone:', deviceId || 'Default');
+      
+      // If microphone is already enabled, restart with new microphone
+      if (isMicrophoneEnabled) {
+        toggleMicrophone(); // Stop current
+        setTimeout(() => toggleMicrophone(), 100); // Restart with new selection
+      }
+    }
+
+    // Initialize microphones on page load
+    refreshMicrophones();
 
     function createRoom() {
       roomCode = document.getElementById('roomCode').value.trim();
@@ -830,13 +894,22 @@
         // Record the main screen's own video and audio (not the admin's mic).
         // A separate stream is built so the live stream is never mutated.
         const mainAudioTracks = mainVideo.srcObject.getAudioTracks().filter(track => track.readyState === 'live');
-        if (!mainAudioTracks.length &&
+        
+        // Add admin's microphone if microphone is enabled
+        let adminAudioTracks = [];
+        if (isMicrophoneEnabled && microphoneStream) {
+          adminAudioTracks = microphoneStream.getAudioTracks().filter(track => track.readyState === 'live');
+        }
+        
+        if (!mainAudioTracks.length && !adminAudioTracks.length &&
             !confirm('The main screen is not sharing any audio (the sharer must tick "share audio"). Record video only?')) {
           return;
         }
+        
         recordingStream = new MediaStream([
           ...mainVideo.srcObject.getVideoTracks(),
-          ...mainAudioTracks
+          ...mainAudioTracks,
+          ...adminAudioTracks
         ]);
 
         const mimeType = pickRecordingMimeType();
@@ -882,6 +955,11 @@
         recordBtn.classList.remove('btn-success');
         recordBtn.classList.add('btn-danger');
         recordingIndicator.classList.add('active');
+        
+        const audioSource = adminAudioTracks.length > 0 ? 'screen + your microphone' : 
+                          (mainAudioTracks.length > 0 ? 'screen audio' : 'video only');
+        console.log(`Recording started with ${audioSource}`);
+        
         // Notify users
         sendToApprovedUsers({ type: 'recording-started' });
       } else {
@@ -994,6 +1072,19 @@
       sendToApprovedUsers({ type: 'admin-sharing-stopped' });
     }
 
+    // Clean up when page unloads
+    window.addEventListener('beforeunload', () => {
+      if (microphoneStream) {
+        microphoneStream.getTracks().forEach(track => track.stop());
+      }
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+      }
+    });
+
     async function toggleCamera() {
       const cameraBtn = document.getElementById('cameraBtn');
       const cameraPreview = document.getElementById('cameraPreview');
@@ -1001,13 +1092,22 @@
 
       if (!isCameraEnabled) {
         try {
-          cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          // Camera only - no audio by default
+          const constraints = {
+            video: true,
+            audio: false
+          };
+          
+          cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
           cameraVideo.srcObject = cameraStream;
           cameraPreview.classList.add('active');
           isCameraEnabled = true;
           cameraBtn.textContent = 'Disable Camera';
+          
+          console.log('Camera enabled (video only)');
         } catch (err) {
-          alert('Could not access camera');
+          console.error('Error accessing camera:', err);
+          alert('Could not access camera: ' + err.message);
         }
       } else {
         if (cameraStream) {
@@ -1017,6 +1117,38 @@
         cameraPreview.classList.remove('active');
         isCameraEnabled = false;
         cameraBtn.textContent = 'Enable Camera';
+      }
+    }
+
+    async function toggleMicrophone() {
+      const micBtn = document.getElementById('micBtn');
+
+      if (!isMicrophoneEnabled) {
+        try {
+          const constraints = selectedMicrophoneId ? 
+            { audio: { deviceId: { exact: selectedMicrophoneId } } } : 
+            { audio: true };
+          
+          microphoneStream = await navigator.mediaDevices.getUserMedia(constraints);
+          isMicrophoneEnabled = true;
+          micBtn.textContent = 'Disable Microphone';
+          micBtn.classList.remove('btn-success');
+          micBtn.classList.add('btn-danger');
+          
+          console.log('Microphone enabled:', selectedMicrophoneId || 'Default');
+        } catch (err) {
+          console.error('Error accessing microphone:', err);
+          alert('Could not access microphone: ' + err.message);
+        }
+      } else {
+        if (microphoneStream) {
+          microphoneStream.getTracks().forEach(track => track.stop());
+        }
+        microphoneStream = null;
+        isMicrophoneEnabled = false;
+        micBtn.textContent = 'Enable Microphone';
+        micBtn.classList.remove('btn-danger');
+        micBtn.classList.add('btn-success');
       }
     }
 
