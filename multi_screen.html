@@ -203,6 +203,7 @@
             border-radius: 12px;
             padding: 1rem;
             overflow: hidden;
+            position: relative;
         }
 
         .video-grid.grid-1 { grid-template-columns: 1fr; }
@@ -219,10 +220,11 @@
             position: relative;
             background: var(--bg-primary);
             border-radius: 8px;
-            overflow: hidden;
+            overflow: visible;
             border: 2px solid var(--border-color);
             cursor: move;
             transition: border-color 0.2s;
+            min-height: 100px;
         }
 
         .video-container:hover {
@@ -230,9 +232,94 @@
         }
 
         .video-container.dragging {
-            opacity: 0.5;
+            opacity: 0.8;
             border-color: var(--accent);
+            z-index: 1000;
         }
+
+        .video-container.selected {
+            border-color: var(--accent);
+            border-width: 3px;
+        }
+
+        /* Resize handles */
+        .resize-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border: 2px solid white;
+            border-radius: 50%;
+            z-index: 10;
+            display: none;
+        }
+
+        .video-container:hover .resize-handle,
+        .video-container.selected .resize-handle {
+            display: block;
+        }
+
+        .resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+        .resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+        .resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+        .resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+        .resize-handle.n { top: -6px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .resize-handle.s { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .resize-handle.e { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+        .resize-handle.w { left: -6px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+
+        /* Crop mode */
+        .video-container.cropping {
+            outline: 2px dashed var(--accent);
+            outline-offset: 2px;
+        }
+
+        .crop-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            display: none;
+        }
+
+        .video-container.cropping .crop-overlay {
+            display: block;
+        }
+
+        .crop-area {
+            position: absolute;
+            border: 2px solid var(--accent);
+            background: rgba(240, 192, 48, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+
+        .video-container.cropping .crop-area {
+            display: block;
+        }
+
+        .crop-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            z-index: 20;
+            cursor: pointer;
+        }
+
+        .crop-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .crop-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .crop-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .crop-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+        .crop-handle.n { top: -5px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .crop-handle.s { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .crop-handle.e { right: -5px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+        .crop-handle.w { left: -5px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
 
         .video-container video {
             width: 100%;
@@ -240,6 +327,7 @@
             object-fit: contain;
             background: #000;
             transition: transform 0.2s;
+            pointer-events: none;
         }
 
         .video-container.video-scaled-50 video { transform: scale(0.5); }
@@ -247,6 +335,23 @@
         .video-container.video-scaled-100 video { transform: scale(1); }
         .video-container.video-scaled-125 video { transform: scale(1.25); }
         .video-container.video-scaled-150 video { transform: scale(1.5); }
+
+        /* Grid positioning for free movement */
+        .video-grid.free-position {
+            display: block;
+            position: relative;
+            min-height: 600px;
+        }
+
+        .video-grid.free-position .video-container {
+            position: absolute;
+            width: 300px;
+            height: 200px;
+        }
+
+        .video-grid:not(.free-position) .video-container {
+            position: relative;
+        }
 
         .video-label {
             position: absolute;
@@ -469,7 +574,8 @@
                 <div class="control-group">
                     <label>Layout:</label>
                     <select id="layoutSelect" onchange="changeLayout()">
-                        <option value="auto">Auto</option>
+                        <option value="auto">Auto Grid</option>
+                        <option value="free" selected>Free Position (Drag & Resize)</option>
                         <option value="1">1 Screen</option>
                         <option value="2">2 Screens</option>
                         <option value="3">3 Screens</option>
@@ -522,6 +628,9 @@
         let recordingStream = null;
         let gridLayout = 'auto';
         let draggedElement = null;
+        let isCropping = false;
+        let currentCropContainer = null;
+        let cropData = {}; // Store crop data for each screen: { top, left, width, height }
 
         // Initialize
         function joinRoom() {
@@ -702,13 +811,55 @@
             const container = document.createElement('div');
             container.className = 'video-container';
             container.dataset.peerId = peerId;
-            container.draggable = true;
+            
+            // Set initial position for free movement
+            const grid = document.getElementById('videoGrid');
+            const existingContainers = grid.querySelectorAll('.video-container');
+            const index = existingContainers.length;
+            
+            // Check if we're in free position mode
+            const isFreePosition = grid.classList.contains('free-position') || gridLayout === 'free';
+            
+            if (isFreePosition) {
+                // Position in a grid pattern initially
+                const positions = [
+                    { left: 10, top: 10 },
+                    { left: 330, top: 10 },
+                    { left: 10, top: 230 },
+                    { left: 330, top: 230 },
+                    { left: 650, top: 10 },
+                    { left: 650, top: 230 }
+                ];
+                
+                const pos = positions[index % positions.length];
+                container.style.position = 'absolute';
+                container.style.left = pos.left + 'px';
+                container.style.top = pos.top + 'px';
+                container.style.width = '300px';
+                container.style.height = '200px';
+            } else {
+                container.style.position = 'relative';
+            }
             
             // Add drag events
-            container.addEventListener('dragstart', handleDragStart);
-            container.addEventListener('dragend', handleDragEnd);
-            container.addEventListener('dragover', handleDragOver);
-            container.addEventListener('drop', handleDrop);
+            container.addEventListener('mousedown', (e) => {
+                // Don't drag if clicking on resize handle or controls
+                if (e.target.classList.contains('resize-handle') || 
+                    e.target.closest('.video-label') ||
+                    e.target.closest('.scale-indicator')) {
+                    return;
+                }
+                handleDragStart.call(container, e);
+            });
+            
+            // Add resize handles
+            const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+            handles.forEach(position => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle ${position}`;
+                handle.addEventListener('mousedown', handleResizeStart);
+                container.appendChild(handle);
+            });
             
             const video = document.createElement('video');
             video.srcObject = stream;
@@ -740,12 +891,36 @@
                 <div class="controls">
                     <button class="btn btn-mini" onclick="toggleMute('${peerId}')">🔊</button>
                     <button class="btn btn-mini" onclick="cycleScale('${peerId}')" title="Scale">🔍</button>
+                    <button class="btn btn-mini" onclick="toggleCropMode('${peerId}')" title="Crop">✂️</button>
+                    <button class="btn btn-mini" onclick="resetCrop('${peerId}')" title="Reset Crop">↺</button>
                     <button class="btn btn-mini btn-danger" onclick="removeVideoStream('${peerId}')">✕</button>
                 </div>
             `;
             
             container.appendChild(video);
             container.appendChild(scaleIndicator);
+            
+            // Add crop overlay and area
+            const cropOverlay = document.createElement('div');
+            cropOverlay.className = 'crop-overlay';
+            container.appendChild(cropOverlay);
+            
+            const cropArea = document.createElement('div');
+            cropArea.className = 'crop-area';
+            cropArea.id = `crop-area-${peerId}`;
+            
+            // Add crop handles
+            const cropHandles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+            cropHandles.forEach(position => {
+                const handle = document.createElement('div');
+                handle.className = `crop-handle ${position}`;
+                handle.dataset.position = position;
+                handle.dataset.peerId = peerId;
+                handle.addEventListener('mousedown', handleCropResizeStart);
+                cropArea.appendChild(handle);
+            });
+            
+            container.appendChild(cropArea);
             container.appendChild(label);
             grid.appendChild(container);
             
@@ -1000,53 +1175,169 @@
             // Remove all layout classes
             grid.className = 'video-grid';
 
-            let layout;
-            if (gridLayout === 'auto') {
-                // Auto layout based on number of screens
-                if (count <= 1) layout = '1';
-                else if (count <= 2) layout = '2';
-                else if (count <= 4) layout = '4';
-                else if (count <= 6) layout = '6';
-                else layout = '9';
+            if (gridLayout === 'free') {
+                // Free positioning mode
+                grid.classList.add('free-position');
+                containers.forEach((container, index) => {
+                    container.style.position = 'absolute';
+                    container.style.width = '300px';
+                    container.style.height = '200px';
+                    
+                    // If not already positioned, set initial position
+                    if (!container.style.left || container.style.left === 'auto' || container.style.left === '0px') {
+                        const positions = [
+                            { left: 10, top: 10 },
+                            { left: 330, top: 10 },
+                            { left: 10, top: 230 },
+                            { left: 330, top: 230 },
+                            { left: 650, top: 10 },
+                            { left: 650, top: 230 }
+                        ];
+                        const pos = positions[index % positions.length];
+                        container.style.left = pos.left + 'px';
+                        container.style.top = pos.top + 'px';
+                    }
+                });
             } else {
-                layout = gridLayout;
-            }
+                // Grid layout mode
+                containers.forEach(container => {
+                    container.style.position = 'relative';
+                    container.style.left = 'auto';
+                    container.style.top = 'auto';
+                    container.style.width = 'auto';
+                    container.style.height = 'auto';
+                });
 
-            grid.classList.add(`grid-${layout}`);
+                let layout;
+                if (gridLayout === 'auto') {
+                    // Auto layout based on number of screens
+                    if (count <= 1) layout = '1';
+                    else if (count <= 2) layout = '2';
+                    else if (count <= 4) layout = '4';
+                    else if (count <= 6) layout = '6';
+                    else layout = '9';
+                } else {
+                    layout = gridLayout;
+                }
+
+                grid.classList.add(`grid-${layout}`);
+            }
         }
 
         // Drag and drop functionality
+        let isDragging = false;
+        let isResizing = false;
+        let currentResizeHandle = null;
+        let startX, startY, startWidth, startHeight, startLeft, startTop;
+        let dragOffsetX, dragOffsetY;
+
         function handleDragStart(e) {
+            if (e.target.classList.contains('resize-handle')) return;
+            
+            isDragging = true;
             draggedElement = this;
             this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
+            
+            const rect = this.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            
+            e.preventDefault();
         }
 
         function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            draggedElement = null;
+            if (isDragging) {
+                isDragging = false;
+                if (draggedElement) {
+                    draggedElement.classList.remove('dragging');
+                    draggedElement = null;
+                }
+            }
         }
 
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
         }
 
-        function handleDrop(e) {
+        function handleDragMove(e) {
+            if (!isDragging || !draggedElement) return;
+            
+            const grid = document.getElementById('videoGrid');
+            const gridRect = grid.getBoundingClientRect();
+            
+            let newX = e.clientX - gridRect.left - dragOffsetX;
+            let newY = e.clientY - gridRect.top - dragOffsetY;
+            
+            // Constrain to grid bounds
+            newX = Math.max(0, Math.min(newX, gridRect.width - draggedElement.offsetWidth));
+            newY = Math.max(0, Math.min(newY, gridRect.height - draggedElement.offsetHeight));
+            
+            draggedElement.style.left = newX + 'px';
+            draggedElement.style.top = newY + 'px';
+        }
+
+        // Resize functionality
+        function handleResizeStart(e) {
+            e.stopPropagation();
+            isResizing = true;
+            currentResizeHandle = e.target;
+            
+            const container = e.target.closest('.video-container');
+            startX = e.clientX;
+            startY = e.clientY;
+            startWidth = container.offsetWidth;
+            startHeight = container.offsetHeight;
+            startLeft = container.offsetLeft;
+            startTop = container.offsetTop;
+            
             e.preventDefault();
-            if (draggedElement && draggedElement !== this) {
-                const grid = document.getElementById('videoGrid');
-                const containers = Array.from(grid.querySelectorAll('.video-container'));
-                const draggedIndex = containers.indexOf(draggedElement);
-                const targetIndex = containers.indexOf(this);
-
-                if (draggedIndex < targetIndex) {
-                    this.parentNode.insertBefore(draggedElement, this.nextSibling);
-                } else {
-                    this.parentNode.insertBefore(draggedElement, this);
-                }
-            }
         }
+
+        function handleResizeMove(e) {
+            if (!isResizing || !currentResizeHandle) return;
+            
+            const container = currentResizeHandle.closest('.video-container');
+            const handleClass = currentResizeHandle.className;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newLeft = startLeft;
+            let newTop = startTop;
+            
+            if (handleClass.includes('e')) {
+                newWidth = startWidth + deltaX;
+            }
+            if (handleClass.includes('w')) {
+                newWidth = startWidth - deltaX;
+                newLeft = startLeft + deltaX;
+            }
+            if (handleClass.includes('s')) {
+                newHeight = startHeight + deltaY;
+            }
+            if (handleClass.includes('n')) {
+                newHeight = startHeight - deltaY;
+                newTop = startTop + deltaY;
+            }
+            
+            // Minimum size constraints
+            newWidth = Math.max(150, newWidth);
+            newHeight = Math.max(100, newHeight);
+            
+            container.style.width = newWidth + 'px';
+            container.style.height = newHeight + 'px';
+            container.style.left = newLeft + 'px';
+            container.style.top = newTop + 'px';
+        }
+
+        function handleResizeEnd(e) {
+            isResizing = false;
+            currentResizeHandle = null;
+        }
+
+
 
         function toggleMute(peerId) {
             const container = document.querySelector(`[data-peer-id="${peerId}"]`);
@@ -1087,6 +1378,193 @@
             }
         }
 
+        function toggleFreePosition() {
+            const grid = document.getElementById('videoGrid');
+            grid.classList.toggle('free-position');
+            updateLayout();
+        }
+
+        function toggleCropMode(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (container) {
+                container.classList.toggle('cropping');
+                isCropping = container.classList.contains('cropping');
+                currentCropContainer = isCropping ? container : null;
+                
+                if (isCropping) {
+                    // Initialize crop area to full size
+                    const cropArea = container.querySelector('.crop-area');
+                    const rect = container.getBoundingClientRect();
+                    cropArea.style.top = '0px';
+                    cropArea.style.left = '0px';
+                    cropArea.style.width = '100%';
+                    cropArea.style.height = '100%';
+                    
+                    // Reset crop data
+                    cropData[peerId] = { top: 0, left: 0, width: 100, height: 100 };
+                } else {
+                    // Apply the crop
+                    applyCrop(peerId);
+                }
+            }
+        }
+
+        let isCropResizing = false;
+        let currentCropHandle = null;
+        let cropStartX, cropStartY, cropStartWidth, cropStartHeight, cropStartLeft, cropStartTop;
+
+        function handleCropResizeStart(e) {
+            e.stopPropagation();
+            isCropResizing = true;
+            currentCropHandle = e.target;
+            currentCropContainer = e.target.closest('.video-container');
+            
+            const cropArea = currentCropContainer.querySelector('.crop-area');
+            const rect = cropArea.getBoundingClientRect();
+            const containerRect = currentCropContainer.getBoundingClientRect();
+            
+            cropStartX = e.clientX;
+            cropStartY = e.clientY;
+            cropStartWidth = rect.width;
+            cropStartHeight = rect.height;
+            cropStartLeft = (rect.left - containerRect.left);
+            cropStartTop = (rect.top - containerRect.top);
+            
+            e.preventDefault();
+        }
+
+        function handleCropResizeMove(e) {
+            if (!isCropResizing || !currentCropContainer) return;
+            
+            const cropArea = currentCropContainer.querySelector('.crop-area');
+            const handlePosition = currentCropHandle.dataset.position;
+            const peerId = currentCropContainer.dataset.peerId;
+            
+            const deltaX = e.clientX - cropStartX;
+            const deltaY = e.clientY - cropStartY;
+            
+            let newWidth = cropStartWidth;
+            let newHeight = cropStartHeight;
+            let newLeft = cropStartLeft;
+            let newTop = cropStartTop;
+            
+            // Calculate new dimensions based on handle position
+            if (handlePosition.includes('e')) {
+                newWidth = cropStartWidth + deltaX;
+            }
+            if (handlePosition.includes('w')) {
+                newWidth = cropStartWidth - deltaX;
+                newLeft = cropStartLeft + deltaX;
+            }
+            if (handlePosition.includes('s')) {
+                newHeight = cropStartHeight + deltaY;
+            }
+            if (handlePosition.includes('n')) {
+                newHeight = cropStartHeight - deltaY;
+                newTop = cropStartTop + deltaY;
+            }
+            
+            // Constrain to container bounds
+            const containerRect = currentCropContainer.getBoundingClientRect();
+            newWidth = Math.max(50, Math.min(newWidth, containerRect.width - newLeft));
+            newHeight = Math.max(50, Math.min(newHeight, containerRect.height - newTop));
+            newLeft = Math.max(0, Math.min(newLeft, containerRect.width - newWidth));
+            newTop = Math.max(0, Math.min(newTop, containerRect.height - newHeight));
+            
+            cropArea.style.width = newWidth + 'px';
+            cropArea.style.height = newHeight + 'px';
+            cropArea.style.left = newLeft + 'px';
+            cropArea.style.top = newTop + 'px';
+            
+            // Store crop data as percentages
+            cropData[peerId] = {
+                left: (newLeft / containerRect.width) * 100,
+                top: (newTop / containerRect.height) * 100,
+                width: (newWidth / containerRect.width) * 100,
+                height: (newHeight / containerRect.height) * 100
+            };
+        }
+
+        function handleCropResizeEnd(e) {
+            isCropResizing = false;
+            currentCropHandle = null;
+        }
+
+        function applyCrop(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (!container || !cropData[peerId]) return;
+            
+            const video = container.querySelector('video');
+            const crop = cropData[peerId];
+            
+            // Apply crop using CSS object-fit and positioning
+            const containerWidth = container.offsetWidth;
+            const containerHeight = container.offsetHeight;
+            
+            const croppedWidth = (crop.width / 100) * containerWidth;
+            const croppedHeight = (crop.height / 100) * containerHeight;
+            const croppedLeft = (crop.left / 100) * containerWidth;
+            const croppedTop = (crop.top / 100) * containerHeight;
+            
+            // Store original video dimensions
+            if (!video.dataset.originalWidth) {
+                video.dataset.originalWidth = video.videoWidth || video.offsetWidth;
+                video.dataset.originalHeight = video.videoHeight || video.offsetHeight;
+            }
+            
+            const originalWidth = parseFloat(video.dataset.originalWidth);
+            const originalHeight = parseFloat(video.dataset.originalHeight);
+            
+            // Calculate scale to fill the cropped area
+            const scaleX = croppedWidth / originalWidth;
+            const scaleY = croppedHeight / originalHeight;
+            const scale = Math.max(scaleX, scaleY);
+            
+            const scaledWidth = originalWidth * scale;
+            const scaledHeight = originalHeight * scale;
+            
+            // Center the scaled video in the cropped area
+            const offsetX = (croppedWidth - scaledWidth) / 2;
+            const offsetY = (croppedHeight - scaledHeight) / 2;
+            
+            video.style.width = scaledWidth + 'px';
+            video.style.height = scaledHeight + 'px';
+            video.style.position = 'absolute';
+            video.style.left = (croppedLeft + offsetX) + 'px';
+            video.style.top = (croppedTop + offsetY) + 'px';
+            video.style.objectFit = 'fill';
+            
+            // Hide crop overlay
+            const cropOverlay = container.querySelector('.crop-overlay');
+            const cropArea = container.querySelector('.crop-area');
+            if (cropOverlay) cropOverlay.style.display = 'none';
+            if (cropArea) cropArea.style.display = 'none';
+        }
+
+        function resetCrop(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (!container) return;
+            
+            const video = container.querySelector('video');
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.position = 'static';
+            video.style.objectFit = 'contain';
+            video.style.left = 'auto';
+            video.style.top = 'auto';
+            
+            delete cropData[peerId];
+            
+            // Reset crop area
+            const cropArea = container.querySelector('.crop-area');
+            if (cropArea) {
+                cropArea.style.top = '0px';
+                cropArea.style.left = '0px';
+                cropArea.style.width = '100%';
+                cropArea.style.height = '100%';
+            }
+        }
+
         function showStreamSettings() {
             alert('YouTube streaming integration requires RTMP setup.\n\nFor professional streaming:\n1. Set up YouTube Live stream\n2. Get RTMP URL and stream key\n3. Use streaming software like OBS\n4. Add this page as a browser source\n\nAlternatively, use the Record button and upload to YouTube later.');
         }
@@ -1123,6 +1601,25 @@
                 alert('Could not add screen: ' + err.message);
             }
         }
+
+        // Add global event listeners for drag and resize
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                handleDragMove(e);
+            }
+            if (isResizing) {
+                handleResizeMove(e);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging) {
+                handleDragEnd(e);
+            }
+            if (isResizing) {
+                handleResizeEnd(e);
+            }
+        });
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
