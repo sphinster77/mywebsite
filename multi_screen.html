@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Screen Studio - Davide's Workshop</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0d0f1a;
+            --bg-secondary: #12152a;
+            --bg-card: #161828;
+            --text-primary: #e8e8e8;
+            --text-secondary: #9090b0;
+            --accent: #f0c030;
+            --accent-hover: #dca50c;
+            --border-color: rgba(240,192,48,0.15);
+            --success: #2ecc71;
+            --danger: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-left h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .header-left a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .room-info span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-hover), var(--accent));
+            color: var(--bg-primary);
+            border: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            border: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            color: white;
+            border: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            gap: 1rem;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 80px);
+        }
+
+        .login-box {
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border-top: 4px solid var(--accent);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h2 {
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Studio Screen */
+        .studio-screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .studio-screen.active {
+            display: flex;
+        }
+
+        /* Video Grid */
+        .video-grid {
+            flex: 1;
+            display: grid;
+            gap: 1rem;
+            min-height: 400px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1rem;
+            overflow: hidden;
+        }
+
+        .video-grid.grid-1 { grid-template-columns: 1fr; }
+        .video-grid.grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .video-grid.grid-3 { grid-template-columns: repeat(2, 1fr); }
+        .video-grid.grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .video-grid.grid-5 { grid-template-columns: repeat(3, 1fr); }
+        .video-grid.grid-6 { grid-template-columns: repeat(3, 1fr); }
+        .video-grid.grid-7 { grid-template-columns: repeat(3, 1fr); }
+        .video-grid.grid-8 { grid-template-columns: repeat(4, 1fr); }
+        .video-grid.grid-9 { grid-template-columns: repeat(3, 1fr); }
+
+        .video-container {
+            position: relative;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+            cursor: move;
+            transition: border-color 0.2s;
+        }
+
+        .video-container:hover {
+            border-color: var(--accent);
+        }
+
+        .video-container.dragging {
+            opacity: 0.5;
+            border-color: var(--accent);
+        }
+
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .video-label .name {
+            font-weight: 600;
+        }
+
+        .video-label .controls {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .video-label .btn-mini {
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            border-radius: 4px;
+        }
+
+        .empty-slot {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Bottom Controls */
+        .bottom-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .control-group select {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        /* Status indicators */
+        .status-bar {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-dot.active {
+            background: var(--success);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.recording {
+            background: var(--danger);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Recording indicator */
+        .recording-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--danger);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            z-index: 1000;
+            animation: pulse 1.5s infinite;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+        }
+
+        .recording-indicator::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .controls {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .video-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .bottom-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html">← Back</a>
+            <h1>Multi-Screen Studio</h1>
+        </div>
+        <div class="room-info" id="roomInfo" style="display: none;">
+            Room: <span id="roomCode"></span> | Users: <span id="userCount">0</span>
+        </div>
+        <div class="controls" id="headerControls" style="display: none;">
+            <button class="btn btn-primary" id="shareScreenBtn" onclick="toggleScreenShare()">Share Screen</button>
+            <button class="btn btn-success" id="recordBtn" onclick="toggleRecording()">Record</button>
+            <button class="btn" onclick="showStreamSettings()">Stream Settings</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-box">
+                <h2>Join Studio</h2>
+                <div class="form-group">
+                    <label>Room Name</label>
+                    <input type="text" id="roomName" placeholder="Enter room name or create new">
+                </div>
+                <div class="form-group">
+                    <label>Your Name</label>
+                    <input type="text" id="userName" placeholder="Enter your name">
+                </div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="joinRoom()">Join Studio</button>
+            </div>
+        </div>
+
+        <!-- Studio Screen -->
+        <div class="studio-screen" id="studioScreen">
+            <div class="video-grid" id="videoGrid">
+                <!-- Video containers will be added dynamically -->
+            </div>
+
+            <div class="bottom-controls">
+                <div class="control-group">
+                    <label>Layout:</label>
+                    <select id="layoutSelect" onchange="changeLayout()">
+                        <option value="auto">Auto</option>
+                        <option value="1">1 Screen</option>
+                        <option value="2">2 Screens</option>
+                        <option value="3">3 Screens</option>
+                        <option value="4">4 Screens</option>
+                        <option value="6">6 Screens</option>
+                        <option value="9">9 Screens</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Quality:</label>
+                    <select id="qualitySelect">
+                        <option value="high">High (1080p)</option>
+                        <option value="medium">Medium (720p)</option>
+                        <option value="low">Low (480p)</option>
+                    </select>
+                </div>
+                <div class="status-bar">
+                    <div class="status-item">
+                        <div class="status-dot" id="connectionStatus"></div>
+                        <span id="connectionText">Disconnected</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot" id="sharingStatus"></div>
+                        <span id="sharingText">Not Sharing</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="recording-indicator" id="recordingIndicator">
+        Recording
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        // Global variables
+        let peer = null;
+        let roomName = '';
+        let userName = '';
+        let localStream = null;
+        let connections = {};
+        let calls = {};
+        let screenStreams = {};
+        let isSharing = false;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let recordingStream = null;
+        let gridLayout = 'auto';
+        let draggedElement = null;
+
+        // Initialize
+        function joinRoom() {
+            roomName = document.getElementById('roomName').value.trim();
+            userName = document.getElementById('userName').value.trim();
+
+            if (!roomName || !userName) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            // Create peer with room-based ID
+            peer = new Peer(`multiscreen-${roomName}-${userName}-${Date.now()}`);
+
+            peer.on('open', (id) => {
+                console.log('Connected with ID:', id);
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('studioScreen').classList.add('active');
+                document.getElementById('roomInfo').style.display = 'flex';
+                document.getElementById('headerControls').style.display = 'flex';
+                document.getElementById('roomCode').textContent = roomName;
+                
+                updateConnectionStatus(true);
+                
+                // Broadcast presence to room
+                broadcastPresence();
+            });
+
+            peer.on('connection', (conn) => {
+                handleConnection(conn);
+            });
+
+            peer.on('call', (call) => {
+                handleCall(call);
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                alert('Connection error: ' + err.message);
+            });
+        }
+
+        function broadcastPresence() {
+            // In a real implementation, this would use a signaling server
+            // For now, we'll use localStorage for same-browser communication
+            const presence = {
+                type: 'presence',
+                peerId: peer.id,
+                userName: userName,
+                roomName: roomName,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(`multiscreen-presence-${peer.id}`, JSON.stringify(presence));
+            
+            // Check for other users in the room
+            checkForOtherUsers();
+        }
+
+        function checkForOtherUsers() {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('multiscreen-presence-') && key !== `multiscreen-presence-${peer.id}`) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        if (data.roomName === roomName && (Date.now() - data.timestamp) < 30000) {
+                            // Connect to this user
+                            const conn = peer.connect(data.peerId);
+                            handleConnection(conn);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing presence data:', e);
+                    }
+                }
+            }
+        }
+
+        function handleConnection(conn) {
+            connections[conn.peer] = conn;
+            
+            conn.on('open', () => {
+                console.log('Connected to:', conn.peer);
+                updateUserCount();
+                
+                conn.on('data', (data) => {
+                    handleData(conn, data);
+                });
+            });
+
+            conn.on('close', () => {
+                delete connections[conn.peer];
+                removeVideoStream(conn.peer);
+                updateUserCount();
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+            });
+        }
+
+        function handleData(conn, data) {
+            switch (data.type) {
+                case 'presence':
+                    // Respond with our presence
+                    conn.send({
+                        type: 'presence-response',
+                        peerId: peer.id,
+                        userName: userName
+                    });
+                    break;
+                case 'presence-response':
+                    // Request their screen if they're sharing
+                    if (isSharing && localStream) {
+                        const call = peer.call(conn.peer, localStream);
+                        handleCall(call);
+                    }
+                    break;
+                case 'screen-sharing-started':
+                    // Request their screen
+                    if (peer) {
+                        const call = peer.call(conn.peer, null);
+                        handleCall(call);
+                    }
+                    break;
+                case 'screen-sharing-stopped':
+                    removeVideoStream(conn.peer);
+                    break;
+            }
+        }
+
+        function handleCall(call) {
+            calls[call.peer] = call;
+            
+            call.on('stream', (stream) => {
+                console.log('Received stream from:', call.peer);
+                addVideoStream(call.peer, stream);
+            });
+
+            call.on('close', () => {
+                delete calls[call.peer];
+                removeVideoStream(call.peer);
+            });
+
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+            });
+
+            // Answer the call
+            call.answer();
+        }
+
+        function addVideoStream(peerId, stream) {
+            const grid = document.getElementById('videoGrid');
+            
+            // Remove existing stream from this peer
+            removeVideoStream(peerId);
+            
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.dataset.peerId = peerId;
+            container.draggable = true;
+            
+            // Add drag events
+            container.addEventListener('dragstart', handleDragStart);
+            container.addEventListener('dragend', handleDragEnd);
+            container.addEventListener('dragover', handleDragOver);
+            container.addEventListener('drop', handleDrop);
+            
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = false;
+            
+            const label = document.createElement('div');
+            label.className = 'video-label';
+            
+            // Try to get user name from connections
+            const conn = connections[peerId];
+            const name = conn ? userName : `User ${peerId.slice(-8)}`;
+            
+            label.innerHTML = `
+                <span class="name">${name}</span>
+                <div class="controls">
+                    <button class="btn btn-mini" onclick="toggleMute('${peerId}')">🔊</button>
+                    <button class="btn btn-mini btn-danger" onclick="removeVideoStream('${peerId}')">✕</button>
+                </div>
+            `;
+            
+            container.appendChild(video);
+            container.appendChild(label);
+            grid.appendChild(container);
+            
+            updateLayout();
+            updateUserCount();
+        }
+
+        function removeVideoStream(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (container) {
+                container.remove();
+                updateLayout();
+            }
+        }
+
+        function updateUserCount() {
+            const count = Object.keys(connections).length + (isSharing ? 1 : 0);
+            document.getElementById('userCount').textContent = count;
+        }
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionText');
+            
+            if (connected) {
+                dot.classList.add('active');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.remove('active');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        async function toggleScreenShare() {
+            const btn = document.getElementById('shareScreenBtn');
+            const sharingDot = document.getElementById('sharingStatus');
+            const sharingText = document.getElementById('sharingText');
+
+            if (!isSharing) {
+                try {
+                    const quality = document.getElementById('qualitySelect').value;
+                    const constraints = getQualityConstraints(quality);
+                    
+                    localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                    
+                    isSharing = true;
+                    btn.textContent = 'Stop Sharing';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-danger');
+                    sharingDot.classList.add('active');
+                    sharingText.textContent = 'Sharing';
+                    
+                    // Add our own stream to the grid
+                    addVideoStream(peer.id, localStream);
+                    
+                    // Share with all connected users
+                    Object.keys(connections).forEach(peerId => {
+                        const call = peer.call(peerId, localStream);
+                        handleCall(call);
+                    });
+                    
+                    // Notify others
+                    Object.values(connections).forEach(conn => {
+                        conn.send({ type: 'screen-sharing-started' });
+                    });
+                    
+                    // Handle user stopping share via browser UI
+                    localStream.getVideoTracks()[0].onended = () => {
+                        stopScreenShare();
+                    };
+                    
+                } catch (err) {
+                    console.error('Error sharing screen:', err);
+                    alert('Could not share screen: ' + err.message);
+                }
+            } else {
+                stopScreenShare();
+            }
+        }
+
+        function stopScreenShare() {
+            const btn = document.getElementById('shareScreenBtn');
+            const sharingDot = document.getElementById('sharingStatus');
+            const sharingText = document.getElementById('sharingText');
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+
+            localStream = null;
+            isSharing = false;
+            btn.textContent = 'Share Screen';
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-primary');
+            sharingDot.classList.remove('active');
+            sharingText.textContent = 'Not Sharing';
+            
+            // Remove our stream from grid
+            removeVideoStream(peer.id);
+            
+            // Close all calls
+            Object.values(calls).forEach(call => {
+                call.close();
+            });
+            calls = {};
+            
+            // Notify others
+            Object.values(connections).forEach(conn => {
+                conn.send({ type: 'screen-sharing-stopped' });
+            });
+        }
+
+        function getQualityConstraints(quality) {
+            const constraints = {
+                video: {
+                    cursor: 'always'
+                },
+                audio: true
+            };
+
+            switch (quality) {
+                case 'high':
+                    constraints.video.width = { ideal: 1920 };
+                    constraints.video.height = { ideal: 1080 };
+                    constraints.video.frameRate = { ideal: 60 };
+                    break;
+                case 'medium':
+                    constraints.video.width = { ideal: 1280 };
+                    constraints.video.height = { ideal: 720 };
+                    constraints.video.frameRate = { ideal: 30 };
+                    break;
+                case 'low':
+                    constraints.video.width = { ideal: 854 };
+                    constraints.video.height = { ideal: 480 };
+                    constraints.video.frameRate = { ideal: 24 };
+                    break;
+            }
+
+            return constraints;
+        }
+
+        function toggleRecording() {
+            const btn = document.getElementById('recordBtn');
+            const indicator = document.getElementById('recordingIndicator');
+
+            if (!isRecording) {
+                const grid = document.getElementById('videoGrid');
+                const videos = grid.querySelectorAll('video');
+                
+                if (videos.length === 0) {
+                    alert('No screens to record');
+                    return;
+                }
+
+                // Create combined stream from all videos
+                const streams = Array.from(videos).map(v => v.srcObject).filter(s => s);
+                if (streams.length === 0) {
+                    alert('No active streams to record');
+                    return;
+                }
+
+                recordingStream = new MediaStream();
+                streams.forEach(stream => {
+                    stream.getTracks().forEach(track => {
+                        recordingStream.addTrack(track);
+                    });
+                });
+
+                const mimeType = getSupportedMimeType();
+                if (!mimeType) {
+                    alert('Recording is not supported in this browser');
+                    return;
+                }
+
+                try {
+                    mediaRecorder = new MediaRecorder(recordingStream, { mimeType });
+                } catch (err) {
+                    console.error('Could not start recorder:', err);
+                    alert('Could not start recording: ' + err.message);
+                    return;
+                }
+
+                recordedChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `multiscreen-recording-${Date.now()}.${extension}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                    recordingStream = null;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.textContent = 'Stop Recording';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-danger');
+                indicator.classList.add('active');
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.textContent = 'Record';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-success');
+                indicator.classList.remove('active');
+            }
+        }
+
+        function getSupportedMimeType() {
+            const types = [
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm',
+                'video/mp4'
+            ];
+            return types.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function changeLayout() {
+            gridLayout = document.getElementById('layoutSelect').value;
+            updateLayout();
+        }
+
+        function updateLayout() {
+            const grid = document.getElementById('videoGrid');
+            const containers = grid.querySelectorAll('.video-container');
+            const count = containers.length;
+
+            // Remove all layout classes
+            grid.className = 'video-grid';
+
+            let layout;
+            if (gridLayout === 'auto') {
+                // Auto layout based on number of screens
+                if (count <= 1) layout = '1';
+                else if (count <= 2) layout = '2';
+                else if (count <= 4) layout = '4';
+                else if (count <= 6) layout = '6';
+                else layout = '9';
+            } else {
+                layout = gridLayout;
+            }
+
+            grid.classList.add(`grid-${layout}`);
+        }
+
+        // Drag and drop functionality
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedElement = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (draggedElement && draggedElement !== this) {
+                const grid = document.getElementById('videoGrid');
+                const containers = Array.from(grid.querySelectorAll('.video-container'));
+                const draggedIndex = containers.indexOf(draggedElement);
+                const targetIndex = containers.indexOf(this);
+
+                if (draggedIndex < targetIndex) {
+                    this.parentNode.insertBefore(draggedElement, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(draggedElement, this);
+                }
+            }
+        }
+
+        function toggleMute(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (container) {
+                const video = container.querySelector('video');
+                video.muted = !video.muted;
+            }
+        }
+
+        function showStreamSettings() {
+            alert('YouTube streaming integration requires RTMP setup.\n\nFor professional streaming:\n1. Set up YouTube Live stream\n2. Get RTMP URL and stream key\n3. Use streaming software like OBS\n4. Add this page as a browser source\n\nAlternatively, use the Record button and upload to YouTube later.');
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (peer) {
+                peer.destroy();
+            }
+            // Clean up presence
+            localStorage.removeItem(`multiscreen-presence-${peer.id}`);
+        });
+
+        // Periodic presence update
+        setInterval(() => {
+            if (peer && roomName) {
+                broadcastPresence();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
