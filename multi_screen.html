@@ -239,7 +239,14 @@
             height: 100%;
             object-fit: contain;
             background: #000;
+            transition: transform 0.2s;
         }
+
+        .video-container.video-scaled-50 video { transform: scale(0.5); }
+        .video-container.video-scaled-75 video { transform: scale(0.75); }
+        .video-container.video-scaled-100 video { transform: scale(1); }
+        .video-container.video-scaled-125 video { transform: scale(1.25); }
+        .video-container.video-scaled-150 video { transform: scale(1.5); }
 
         .video-label {
             position: absolute;
@@ -268,6 +275,26 @@
             padding: 0.2rem 0.5rem;
             font-size: 0.7rem;
             border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+        }
+
+        .video-label .btn-mini:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .scale-indicator {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            pointer-events: none;
         }
 
         .empty-slot {
@@ -409,6 +436,7 @@
         </div>
         <div class="controls" id="headerControls" style="display: none;">
             <button class="btn btn-primary" id="shareScreenBtn" onclick="toggleScreenShare()">Share Screen</button>
+            <button class="btn" id="addScreenBtn" onclick="addAdditionalScreen()">+ Add Screen</button>
             <button class="btn btn-success" id="recordBtn" onclick="toggleRecording()">Record</button>
             <button class="btn" onclick="showStreamSettings()">Stream Settings</button>
         </div>
@@ -483,6 +511,7 @@
         let roomName = '';
         let userName = '';
         let localStream = null;
+        let additionalStreams = [];
         let connections = {};
         let calls = {};
         let screenStreams = {};
@@ -543,10 +572,14 @@
                 peerId: peer.id,
                 userName: userName,
                 roomName: roomName,
+                isSharing: isSharing,
                 timestamp: Date.now()
             };
             
             localStorage.setItem(`multiscreen-presence-${peer.id}`, JSON.stringify(presence));
+            
+            // Also set a room-specific key for easier discovery
+            localStorage.setItem(`multiscreen-room-${roomName}-${peer.id}`, JSON.stringify(presence));
             
             // Check for other users in the room
             checkForOtherUsers();
@@ -555,13 +588,20 @@
         function checkForOtherUsers() {
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key.startsWith('multiscreen-presence-') && key !== `multiscreen-presence-${peer.id}`) {
+                // Check both presence formats
+                if ((key.startsWith('multiscreen-presence-') || key.startsWith('multiscreen-room-')) && 
+                    key !== `multiscreen-presence-${peer.id}` && 
+                    key !== `multiscreen-room-${roomName}-${peer.id}`) {
                     try {
                         const data = JSON.parse(localStorage.getItem(key));
+                        // Only connect if same room and recent (within 30 seconds)
                         if (data.roomName === roomName && (Date.now() - data.timestamp) < 30000) {
-                            // Connect to this user
-                            const conn = peer.connect(data.peerId);
-                            handleConnection(conn);
+                            // Only connect if not already connected
+                            if (!connections[data.peerId]) {
+                                console.log('Found user in room:', data.userName);
+                                const conn = peer.connect(data.peerId);
+                                handleConnection(conn);
+                            }
                         }
                     } catch (e) {
                         console.error('Error parsing presence data:', e);
@@ -596,17 +636,26 @@
         function handleData(conn, data) {
             switch (data.type) {
                 case 'presence':
-                    // Respond with our presence
+                    // Store user info and respond
+                    connections[conn.peer].userName = data.userName;
                     conn.send({
                         type: 'presence-response',
                         peerId: peer.id,
-                        userName: userName
+                        userName: userName,
+                        isSharing: isSharing
                     });
-                    break;
-                case 'presence-response':
-                    // Request their screen if they're sharing
+                    // If we're sharing, send our stream to them
                     if (isSharing && localStream) {
                         const call = peer.call(conn.peer, localStream);
+                        handleCall(call);
+                    }
+                    break;
+                case 'presence-response':
+                    // Store user info
+                    connections[conn.peer].userName = data.userName;
+                    // If they're sharing, request their stream
+                    if (data.isSharing) {
+                        const call = peer.call(conn.peer, null);
                         handleCall(call);
                     }
                     break;
@@ -667,22 +716,36 @@
             video.playsInline = true;
             video.muted = false;
             
+            const scaleIndicator = document.createElement('div');
+            scaleIndicator.className = 'scale-indicator';
+            scaleIndicator.textContent = '100%';
+            scaleIndicator.dataset.scale = '100';
+            
             const label = document.createElement('div');
             label.className = 'video-label';
             
             // Try to get user name from connections
             const conn = connections[peerId];
-            const name = conn ? userName : `User ${peerId.slice(-8)}`;
+            let name;
+            if (peerId === peer.id) {
+                name = userName + ' (You)';
+            } else if (conn && conn.userName) {
+                name = conn.userName;
+            } else {
+                name = `User ${peerId.slice(-8)}`;
+            }
             
             label.innerHTML = `
                 <span class="name">${name}</span>
                 <div class="controls">
                     <button class="btn btn-mini" onclick="toggleMute('${peerId}')">🔊</button>
+                    <button class="btn btn-mini" onclick="cycleScale('${peerId}')" title="Scale">🔍</button>
                     <button class="btn btn-mini btn-danger" onclick="removeVideoStream('${peerId}')">✕</button>
                 </div>
             `;
             
             container.appendChild(video);
+            container.appendChild(scaleIndicator);
             container.appendChild(label);
             grid.appendChild(container);
             
@@ -744,10 +807,11 @@
                         handleCall(call);
                     });
                     
-                    // Notify others
+                    // Notify others and update presence
                     Object.values(connections).forEach(conn => {
                         conn.send({ type: 'screen-sharing-started' });
                     });
+                    broadcastPresence(); // Update presence to show we're sharing
                     
                     // Handle user stopping share via browser UI
                     localStream.getVideoTracks()[0].onended = () => {
@@ -772,6 +836,12 @@
                 localStream.getTracks().forEach(track => track.stop());
             }
 
+            // Stop all additional streams
+            additionalStreams.forEach(stream => {
+                stream.getTracks().forEach(track => track.stop());
+            });
+            additionalStreams = [];
+
             localStream = null;
             isSharing = false;
             btn.textContent = 'Share Screen';
@@ -780,7 +850,10 @@
             sharingDot.classList.remove('active');
             sharingText.textContent = 'Not Sharing';
             
-            // Remove our stream from grid
+            // Remove all local streams from grid
+            document.querySelectorAll('.video-container[data-peer-id^="local-"]').forEach(container => {
+                container.remove();
+            });
             removeVideoStream(peer.id);
             
             // Close all calls
@@ -789,10 +862,11 @@
             });
             calls = {};
             
-            // Notify others
+            // Notify others and update presence
             Object.values(connections).forEach(conn => {
                 conn.send({ type: 'screen-sharing-stopped' });
             });
+            broadcastPresence(); // Update presence to show we stopped sharing
         }
 
         function getQualityConstraints(quality) {
@@ -982,8 +1056,72 @@
             }
         }
 
+        function cycleScale(peerId) {
+            const container = document.querySelector(`[data-peer-id="${peerId}"]`);
+            if (container) {
+                const scales = ['', 'video-scaled-50', 'video-scaled-75', 'video-scaled-100', 'video-scaled-125', 'video-scaled-150'];
+                const scaleLabels = ['100%', '50%', '75%', '100%', '125%', '150%'];
+                const currentScale = scales.find(scale => container.classList.contains(scale)) || '';
+                const currentIndex = scales.indexOf(currentScale);
+                const nextIndex = (currentIndex + 1) % scales.length;
+                
+                // Remove current scale class
+                if (currentScale) {
+                    container.classList.remove(currentScale);
+                }
+                
+                // Add new scale class
+                const newScale = scales[nextIndex];
+                if (newScale) {
+                    container.classList.add(newScale);
+                }
+                
+                // Update scale indicator
+                const indicator = container.querySelector('.scale-indicator');
+                if (indicator) {
+                    indicator.textContent = scaleLabels[nextIndex];
+                    indicator.dataset.scale = scaleLabels[nextIndex].replace('%', '');
+                }
+                
+                console.log(`Scaled video to: ${scaleLabels[nextIndex]}`);
+            }
+        }
+
         function showStreamSettings() {
             alert('YouTube streaming integration requires RTMP setup.\n\nFor professional streaming:\n1. Set up YouTube Live stream\n2. Get RTMP URL and stream key\n3. Use streaming software like OBS\n4. Add this page as a browser source\n\nAlternatively, use the Record button and upload to YouTube later.');
+        }
+
+        async function addAdditionalScreen() {
+            try {
+                const quality = document.getElementById('qualitySelect').value;
+                const constraints = getQualityConstraints(quality);
+                
+                const additionalStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                additionalStreams.push(additionalStream);
+                
+                // Add to grid with a unique ID
+                const streamId = `local-${Date.now()}`;
+                addVideoStream(streamId, additionalStream);
+                
+                // Share with all connected users
+                Object.keys(connections).forEach(peerId => {
+                    const call = peer.call(peerId, additionalStream);
+                    handleCall(call);
+                });
+                
+                // Handle user stopping share via browser UI
+                additionalStream.getVideoTracks()[0].onended = () => {
+                    removeVideoStream(streamId);
+                    const index = additionalStreams.indexOf(additionalStream);
+                    if (index > -1) {
+                        additionalStreams.splice(index, 1);
+                    }
+                };
+                
+            } catch (err) {
+                console.error('Error adding additional screen:', err);
+                alert('Could not add screen: ' + err.message);
+            }
         }
 
         // Cleanup on page unload
@@ -991,19 +1129,40 @@
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
+            additionalStreams.forEach(stream => {
+                stream.getTracks().forEach(track => track.stop());
+            });
             if (peer) {
                 peer.destroy();
             }
             // Clean up presence
             localStorage.removeItem(`multiscreen-presence-${peer.id}`);
+            localStorage.removeItem(`multiscreen-room-${roomName}-${peer.id}`);
         });
 
-        // Periodic presence update
+        // Periodic presence update and cleanup
         setInterval(() => {
             if (peer && roomName) {
                 broadcastPresence();
             }
-        }, 10000);
+            
+            // Clean up old presence data (older than 60 seconds)
+            const now = Date.now();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('multiscreen-')) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        if (data.timestamp && (now - data.timestamp) > 60000) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        // Remove invalid data
+                        localStorage.removeItem(key);
+                    }
+                }
+            }
+        }, 5000); // Check every 5 seconds for better responsiveness
     </script>
 </body>
 </html>
